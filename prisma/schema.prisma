@@ -1,0 +1,324 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth (NextAuth) ────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("auth_accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("auth_sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("auth_verification_tokens")
+}
+
+// ─── Users ──────────────────────────────────────────────────
+
+enum UserRole {
+  CLIPPER
+  ADMIN
+  OWNER
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+  SUSPENDED
+}
+
+model User {
+  id            String     @id @default(cuid())
+  name          String?
+  discordId     String?    @unique
+  username      String     @default("user")
+  email         String?    @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole   @default(CLIPPER)
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // Relations
+  authAccounts     Account[]
+  sessions         Session[]
+  clipAccounts     ClipAccount[]
+  clips            Clip[]
+  payoutRequests   PayoutRequest[]
+  notes            Note[]
+  campaignsCreated Campaign[]          @relation("CampaignsCreated")
+  pendingEdits     PendingCampaignEdit[]
+  campaignAdmins   CampaignAdmin[]
+
+  @@map("users")
+}
+
+// ─── Campaigns ──────────────────────────────────────────────
+
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  DRAFT
+}
+
+model Campaign {
+  id              String         @id @default(cuid())
+  name            String
+  clientName      String?
+  platform        String
+  status          CampaignStatus @default(DRAFT)
+  budget          Float?
+  cpmRate         Float?
+  payoutRule      String?
+  minViews        Int?
+  maxPayoutPerClip Float?
+  description     String?        @db.Text
+  requirements    String?        @db.Text
+  examples        String?        @db.Text
+  soundLink       String?
+  assetLink       String?
+  imageUrl        String?
+  bannedContent   String?        @db.Text
+  captionRules    String?        @db.Text
+  hashtagRules    String?        @db.Text
+  videoLengthMin  Int?
+  videoLengthMax  Int?
+  reviewTiming    String?
+  startDate       DateTime?
+  endDate         DateTime?
+  createdById     String?
+  isArchived      Boolean        @default(false)
+  archivedAt      DateTime?
+  archivedById    String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  createdBy        User?   @relation("CampaignsCreated", fields: [createdById], references: [id])
+  clips            Clip[]
+  notes            Note[]
+  campaignAccounts CampaignAccount[]
+  pendingEdits     PendingCampaignEdit[]
+  campaignAdmins   CampaignAdmin[]
+  payoutRequests   PayoutRequest[]
+
+  @@map("campaigns")
+}
+
+// ─── Clip Accounts (social media accounts) ──────────────────
+
+enum ClipAccountStatus {
+  PENDING
+  VERIFIED
+  APPROVED
+  REJECTED
+}
+
+model ClipAccount {
+  id                String           @id @default(cuid())
+  userId            String
+  platform          String
+  username          String
+  profileLink       String
+  followerCount     Int?
+  contentNiche      String?
+  country           String?
+  status            ClipAccountStatus @default(PENDING)
+  rejectionReason   String?
+  verificationCode  String?
+  verifiedAt        DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clips            Clip[]
+  campaignAccounts CampaignAccount[]
+
+  @@map("clip_accounts")
+}
+
+// ─── Campaign Accounts (join: account ↔ campaign) ──────────
+
+model CampaignAccount {
+  id            String      @id @default(cuid())
+  clipAccountId String
+  campaignId    String
+  joinedAt      DateTime    @default(now())
+
+  clipAccount ClipAccount @relation(fields: [clipAccountId], references: [id], onDelete: Cascade)
+  campaign    Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([clipAccountId, campaignId])
+  @@map("campaign_accounts")
+}
+
+// ─── Clips ──────────────────────────────────────────────────
+
+enum ClipStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ARCHIVED
+  FLAGGED
+}
+
+model Clip {
+  id              String     @id @default(cuid())
+  userId          String
+  campaignId      String
+  clipAccountId   String
+  clipUrl         String
+  note            String?    @db.Text
+  status          ClipStatus @default(PENDING)
+  rejectionReason String?
+  earnings        Float      @default(0)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign    Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  clipAccount ClipAccount @relation(fields: [clipAccountId], references: [id], onDelete: Cascade)
+  stats       ClipStat[]
+
+  @@unique([clipUrl, campaignId])
+  @@map("clips")
+}
+
+// ─── Clip Stats (snapshots) ─────────────────────────────────
+
+model ClipStat {
+  id        String   @id @default(cuid())
+  clipId    String
+  views     Int      @default(0)
+  likes     Int      @default(0)
+  comments  Int      @default(0)
+  shares    Int      @default(0)
+  checkedAt DateTime @default(now())
+
+  clip Clip @relation(fields: [clipId], references: [id], onDelete: Cascade)
+
+  @@map("clip_stats")
+}
+
+// ─── Payout Requests ────────────────────────────────────────
+
+enum PayoutStatus {
+  REQUESTED
+  UNDER_REVIEW
+  APPROVED
+  PAID
+  REJECTED
+}
+
+model PayoutRequest {
+  id              String       @id @default(cuid())
+  userId          String
+  campaignId      String?
+  amount          Float
+  walletAddress   String
+  discordUsername String?
+  proofNote       String?      @db.Text
+  proofFileUrl    String?
+  status          PayoutStatus @default(REQUESTED)
+  rejectionReason String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
+
+  @@map("payout_requests")
+}
+
+// ─── Campaign Admins (team access: which admins can manage which campaigns) ──
+
+model CampaignAdmin {
+  id         String   @id @default(cuid())
+  userId     String
+  campaignId String
+  assignedAt DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, campaignId])
+  @@map("campaign_admins")
+}
+
+// ─── Pending Campaign Edits (admin edit requests) ────────────
+
+enum PendingEditStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model PendingCampaignEdit {
+  id         String            @id @default(cuid())
+  campaignId String
+  requestedById String
+  changes    String            @db.Text // JSON of proposed changes
+  status     PendingEditStatus @default(PENDING)
+  reviewNote String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  requestedBy User     @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@map("pending_campaign_edits")
+}
+
+// ─── Notes (internal CRM) ───────────────────────────────────
+
+model Note {
+  id         String   @id @default(cuid())
+  content    String   @db.Text
+  authorId   String
+  userId     String?
+  campaignId String?
+  clipId     String?
+  createdAt  DateTime @default(now())
+
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
+
+  @@map("notes")
+}

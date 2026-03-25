@@ -2,7 +2,42 @@
   "permissions": {
     "allow": [
       "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
-      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack --yes)"
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack --yes)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx next:*)",
+      "Bash(curl -s http://localhost:3099/api/dev-auth -X POST -H \"Content-Type: application/json\" -d '{\"\"role\"\":\"\"ADMIN\"\"}')",
+      "Bash(curl -s -b \"dev-auth-role=ADMIN\" http://localhost:3000/api/campaigns -X POST -H \"Content-Type: application/json\" -d '{\"\"name\"\":\"\"Test Campaign\"\",\"\"platform\"\":\"\"TikTok\"\",\"\"status\"\":\"\"ACTIVE\"\"}')",
+      "Bash(curl -s -b \"dev-auth-role=CLIPPER\" http://localhost:3000/api/accounts -X POST -H \"Content-Type: application/json\" -d '{\"\"platform\"\":\"\"TikTok\"\",\"\"username\"\":\"\"testclipper\"\",\"\"profileLink\"\":\"\"https://tiktok.com/@testclipper\"\"}')",
+      "Bash(curl -s -b \"dev-auth-role=ADMIN\" http://localhost:3000/api/campaigns)",
+      "Bash(curl -s -b \"dev-auth-role=CLIPPER\" http://localhost:3000/api/accounts/mine)",
+      "Bash(curl -s -b \"dev-auth-role=ADMIN\" http://localhost:3000/api/accounts/dev_ancwtu1e1/review -X POST -H \"Content-Type: application/json\" -d '{\"\"action\"\":\"\"VERIFIED\"\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d[0][''''status''''], d[0][''''verifiedAt'''']\\)\")",
+      "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{const a=JSON.parse\\(d\\)[0];console.log\\(''''status:'''',a.status,''''verifiedAt:'''',a.verifiedAt\\)}\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const d=JSON.parse\\(require\\(''fs''\\).readFileSync\\(''.dev-data/store.json'',''utf8''\\)\\); console.log\\(''clips:'', d.clips.length\\); d.clips.forEach\\(\\(c,i\\)=>console.log\\(i, c.id, c.status, c.earnings, c.campaign?.name, JSON.stringify\\(c.stats?.[0]\\)\\)\\)\")",
+      "Bash(node -e \"const d=JSON.parse\\(require\\(''fs''\\).readFileSync\\(''.dev-data/store.json'',''utf8''\\)\\); d.campaigns.forEach\\(c=>console.log\\(c.id, c.name, ''cpm:'', c.cpmRate, ''budget:'', c.budget\\)\\)\")",
+      "Bash(node -e \":*)",
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\(f''''Total payouts: {len\\(d\\)}''''\\);[print\\(f''''  {p[id]}: $p[\"\"amount\"\"] - {p[status]}''''\\) for p in d[:3]]\")",
+      "Bash(curl -s -b dev-auth-role=CLIPPER http://localhost:3000/api/payouts/mine?_t=999)",
+      "Bash(curl -s -b dev-auth-role=OWNER 'http://localhost:3000/api/payouts?_t=$\\(date +%s%N\\)')",
+      "Bash(curl -s -b dev-auth-role=CLIPPER 'http://localhost:3000/api/payouts/mine?_t=$\\(date +%s%N\\)')",
+      "Bash(node -e \"process.stdin.on\\(''''data'''',d=>{const a=JSON.parse\\(d\\);const p=a.find\\(x=>x.id===''''dev_pjsmjutmh''''\\);console.log\\(''''Payout status:'''',p?.status\\)}\\)\")",
+      "Bash(node -e \"console.log\\(require\\(''crypto''\\).randomBytes\\(32\\).toString\\(''hex''\\)\\)\")",
+      "Bash(curl -s http://localhost:3000/api/campaigns)",
+      "Bash(curl -s -b \"dev-auth-role=OWNER\" http://localhost:3000/api/campaigns)",
+      "Bash(curl -s -X POST -b \"dev-auth-role=OWNER\" -H \"Content-Type: application/json\" -d '{\"\"name\"\":\"\"Test Campaign\"\",\"\"platform\"\":\"\"TikTok\"\",\"\"budget\"\":\"\"1000\"\",\"\"cpmRate\"\":\"\"2\"\",\"\"minViews\"\":\"\"1000\"\",\"\"maxPayoutPerClip\"\":\"\"50\"\",\"\"status\"\":\"\"ACTIVE\"\"}' http://localhost:3000/api/campaigns)",
+      "Bash(node test-flows.mjs)",
+      "Bash(node test-stress.mjs)",
+      "Bash(find \"/c/Users/Game Centar/OneDrive/Desktop/clippers-hq/src/app/\\(app\\)\" -name \"page.tsx\" -type f)",
+      "Bash(cat \"/c/Users/Game Centar/OneDrive/Desktop/clippers-hq/src/app/\\(app\\)/admin/page.tsx\")",
+      "Bash(cat \"/c/Users/Game Centar/OneDrive/Desktop/clippers-hq/src/app/\\(app\\)/clips/page.tsx\")",
+      "Bash(cat \"/c/Users/Game Centar/OneDrive/Desktop/clippers-hq/src/app/\\(app\\)/payouts/page.tsx\")",
+      "Bash(cat \"/c/Users/Game Centar/OneDrive/Desktop/clippers-hq/src/app/\\(app\\)/accounts/page.tsx\")",
+      "Bash(cat \"/c/Users/Game Centar/OneDrive/Desktop/clippers-hq/src/app/\\(app\\)/earnings/page.tsx\")",
+      "Bash(cat \"/c/Users/Game Centar/OneDrive/Desktop/clippers-hq/src/app/\\(app\\)/admin/campaigns/page.tsx\")",
+      "Bash(cat \"/c/Users/Game Centar/OneDrive/Desktop/clippers-hq/src/app/\\(app\\)/admin/clips/page.tsx\")",
+      "Bash(cat \"/c/Users/Game Centar/OneDrive/Desktop/clippers-hq/src/app/\\(app\\)/layout.tsx\")"
     ]
   }
 }
