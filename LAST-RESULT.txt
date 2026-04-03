@@ -1,31 +1,21 @@
-TWO CHANGES — Summary
-=======================
+BUILD SCRIPT UPDATE — Summary
+===============================
 
-1. Vercel cron schedule
-   File: vercel.json
-   Changed: "*/5 * * * *" → "0 * * * *"
-   Effect: cron runs every hour on the hour (fits Vercel free tier)
+File: package.json
+Changed: "build": "next build"
+To:      "build": "prisma generate && next build"
 
-2. Tracking nextCheckAt — round to clean hour marks
-   File: src/lib/tracking.ts
+Why: On Vercel, the src/generated/prisma/ folder is not committed to git
+(it's in .gitignore). Without prisma generate in the build script, Vercel
+would try to build without the generated Prisma client and fail.
 
-   Added roundToNextSlot(intervalMin) helper:
-   - 60 min → next round hour (5:37 PM → 6:00 PM)
-   - 120 min → next even hour (5:37 PM → 6:00 PM, 6:05 PM → 8:00 PM)
-   - 240 min → next 4-hour mark (midnight, 4AM, 8AM, noon, 4PM, 8PM)
-   - 480 min → next 8-hour mark (midnight, 8AM, 4PM)
-   - 1440 min → next midnight UTC
-   - 4320 min → midnight UTC + 3 days
+Now the build pipeline is:
+1. prisma generate → creates src/generated/prisma/ with typed client
+2. next build → compiles the app (which imports from @/generated/prisma)
 
-   Replaced: new Date(Date.now() + newInterval * 60 * 1000)
-   With: roundToNextSlot(newInterval)
+Verified: npm run build outputs:
+  ✔ Generated Prisma Client (7.5.0)
+  ✓ Compiled successfully
+  ✓ Generating static pages (33/33)
 
-   Error retry (30 min) unchanged — still uses raw offset since it's a retry, not a scheduled slot.
-
-   How it works with hourly cron:
-   - Cron fires at :00 every hour
-   - Picks up all jobs where nextCheckAt <= now
-   - After processing, each job's nextCheckAt is set to a clean future hour mark
-   - Jobs naturally align to the cron's hourly cadence
-
-BUILD: tsc ✓ | next build ✓ (33/33 pages)
+BUILD: ✓
