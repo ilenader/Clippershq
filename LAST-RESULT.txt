@@ -1,29 +1,22 @@
-FIX: NextAuth PKCE on Vercel — Summary
-========================================
+TEMPORARY DEBUG ENDPOINT — Summary
+=====================================
 
-File: src/lib/auth.ts
+Created: src/app/api/debug/auth-check/route.ts
 
-Added to NextAuth config:
+GET /api/debug/auth-check — no auth required (temporary diagnostic)
 
-  trustHost: true,
-  cookies: {
-    pkceCodeVerifier: {
-      name: "next-auth.pkce.code_verifier",
-      options: {
-        httpOnly: true,
-        sameSite: "none",
-        path: "/",
-        secure: true,
-      },
-    },
-  },
+Returns JSON with status of all auth-related env variables:
+- AUTH_SECRET: SET (length) or MISSING
+- AUTH_DISCORD_ID: SET (length) or MISSING
+- AUTH_DISCORD_SECRET: SET (length) or MISSING
+- AUTH_URL: value or MISSING
+- NEXTAUTH_URL: value or MISSING
+- AUTH_TRUST_HOST: value or MISSING
+- AUTH_OWNER_EMAIL: SET or MISSING
+- DATABASE_URL: SET (pgbouncer check) or MISSING
+- NODE_ENV: value
 
-Why: On Vercel serverless, the PKCE code verifier cookie set during the
-Discord OAuth redirect wasn't surviving to the callback. The cookie's
-default sameSite="lax" gets dropped on cross-origin redirects in some
-browsers. Setting sameSite="none" + secure=true fixes this.
+Does NOT expose actual secret values — only presence and length.
+REMEMBER TO DELETE THIS ENDPOINT after debugging is complete.
 
-trustHost: true tells NextAuth to trust the Host header from Vercel's
-proxy, preventing "untrusted host" errors in production.
-
-BUILD: ✓ (prisma generate + next build, 33/33 pages)
+BUILD: ✓ (33/33 pages, /api/debug/auth-check registered)
