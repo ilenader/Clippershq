@@ -1,13 +1,11 @@
 /**
- * Email service abstraction.
+ * Email service — sends transactional emails to clippers via Resend.
  *
- * Currently prepared for Resend or any HTTP email provider.
- * All templates are ready. To activate:
- *   1. Set EMAIL_API_KEY in .env.local
- *   2. Set EMAIL_FROM in .env.local (e.g. "Clippers HQ <noreply@clippershq.com>")
- *   3. Install `resend` package: npm i resend
+ * To activate:
+ *   1. Set EMAIL_API_KEY in env (Resend API key)
+ *   2. Set EMAIL_FROM in env (e.g. "Clippers HQ <noreply@clipershq.com>")
  *
- * Until then, emails are logged to console but not sent.
+ * Until configured, emails are logged to console but not sent.
  */
 
 interface EmailParams {
@@ -17,7 +15,6 @@ interface EmailParams {
 }
 
 async function sendEmail(params: EmailParams): Promise<boolean> {
-  // Read env at call time (not module load time) so hot reload picks up changes
   const apiKey = process.env.EMAIL_API_KEY || "";
   const from = process.env.EMAIL_FROM || "Clippers HQ <onboarding@resend.dev>";
 
@@ -27,17 +24,15 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
   }
 
   try {
-    console.log(`[EMAIL] Sending to: ${params.to} | Subject: ${params.subject} | From: ${from}`);
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ from, to: params.to, subject: params.subject, html: params.html }),
     });
-    const resBody = await res.text();
     if (res.ok) {
-      console.log(`[EMAIL OK] Sent to ${params.to} — ${resBody}`);
+      console.log(`[EMAIL OK] Sent to ${params.to}`);
     } else {
-      console.error(`[EMAIL FAIL] ${res.status} — ${resBody}`);
+      console.error(`[EMAIL FAIL] ${res.status}`);
     }
     return res.ok;
   } catch (err) {
@@ -46,99 +41,117 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
   }
 }
 
-// ─── Templates ──────────────────────────────────────────────
+// ─── Template wrapper ────────────────────────────────────────
 
 function wrap(content: string): string {
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #e4e4e7; background: #09090b; border-radius: 16px;">
-      <div style="text-align: center; margin-bottom: 24px;">
-        <h2 style="color: #fff; font-size: 20px; margin: 0;">CLIPPERS HQ</h2>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; background: #09090b; border-radius: 16px; overflow: hidden;">
+      <div style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c1c20;">
+        <h2 style="color: #2596be; font-size: 22px; margin: 0; letter-spacing: 1px;">CLIPPERS HQ</h2>
       </div>
-      ${content}
-      <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #232327; text-align: center;">
-        <p style="color: #71717a; font-size: 12px; margin: 0;">Clippers HQ — Your clipping platform</p>
+      <div style="padding: 24px; color: #e4e4e7;">
+        ${content}
+      </div>
+      <div style="padding: 16px 24px; border-top: 1px solid #1c1c20; text-align: center;">
+        <p style="color: #52525b; font-size: 12px; margin: 0;">&copy; 2026 Clippers HQ &mdash; clipershq.com</p>
       </div>
     </div>
   `;
 }
 
-export async function sendClipSubmitted(email: string, clipUrl: string): Promise<boolean> {
+// ─── Email functions ─────────────────────────────────────────
+
+export async function sendWelcomeEmail(email: string, username: string): Promise<boolean> {
   return sendEmail({
     to: email,
-    subject: "Clip submitted successfully",
+    subject: "Welcome to Clippers HQ",
     html: wrap(`
-      <p style="font-size: 15px;">Thanks for submitting your clip.</p>
-      <p style="font-size: 14px; color: #a1a1aa;">We'll review it within approximately 24 hours.</p>
-      <p style="font-size: 13px; color: #71717a; margin-top: 16px;">${clipUrl}</p>
+      <p style="font-size: 16px; margin: 0 0 12px;">Hey ${username},</p>
+      <p style="font-size: 15px; color: #a1a1aa; margin: 0 0 16px;">Welcome to Clippers HQ! Here's how to start earning:</p>
+      <ol style="font-size: 14px; color: #d4d4d8; padding-left: 20px; margin: 0 0 16px;">
+        <li style="margin-bottom: 8px;">Add your TikTok or Instagram account in <strong style="color: #fff;">Accounts</strong></li>
+        <li style="margin-bottom: 8px;">Browse and join a <strong style="color: #fff;">Campaign</strong></li>
+        <li style="margin-bottom: 8px;">Post clips and submit them in <strong style="color: #fff;">Clips</strong></li>
+        <li>Earn money based on your views!</li>
+      </ol>
+      <p style="font-size: 14px; color: #71717a; margin: 0;">Good luck and happy clipping!</p>
     `),
   });
 }
 
-export async function sendClipApproved(email: string, earnings: number): Promise<boolean> {
+export async function sendClipApproved(email: string, campaignName: string, earnings: number): Promise<boolean> {
   return sendEmail({
     to: email,
     subject: "Your clip was approved!",
     html: wrap(`
-      <p style="font-size: 15px;">Great news — your clip has been approved.</p>
-      ${earnings > 0 ? `<p style="font-size: 18px; color: #22c55e; font-weight: bold;">Earnings: $${earnings.toFixed(2)}</p>` : ""}
-      <p style="font-size: 14px; color: #a1a1aa;">Keep posting to build your streak and earn more.</p>
+      <p style="font-size: 16px; margin: 0 0 12px;">Great news!</p>
+      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${campaignName}</strong> has been approved.</p>
+      ${earnings > 0 ? `<p style="font-size: 20px; color: #2596be; font-weight: bold; margin: 0 0 12px;">Current earnings: $${earnings.toFixed(2)}</p>` : ""}
+      <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Tracking has started — we'll monitor views and calculate your earnings automatically.</p>
     `),
   });
 }
 
-export async function sendClipRejected(email: string, reason?: string): Promise<boolean> {
+export async function sendClipRejected(email: string, campaignName: string, reason?: string): Promise<boolean> {
   return sendEmail({
     to: email,
-    subject: "Clip review update",
+    subject: "Clip update",
     html: wrap(`
-      <p style="font-size: 15px;">Your clip was not approved this time.</p>
-      ${reason ? `<p style="font-size: 14px; color: #f87171;">Reason: ${reason}</p>` : ""}
-      <p style="font-size: 14px; color: #a1a1aa;">Review the campaign requirements and try again.</p>
+      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${campaignName}</strong> was not approved.</p>
+      ${reason ? `<p style="font-size: 14px; color: #f87171; margin: 0 0 12px;">Reason: ${reason}</p>` : ""}
+      <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Submit another clip to keep your streak going!</p>
     `),
   });
 }
 
+export async function sendPayoutApproved(email: string, amount: number): Promise<boolean> {
+  return sendEmail({
+    to: email,
+    subject: "Payout sent!",
+    html: wrap(`
+      <p style="font-size: 16px; margin: 0 0 12px;">Your payout has been sent!</p>
+      <p style="font-size: 22px; color: #2596be; font-weight: bold; margin: 0 0 12px;">$${amount.toFixed(2)}</p>
+      <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Check your wallet for the transfer. It may take a few business days to arrive.</p>
+    `),
+  });
+}
+
+export async function sendPayoutRejected(email: string, amount: number, reason?: string): Promise<boolean> {
+  return sendEmail({
+    to: email,
+    subject: "Payout update",
+    html: wrap(`
+      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your payout request of <strong style="color: #fff;">$${amount.toFixed(2)}</strong> was not approved.</p>
+      ${reason ? `<p style="font-size: 14px; color: #f87171; margin: 0 0 12px;">Reason: ${reason}</p>` : ""}
+      <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Contact us on Discord if you have questions.</p>
+    `),
+  });
+}
+
+export async function sendCallScheduled(email: string, amount: number): Promise<boolean> {
+  return sendEmail({
+    to: email,
+    subject: "Verification call scheduled",
+    html: wrap(`
+      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">A verification call has been scheduled for your payout of <strong style="color: #fff;">$${amount.toFixed(2)}</strong>.</p>
+      <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Please select a time that works for you by visiting your Payouts page.</p>
+    `),
+  });
+}
+
+// Legacy exports (kept for backward compat with existing code)
+export async function sendClipSubmitted(email: string, clipUrl: string): Promise<boolean> {
+  return sendEmail({ to: email, subject: "Clip submitted", html: wrap(`<p style="font-size: 15px;">Your clip was submitted and is being reviewed.</p>`) });
+}
 export async function sendStreakWarning(email: string, currentStreak: number): Promise<boolean> {
-  return sendEmail({
-    to: email,
-    subject: "Don't lose your streak!",
-    html: wrap(`
-      <p style="font-size: 15px;">You have a <strong>${currentStreak}-day streak</strong>.</p>
-      <p style="font-size: 14px; color: #fb923c;">Submit a clip today to keep it alive!</p>
-      <p style="font-size: 13px; color: #a1a1aa;">Missing a day resets your streak bonus to 0%.</p>
-    `),
-  });
+  return sendEmail({ to: email, subject: "Don't lose your streak!", html: wrap(`<p style="font-size: 15px;">Your ${currentStreak}-day streak is at risk. Submit a clip today!</p>`) });
 }
-
 export async function sendCampaignApproved(email: string, campaignName: string): Promise<boolean> {
-  return sendEmail({
-    to: email,
-    subject: `Campaign "${campaignName}" approved`,
-    html: wrap(`
-      <p style="font-size: 15px;">Your campaign <strong>${campaignName}</strong> has been approved and is now live.</p>
-      <p style="font-size: 14px; color: #a1a1aa;">Clippers can now join and submit clips.</p>
-    `),
-  });
+  return sendEmail({ to: email, subject: `Campaign approved`, html: wrap(`<p style="font-size: 15px;">Your campaign <strong>${campaignName}</strong> is live.</p>`) });
 }
-
 export async function sendCampaignRejected(email: string, campaignName: string): Promise<boolean> {
-  return sendEmail({
-    to: email,
-    subject: `Campaign "${campaignName}" not approved`,
-    html: wrap(`
-      <p style="font-size: 15px;">Your campaign <strong>${campaignName}</strong> was not approved.</p>
-      <p style="font-size: 14px; color: #a1a1aa;">Review the feedback and resubmit.</p>
-    `),
-  });
+  return sendEmail({ to: email, subject: `Campaign not approved`, html: wrap(`<p style="font-size: 15px;">Your campaign <strong>${campaignName}</strong> was not approved.</p>`) });
 }
-
 export async function sendReferralSignup(email: string, referredName: string): Promise<boolean> {
-  return sendEmail({
-    to: email,
-    subject: "Someone signed up with your referral!",
-    html: wrap(`
-      <p style="font-size: 15px;"><strong>${referredName}</strong> just signed up using your referral link.</p>
-      <p style="font-size: 14px; color: #22c55e;">You'll earn 5% of their approved earnings — forever.</p>
-    `),
-  });
+  return sendEmail({ to: email, subject: "New referral!", html: wrap(`<p style="font-size: 15px;"><strong>${referredName}</strong> signed up with your link. You earn 5% of their earnings forever.</p>`) });
 }

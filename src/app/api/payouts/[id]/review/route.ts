@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { createNotification } from "@/lib/notifications";
+import { sendPayoutApproved, sendPayoutRejected } from "@/lib/email";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
@@ -94,6 +95,25 @@ export async function POST(
         `Your payout of ${formattedAmount} has been sent. Please allow a few business days for it to arrive.`,
         { payoutId: id, amount: existing.amount },
       );
+      // Send email for PAID payouts
+      try {
+        const payoutUser = await db.user.findUnique({ where: { id: existing.userId }, select: { email: true, role: true } });
+        if (payoutUser?.email && payoutUser.role === "CLIPPER") {
+          await sendPayoutApproved(payoutUser.email, existing.finalAmount ?? existing.amount);
+        }
+      } catch {}
+    } else if (action === "REJECTED") {
+      // Send email for REJECTED payouts (handled after notification above, but email goes here for REJECTED)
+    }
+
+    // Send rejection email (only for clippers)
+    if (action === "REJECTED") {
+      try {
+        const payoutUser = await db.user.findUnique({ where: { id: existing.userId }, select: { email: true, role: true } });
+        if (payoutUser?.email && payoutUser.role === "CLIPPER") {
+          await sendPayoutRejected(payoutUser.email, existing.amount, rejectionReason);
+        }
+      } catch {}
     }
 
     return NextResponse.json({ success: true });

@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
 import { createNotification } from "@/lib/notifications";
+import { sendCallScheduled } from "@/lib/email";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -190,15 +191,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Notify clipper
+    // Notify clipper (in-app + email)
     const formattedAmount = `$${Number(payout.amount).toFixed(2)}`;
     await createNotification(
       payout.userId,
-      "PAYOUT_APPROVED", // reuse type for now
+      "PAYOUT_APPROVED",
       "Verification call requested",
       `A verification call has been requested for your payout of ${formattedAmount}. Please select a time slot on your Payouts page.`,
       { payoutId },
     );
+    // Send email
+    try {
+      const callUser = await db.user.findUnique({ where: { id: payout.userId }, select: { email: true, role: true } });
+      if (callUser?.email && callUser.role === "CLIPPER") {
+        await sendCallScheduled(callUser.email, payout.amount);
+      }
+    } catch {}
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

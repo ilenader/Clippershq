@@ -109,6 +109,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           data: updateData,
         });
 
+        // Send welcome email to new clippers
+        if (user.email && updateData.role !== "OWNER") {
+          try {
+            const { sendWelcomeEmail } = await import("@/lib/email");
+            await sendWelcomeEmail(user.email, updateData.username || "Clipper");
+          } catch {}
+        }
+
         // Attach referral if referral_code cookie was set on login page
         try {
           if (user.id) {

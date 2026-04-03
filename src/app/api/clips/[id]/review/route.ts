@@ -94,8 +94,8 @@ export async function POST(
       createNotification(clip.userId, "CLIP_APPROVED", "Clip approved!", "Your clip has been approved and earnings have been calculated.").catch(() => {});
       if (clip.user?.email) {
         const earnAmt = clipWithData?.stats?.[0]?.views ? recalculateClipEarnings({ stats: clipWithData.stats, campaign: clipWithData.campaign, user: clipWithData.user || undefined }) : 0;
-        console.log(`[EMAIL] Sending clip approved to ${clip.user.email}, earnings: $${earnAmt}`);
-        await sendClipApproved(clip.user.email, earnAmt);
+        const campName = clipWithData?.campaign ? (await db.campaign.findUnique({ where: { id: clip.campaignId }, select: { name: true } }))?.name || "your campaign" : "your campaign";
+        await sendClipApproved(clip.user.email, campName, earnAmt);
       } else {
         console.log(`[EMAIL] No email for user ${clip.userId} — skipping clip approved email`);
       }
@@ -112,8 +112,8 @@ export async function POST(
         } catch {}
         createNotification(clip.userId, "CLIP_REJECTED", "Clip rejected", body.rejectionReason ? `Reason: ${body.rejectionReason}` : "Your clip was rejected. Check the reason and try again.").catch(() => {});
         if (clip.user?.email) {
-          console.log(`[EMAIL] Sending clip rejected to ${clip.user.email}`);
-          await sendClipRejected(clip.user.email, body.rejectionReason);
+          const rejCampName = (await db.campaign.findUnique({ where: { id: clip.campaignId }, select: { name: true } }))?.name || "your campaign";
+          await sendClipRejected(clip.user.email, rejCampName, body.rejectionReason);
         } else {
           console.log(`[EMAIL] No email for user ${clip.userId} — skipping clip rejected email`);
         }

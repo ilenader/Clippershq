@@ -1,72 +1,82 @@
-PRODUCTION AUDIT — Vercel Deployment Readiness
-=================================================
+TWO TASKS — Summary
+======================
 
-1. HARDCODED LOCALHOST REFERENCES
-   Status: CLEAN ✓
-   Searched for "localhost", "127.0.0.1" in all src/ files.
-   Result: zero matches. All API calls use relative paths ("/api/...").
+TASK 1: Login page redesign
+-----------------------------
+File: src/app/login/page.tsx — complete rewrite
 
-2. FILE SYSTEM OPERATIONS
-   Status: CLEAN ✓
-   Only file: src/lib/dev-store.ts (fs read/write)
-   Impact: NONE — this file is never imported by any app code. It's a standalone
-   dev utility for running without a database. No production impact.
-   Upload route (src/app/api/upload/route.ts): already migrated to Supabase Storage.
+Design:
+- Dark #09090b background with subtle dot grid pattern (CSS radial-gradient, no images)
+- Centered glass-effect card (backdrop-blur-xl, semi-transparent white border)
+- Accent blue glow behind card (600px blurred circle, accent/5 opacity)
+- Gradient accent line above card (transparent → accent → transparent, 2px)
+- Fade-up animation on load (CSS @keyframes fadeUp, 0.6s ease-out)
 
-3. IN-MEMORY STATE
-   Status: ACCEPTABLE ✓ (documented)
-   - src/lib/rate-limit.ts: in-memory Map for rate limiting
-     Impact: on Vercel serverless, each cold start gets a fresh Map.
-     Rate limits won't be perfectly enforced across instances but still
-     provide meaningful per-instance burst protection. ACCEPTABLE.
-   - src/lib/db.ts: globalThis Prisma singleton
-     Impact: correct pattern for serverless — reuses connection within
-     warm instances. CORRECT.
-   - src/lib/dev-store.ts: globalThis dev cache
-     Impact: NONE — not imported in production code.
+Content:
+- Logo icon in accent blue rounded square (accent/10 bg, accent/20 border)
+- "CLIPPERS HQ" title — white with accent blue "HQ"
+- Tagline: "The all-in-one platform for managing clips, campaigns, and payouts."
+- Referral banner (if ?ref= param exists) — accent blue border
+- Large "Sign in with Discord" button — accent blue, shadow, Discord SVG icon
+- "Join thousands of clippers earning from their content" below button
+- Terms text at bottom in muted zinc
 
-4. SSE (Server-Sent Events)
-   Status: CLEAN ✓
-   - /api/notifications/sse: has 15-second heartbeat ✓
-   - /api/chat/sse: has 15-second heartbeat ✓
-   Both handle abort signals properly and clean up intervals.
-   Vercel Pro allows 60-second SSE connections. With 15s heartbeat,
-   connections stay alive and auto-reconnect on timeout.
+Responsive: max-w-md card, padding scales sm:p-10
+No Belgrade/location references.
 
-5. IMAGE/ASSET REFERENCES
-   Status: CLEAN ✓
-   Searched for "/uploads/", "public/uploads" in all src/ files.
-   Result: zero matches. Upload route now returns Supabase Storage URLs.
-   CampaignImage component handles broken images with placeholder fallback.
+Landing page (src/app/page.tsx): left unchanged — already redirects authenticated users, shows a simple landing for unauthenticated.
 
-6. ENVIRONMENT VARIABLE HANDLING
-   Status: CLEAN ✓
-   - AUTH_DISCORD_ID/SECRET: use `!` assertion — clear crash if missing (correct)
-   - DATABASE_URL: checked with `if (!connectionString)` → returns null gracefully
-   - APIFY_API_KEY: throws clear error "APIFY_API_KEY is not set" if missing
-   - EMAIL_API_KEY: falls back to console preview mode if missing
-   - CRON_SECRET: checked in production, returns 401 if missing/wrong
-   - AUTH_OWNER_EMAIL: checked with `if (OWNER_EMAIL && ...)` — no crash if missing
-   - SUPABASE_URL/KEY: checked in upload route, returns error if missing
+TASK 2: Email notifications for clippers
+-------------------------------------------
+File: src/lib/email.ts — rewritten with new template system
 
-7. COOKIE/SESSION CONFIGURATION
-   Status: CLEAN ✓
-   - trustHost: true ✓ (line 132 in auth.ts)
-   - PKCE cookie: sameSite: "none", secure: true ✓ (lines 134-140)
-   - No localhost-specific cookie settings
+Template design:
+- Dark #09090b background, 560px max-width, 16px border-radius
+- Header: "CLIPPERS HQ" in accent blue (#2596be), centered, border-bottom
+- Body: light text (#e4e4e7) on dark bg, clean typography
+- Footer: "© 2026 Clippers HQ — clipershq.com" in muted gray
+- Accent blue for amounts, links, highlights
 
-8. CORS
-   Status: CLEAN ✓
-   No Access-Control headers, no CORS restrictions anywhere.
-   Next.js API routes default to same-origin which is correct.
+6 email functions:
 
-9. PUBLIC SOUND FILES
-   Status: CLEAN ✓
-   - /sounds/chat-ping.wav → public/sounds/chat-ping.wav EXISTS ✓
-   - /sounds/whoosh-notification-ding-betacut-1-00-01.mp3 → EXISTS ✓
-   These are served as static assets by Vercel from public/ directory.
+1. sendWelcomeEmail(email, username)
+   Subject: "Welcome to Clippers HQ"
+   Trigger: auth.ts createUser event (new user signup)
+   Only sends to non-OWNER users (clippers)
 
-SUMMARY: Zero production-breaking issues found.
-All systems are Vercel-ready. No changes needed.
+2. sendClipApproved(email, campaignName, earnings)
+   Subject: "Your clip was approved!"
+   Trigger: POST /api/clips/[id]/review (APPROVED action)
+   Shows campaign name and current earnings
+
+3. sendClipRejected(email, campaignName, reason?)
+   Subject: "Clip update"
+   Trigger: POST /api/clips/[id]/review (REJECTED action)
+   Shows campaign name and rejection reason
+
+4. sendPayoutApproved(email, amount)
+   Subject: "Payout sent!"
+   Trigger: POST /api/payouts/[id]/review (PAID action)
+   Shows payout amount
+
+5. sendPayoutRejected(email, amount, reason?)
+   Subject: "Payout update"
+   Trigger: POST /api/payouts/[id]/review (REJECTED action)
+   Shows amount and reason
+
+6. sendCallScheduled(email, amount)
+   Subject: "Verification call scheduled"
+   Trigger: POST /api/calls (owner creates call request)
+   Tells clipper to visit Payouts page
+
+Integration points:
+- src/lib/auth.ts: welcome email in createUser event
+- src/app/api/clips/[id]/review/route.ts: clip approved/rejected emails (updated signatures to include campaignName)
+- src/app/api/payouts/[id]/review/route.ts: payout paid/rejected emails (NEW — added import + email sends)
+- src/app/api/calls/route.ts: call scheduled email (NEW — added import + email send)
+
+All emails check user.role === "CLIPPER" before sending (no emails to owner/admin).
+All email sends are wrapped in try/catch — failures don't crash the API.
+Legacy email exports kept for backward compatibility.
 
 BUILD: ✓ (prisma generate + next build, 33/33 pages)
