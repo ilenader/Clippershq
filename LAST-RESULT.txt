@@ -1,0 +1,50 @@
+PUSH TO GITHUB — Commands
+===========================
+
+Your repo is already initialized and connected to:
+  origin → https://github.com/ilenader/Clippershq.git
+
+The .gitignore has been updated to exclude:
+  node_modules, .next, .env*, .dev-data, src/generated/prisma,
+  public/uploads (user images), AUDIT.txt, stray files (git, structure.txt, pr)
+
+Run these commands in order:
+
+────────────────────────────────────────
+cd "C:\Users\Game Centar\OneDrive\Desktop\clippers-hq"
+
+git add -A
+
+git status
+
+git commit -m "Full platform update: security, fraud, rate limiting, monetization, call scheduling, referrals, streak grace period, UI redesign, ban system, role isolation, auto-refresh, tooltips, onboarding checklist"
+
+git push origin main
+────────────────────────────────────────
+
+If git push fails with "rejected" (remote has changes you don't have):
+  git pull origin main --rebase
+  git push origin main
+
+If git push asks for authentication:
+  - Use a GitHub Personal Access Token (not your password)
+  - Or use: gh auth login (GitHub CLI)
+
+WHAT GETS PUSHED (118 files changed, 56 new files):
+- Security: ban system, rate limiting, auth hardening, dev-auth production guard
+- Fraud: 8-signal detection, auto-flagging, stored scores
+- Monetization: single clipper CPM model (removed split CPM)
+- Features: call scheduling, referral pages, auto-refresh, tooltips, getting started
+- UI: progress page redesign, accounts cleanup, help page rewrite
+- Tracking: tiered schedule (60min → 4320min), no deactivation on flats
+- Streaks: 48-hour grace period for clip approval
+- Role isolation: clipper/admin/owner data separation
+- Platform: removed Twitter/Snapchat, Belgrade references cleaned
+
+WHAT DOES NOT GET PUSHED:
+- .env / .env.local (secrets)
+- node_modules (dependencies)
+- .next (build output)
+- src/generated/prisma (generated client)
+- public/uploads/*.png (user images)
+- .dev-data (dev persistence)

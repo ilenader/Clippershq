@@ -1,4 +1,6 @@
 import { getSession } from "@/lib/get-session";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
 import { writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -8,6 +10,13 @@ const UPLOAD_DIR = join(process.cwd(), "public", "uploads");
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
+
+  // Rate limit: 20 uploads per hour per user
+  const rl = checkRateLimit(`upload:${session.user.id}`, 20, 3_600_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   try {
     const formData = await req.formData();

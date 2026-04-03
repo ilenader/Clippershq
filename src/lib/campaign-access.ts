@@ -1,6 +1,7 @@
 /**
  * Shared helper: get the list of campaign IDs a user can access.
- * OWNER sees all. ADMIN sees created + assigned. CLIPPER sees none (uses /mine endpoints).
+ * OWNER sees all. ADMIN sees created + assigned + team campaigns.
+ * CLIPPER sees none (uses /mine endpoints).
  */
 import { db } from "@/lib/db";
 
@@ -10,19 +11,41 @@ export async function getUserCampaignIds(userId: string, role: string): Promise<
 
   if (!db) return [];
 
-  const [assignments, created] = await Promise.all([
-    db.campaignAdmin.findMany({
-      where: { userId },
-      select: { campaignId: true },
-    }),
-    db.campaign.findMany({
-      where: { createdById: userId },
-      select: { id: true },
-    }),
-  ]);
+  try {
+    const [directAssignments, created, teamMemberships] = await Promise.all([
+      // Direct campaign assignments
+      db.campaignAdmin.findMany({
+        where: { userId },
+        select: { campaignId: true },
+      }),
+      // Campaigns created by this user
+      db.campaign.findMany({
+        where: { createdById: userId },
+        select: { id: true },
+      }),
+      // Team-based access: find user's teams, then find team campaigns
+      db.teamMember.findMany({
+        where: { userId },
+        select: { teamId: true },
+      }),
+    ]);
 
-  const ids = new Set<string>();
-  for (const a of assignments) ids.add(a.campaignId);
-  for (const c of created) ids.add(c.id);
-  return [...ids];
+    const ids = new Set<string>();
+    for (const a of directAssignments) ids.add(a.campaignId);
+    for (const c of created) ids.add(c.id);
+
+    // Get campaigns from all user's teams
+    if (teamMemberships.length > 0) {
+      const teamIds = teamMemberships.map((tm: any) => tm.teamId);
+      const teamCampaigns = await db.teamCampaign.findMany({
+        where: { teamId: { in: teamIds } },
+        select: { campaignId: true },
+      });
+      for (const tc of teamCampaigns) ids.add(tc.campaignId);
+    }
+
+    return [...ids];
+  } catch {
+    return [];
+  }
 }

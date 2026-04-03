@@ -1,11 +1,17 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
+import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 
 // GET: List joined campaigns for user's accounts or for a specific campaign
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json([], { status: 401 });
+
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
 
   const campaignId = req.nextUrl.searchParams.get("campaignId") || undefined;
   const clipAccountId = req.nextUrl.searchParams.get("clipAccountId") || undefined;
@@ -16,9 +22,9 @@ export async function GET(req: NextRequest) {
     const where: any = {};
     if (campaignId) where.campaignId = campaignId;
     if (clipAccountId) where.clipAccountId = clipAccountId;
-    // Only show user's own joins (unless admin)
+    // Role isolation: CLIPPER sees own joins; ADMIN/OWNER see all (for management)
     const role = (session.user as any).role;
-    if (role !== "ADMIN" && role !== "OWNER") {
+    if (role === "CLIPPER") {
       where.clipAccount = { userId: session.user.id };
     }
     const joins = await db.campaignAccount.findMany({
@@ -35,10 +41,18 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST: Join a campaign with an approved account
+// POST: Join a campaign with an approved account (clippers only)
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const banCheck2 = checkBanStatus(session);
+  if (banCheck2) return banCheck2;
+
+  const role = (session.user as any).role;
+  if (role !== "CLIPPER") {
+    return NextResponse.json({ error: "You don't have permission to join campaigns." }, { status: 403 });
+  }
 
   let body: any;
   try {
@@ -84,6 +98,9 @@ export async function DELETE(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const banCheck3 = checkBanStatus(session);
+  if (banCheck3) return banCheck3;
+
   let body: any;
   try {
     body = await req.json();
@@ -96,6 +113,14 @@ export async function DELETE(req: NextRequest) {
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   try {
+    // Verify the clipAccount belongs to the requesting user (prevent IDOR)
+    const account = await db.clipAccount.findFirst({
+      where: { id: clipAccountId, userId: session.user.id },
+    });
+    if (!account) {
+      return NextResponse.json({ error: "Account not found" }, { status: 404 });
+    }
+
     await db.campaignAccount.delete({
       where: { clipAccountId_campaignId: { clipAccountId, campaignId } },
     });

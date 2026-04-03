@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,9 @@ function RenderTextWithLinks({ text }: { text: string }) {
 export default function CampaignDetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role || "CLIPPER";
+  const isClipper = userRole === "CLIPPER";
   const [campaign, setCampaign] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [approvedAccounts, setApprovedAccounts] = useState<any[]>([]);
@@ -140,8 +144,8 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
-      {/* Joined Accounts */}
-      {joinedAccounts.length > 0 && (
+      {/* Joined Accounts — clipper only */}
+      {isClipper && joinedAccounts.length > 0 && (
         <Card>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Your joined accounts</h2>
           <div className="flex flex-wrap gap-2">
@@ -165,10 +169,10 @@ export default function CampaignDetailPage() {
         <div className="grid gap-5 sm:grid-cols-2">
           {[
             { label: "Platforms", value: platforms.join(", ") || "N/A" },
-            { label: "CPM rate", value: campaign.cpmRate ? formatCurrency(campaign.cpmRate) : "N/A" },
-            { label: "Min views", value: campaign.minViews ? formatNumber(campaign.minViews) : "N/A" },
-            { label: "Max payout / clip", value: campaign.maxPayoutPerClip ? formatCurrency(campaign.maxPayoutPerClip) : "N/A" },
-            { label: "Start date", value: campaign.startDate ? new Date(campaign.startDate).toLocaleDateString() : "N/A" },
+            { label: "CPM rate", value: (campaign.clipperCpm ?? campaign.cpmRate) ? formatCurrency(campaign.clipperCpm ?? campaign.cpmRate) : "-" },
+            { label: "Min views", value: campaign.minViews ? formatNumber(campaign.minViews) : "-" },
+            { label: "Max payout / clip", value: campaign.maxPayoutPerClip ? formatCurrency(campaign.maxPayoutPerClip) : "-" },
+            { label: "Start date", value: campaign.startDate ? new Date(campaign.startDate).toLocaleDateString() : "-" },
           ].map((item) => (
             <div key={item.label}>
               <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">{item.label}</p>
@@ -246,17 +250,26 @@ export default function CampaignDetailPage() {
         </Card>
       )}
 
-      {/* CTAs */}
-      <div className="flex gap-3">
-        {campaign.status === "ACTIVE" && (
-          <Button onClick={() => setShowJoinModal(true)} icon={<UserPlus className="h-4 w-4" />}>
-            Join campaign
-          </Button>
-        )}
-        <Link href={`/clips?campaignId=${id}`}>
-          <Button variant="secondary">Submit a clip</Button>
-        </Link>
-      </div>
+      {/* CTAs — clipper only */}
+      {isClipper && (
+        <div className="flex gap-3">
+          {campaign.status === "ACTIVE" && (
+            joinedAccounts.length > 0 ? (
+              <div className="flex items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-5 py-2.5">
+                <CheckCircle className="h-4 w-4 text-emerald-400" />
+                <span className="text-sm font-medium text-emerald-400">Joined</span>
+              </div>
+            ) : (
+              <Button onClick={() => setShowJoinModal(true)} icon={<UserPlus className="h-4 w-4" />}>
+                Join campaign
+              </Button>
+            )
+          )}
+          <Link href={`/clips?campaignId=${id}`}>
+            <Button variant="secondary">Submit a clip</Button>
+          </Link>
+        </div>
+      )}
 
       {/* Join Modal */}
       <Modal open={showJoinModal} onClose={() => setShowJoinModal(false)} title="Join campaign">

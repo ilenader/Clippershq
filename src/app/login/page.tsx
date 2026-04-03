@@ -1,9 +1,21 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const ref = searchParams.get("ref");
+
+  // Store referral code in cookie so the server-side createUser event can read it
+  useEffect(() => {
+    if (ref) {
+      document.cookie = `referral_code=${ref}; path=/; max-age=86400; samesite=lax`;
+    }
+  }, [ref]);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)] px-4 transition-theme">
       <div className="w-full max-w-sm text-center">
@@ -19,6 +31,12 @@ export default function LoginPage() {
             Sign in to access your dashboard
           </p>
         </div>
+
+        {ref && (
+          <div className="mb-4 rounded-xl border border-accent/20 bg-accent/5 px-4 py-2.5">
+            <p className="text-sm text-accent">You were invited! Sign up to get a reduced payout fee.</p>
+          </div>
+        )}
 
         {/* Discord Login */}
         <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
@@ -39,5 +57,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }

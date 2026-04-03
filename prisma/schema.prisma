@@ -73,10 +73,23 @@ model User {
   image         String?
   role          UserRole   @default(CLIPPER)
   status        UserStatus @default(ACTIVE)
+  trustScore    Int        @default(50)
+  totalEarnings Float      @default(0)
+  totalViews    Int        @default(0)
+  level         Int        @default(0)
+  bonusPercentage Float    @default(0)
+  currentStreak Int        @default(0)
+  longestStreak Int        @default(0)
+  lastActiveDate DateTime?
+  referralCode  String?    @unique
+  referredById  String?
+  manualBonusOverride Float?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
   // Relations
+  referredBy       User?     @relation("Referrals", fields: [referredById], references: [id])
+  referrals        User[]    @relation("Referrals")
   authAccounts     Account[]
   sessions         Session[]
   clipAccounts     ClipAccount[]
@@ -86,8 +99,53 @@ model User {
   campaignsCreated Campaign[]          @relation("CampaignsCreated")
   pendingEdits     PendingCampaignEdit[]
   campaignAdmins   CampaignAdmin[]
+  teamMemberships  TeamMember[]
+  auditLogs        AuditLog[]
+  conversationParticipants ConversationParticipant[]
+  messagesSent     Message[]
+  notifications    Notification[]
+  scheduledCalls   ScheduledCall[]
 
   @@map("users")
+}
+
+// ─── Teams ──────────────────────────────────────────────────
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   TeamMember[]
+  campaigns TeamCampaign[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id     String @id @default(cuid())
+  teamId String
+  userId String
+  role   String @default("MEMBER") // LEAD, MEMBER, VIEWER
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model TeamCampaign {
+  id         String @id @default(cuid())
+  teamId     String
+  campaignId String
+
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, campaignId])
+  @@map("team_campaigns")
 }
 
 // ─── Campaigns ──────────────────────────────────────────────
@@ -105,11 +163,16 @@ model Campaign {
   clientName      String?
   platform        String
   status          CampaignStatus @default(DRAFT)
+  monetizationType String       @default("CPM") // "CPM" or "AGENCY"
   budget          Float?
   cpmRate         Float?
+  clipperCpm      Float?
+  ownerCpm        Float?
+  agencyFee       Float?
   payoutRule      String?
   minViews        Int?
   maxPayoutPerClip Float?
+  maxClipsPerUserPerDay Int     @default(3)
   description     String?        @db.Text
   requirements    String?        @db.Text
   examples        String?        @db.Text
@@ -138,7 +201,13 @@ model Campaign {
   pendingEdits     PendingCampaignEdit[]
   campaignAdmins   CampaignAdmin[]
   payoutRequests   PayoutRequest[]
+  teamCampaigns    TeamCampaign[]
+  trackingJobs     TrackingJob[]
+  conversations    Conversation[]
 
+  @@index([status])
+  @@index([isArchived])
+  @@index([createdById])
   @@map("campaigns")
 }
 
@@ -171,6 +240,7 @@ model ClipAccount {
   clips            Clip[]
   campaignAccounts CampaignAccount[]
 
+  @@index([userId])
   @@map("clip_accounts")
 }
 
@@ -209,6 +279,12 @@ model Clip {
   status          ClipStatus @default(PENDING)
   rejectionReason String?
   earnings        Float      @default(0)
+  isDeleted       Boolean    @default(false)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  fraudScore      Int        @default(0)
+  fraudReasons    String?    @db.Text // JSON array of reason strings
+  fraudCheckedAt  DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -216,8 +292,12 @@ model Clip {
   campaign    Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   clipAccount ClipAccount @relation(fields: [clipAccountId], references: [id], onDelete: Cascade)
   stats       ClipStat[]
+  trackingJob TrackingJob?
 
   @@unique([clipUrl, campaignId])
+  @@index([userId])
+  @@index([campaignId])
+  @@index([status])
   @@map("clips")
 }
 
@@ -230,11 +310,34 @@ model ClipStat {
   likes     Int      @default(0)
   comments  Int      @default(0)
   shares    Int      @default(0)
+  isManual  Boolean  @default(false)
   checkedAt DateTime @default(now())
 
   clip Clip @relation(fields: [clipId], references: [id], onDelete: Cascade)
 
+  @@index([clipId])
   @@map("clip_stats")
+}
+
+// ─── Tracking Jobs ──────────────────────────────────────────
+
+model TrackingJob {
+  id               String   @id @default(cuid())
+  clipId           String   @unique
+  campaignId       String
+  nextCheckAt      DateTime
+  checkIntervalMin Int      @default(120) // minutes
+  consecutiveFlats Int      @default(0)
+  isActive         Boolean  @default(true)
+  lastCheckedAt    DateTime?
+  createdAt        DateTime @default(now())
+
+  clip     Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([isActive, nextCheckAt])
+  @@index([campaignId])
+  @@map("tracking_jobs")
 }
 
 // ─── Payout Requests ────────────────────────────────────────
@@ -252,19 +355,56 @@ model PayoutRequest {
   userId          String
   campaignId      String?
   amount          Float
+  feePercent      Float?
+  bonusPercent    Float?
+  feeAmount       Float?
+  bonusAmount     Float?
+  finalAmount     Float?
   walletAddress   String
+  walletAsset     String?
+  walletChain     String?
   discordUsername String?
   proofNote       String?      @db.Text
   proofFileUrl    String?
   status          PayoutStatus @default(REQUESTED)
   rejectionReason String?
+  reviewedById    String?
+  reviewedAt      DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  campaign Campaign? @relation(fields: [campaignId], references: [id])
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign       Campaign?       @relation(fields: [campaignId], references: [id])
+  scheduledCalls ScheduledCall[]
 
+  @@index([userId])
+  @@index([status])
+  @@index([campaignId])
   @@map("payout_requests")
+}
+
+// ─── Scheduled Calls (payout verification) ──────────────────
+
+model ScheduledCall {
+  id              String   @id @default(cuid())
+  payoutId        String
+  userId          String
+  scheduledAt     DateTime?
+  duration        Int      @default(15)
+  status          String   @default("PENDING") // PENDING, CONFIRMED, COMPLETED, MISSED, CANCELLED
+  discordUsername  String?
+  clipperTimezone  String?
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  payout PayoutRequest @relation(fields: [payoutId], references: [id])
+  user   User          @relation(fields: [userId], references: [id])
+
+  @@index([scheduledAt])
+  @@index([userId])
+  @@index([payoutId])
+  @@map("scheduled_calls")
 }
 
 // ─── Campaign Admins (team access: which admins can manage which campaigns) ──
@@ -279,6 +419,7 @@ model CampaignAdmin {
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@unique([userId, campaignId])
+  @@index([userId])
   @@map("campaign_admins")
 }
 
@@ -294,7 +435,7 @@ model PendingCampaignEdit {
   id         String            @id @default(cuid())
   campaignId String
   requestedById String
-  changes    String            @db.Text // JSON of proposed changes
+  changes    String            @db.Text
   status     PendingEditStatus @default(PENDING)
   reviewNote String?
   createdAt  DateTime          @default(now())
@@ -304,6 +445,25 @@ model PendingCampaignEdit {
   requestedBy User     @relation(fields: [requestedById], references: [id], onDelete: Cascade)
 
   @@map("pending_campaign_edits")
+}
+
+// ─── Audit Log ──────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String   // APPROVE_CLIP, REJECT_PAYOUT, CHANGE_ROLE, MANUAL_OVERRIDE, etc.
+  targetType String   // clip, payout, user, campaign
+  targetId   String
+  details    String?  @db.Text // JSON: before/after values
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 // ─── Notes (internal CRM) ───────────────────────────────────
@@ -321,4 +481,77 @@ model Note {
   campaign Campaign? @relation(fields: [campaignId], references: [id])
 
   @@map("notes")
+}
+
+// ─── Chat System ────────────────────────────────────────────
+
+model Conversation {
+  id         String   @id @default(cuid())
+  campaignId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  campaign     Campaign?                 @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([updatedAt])
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String   @db.Text
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// ─── Notifications ──────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // CLIP_SUBMITTED, CLIP_APPROVED, CLIP_REJECTED, STREAK_WARNING, LEVEL_UP, REFERRAL_SIGNUP, etc.
+  title     String
+  body      String   @db.Text
+  isRead    Boolean  @default(false)
+  metadata  String?  @db.Text // JSON
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ─── Gamification & Platform Config ─────────────────────────
+
+model GamificationConfig {
+  id        String @id @default(cuid())
+  key       String @unique // e.g. "level_thresholds", "streak_rewards", "platform_fee"
+  value     String @db.Text // JSON config
+
+  @@map("gamification_config")
 }

@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { fetchClipStats, detectPlatform } from "@/lib/apify";
 import { revalidatePath } from "next/cache";
 
 export async function getMyClips() {
@@ -53,25 +54,59 @@ export async function submitClip(data: {
   });
   if (existingOther) throw new Error("This clip URL has already been submitted to another campaign");
 
-  const clip = await db.clip.create({
-    data: {
-      userId: session.user.id,
-      campaignId: data.campaignId,
-      clipAccountId: data.clipAccountId,
-      clipUrl: data.clipUrl,
-      note: data.note || null,
-    },
-  });
+  // Fetch real stats for TikTok / Instagram clips
+  const platform = detectPlatform(data.clipUrl);
+  let fetchedStats: { views: number; likes: number; comments: number; shares: number } | null = null;
 
-  // Create initial mock stats
-  await db.clipStat.create({
-    data: {
-      clipId: clip.id,
-      views: 0,
-      likes: 0,
-      comments: 0,
-      shares: 0,
-    },
+  if (platform === "tiktok" || platform === "instagram") {
+    try {
+      const stats = await fetchClipStats(data.clipUrl);
+      fetchedStats = { views: stats.views, likes: stats.likes, comments: stats.comments, shares: stats.shares };
+    } catch (err: any) {
+      console.warn(`[submitClip] Apify ${platform} fetch failed: ${err.message}`);
+    }
+  }
+
+  // Create clip, first snapshot, and tracking job atomically
+  const clip = await db.$transaction(async (tx: any) => {
+    const newClip = await tx.clip.create({
+      data: {
+        userId: session.user.id,
+        campaignId: data.campaignId,
+        clipAccountId: data.clipAccountId,
+        clipUrl: data.clipUrl,
+        note: data.note || null,
+      },
+    });
+
+    await tx.clipStat.create({
+      data: {
+        clipId: newClip.id,
+        views: fetchedStats?.views ?? 0,
+        likes: fetchedStats?.likes ?? 0,
+        comments: fetchedStats?.comments ?? 0,
+        shares: fetchedStats?.shares ?? 0,
+      },
+    });
+
+    if (platform === "tiktok" || platform === "instagram") {
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setMinutes(0, 0, 0);
+      nextHour.setHours(nextHour.getHours() + 1);
+
+      await tx.trackingJob.create({
+        data: {
+          clipId: newClip.id,
+          campaignId: data.campaignId,
+          nextCheckAt: nextHour,
+          checkIntervalMin: 60,
+          isActive: true,
+        },
+      });
+    }
+
+    return newClip;
   });
 
   revalidatePath("/clips");

@@ -12,25 +12,26 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
-import { Plus, Megaphone, Pause, Play, Pencil, Trash2 } from "lucide-react";
+import { Plus, Megaphone, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit } from "lucide-react";
 import { toast } from "sonner";
 
 const platformList = [
   { value: "TikTok", label: "TikTok" },
   { value: "Instagram", label: "Instagram" },
   { value: "YouTube", label: "YouTube" },
-  { value: "Twitter", label: "Twitter / X" },
-  { value: "Snapchat", label: "Snapchat" },
 ];
 
 const statusFilterOptions = [
   { value: "ACTIVE", label: "Active" },
   { value: "PAUSED", label: "Paused" },
+  { value: "DRAFT", label: "In Review" },
 ];
 
 const defaultForm = {
-  name: "", clientName: "", platforms: [] as string[], budget: "", cpmRate: "",
+  name: "", clientName: "", platforms: [] as string[],
+  clipperCpm: "", budget: "",
   payoutRule: "", minViews: "", maxPayoutPerClip: "",
+  maxClipsPerUserPerDay: "3",
   requirementsList: [""] as string[],
   examples: "", soundLink: "", assetLink: "", imageUrl: "",
   captionRules: "", hashtagRules: "",
@@ -51,22 +52,29 @@ export default function AdminCampaignsPage() {
   const [form, setForm] = useState(defaultForm);
   const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
   const [spendByCampaign, setSpendByCampaign] = useState<Record<string, number>>({});
+  const [memberStats, setMemberStats] = useState<Record<string, { clippers: number; accounts: number }>>({});
+  const [pendingEdits, setPendingEdits] = useState<any[]>([]);
+  const [reviewingEdit, setReviewingEdit] = useState<any | null>(null);
 
   const load = () => {
-    Promise.all([
+    const fetches: Promise<any>[] = [
       fetch("/api/campaigns?scope=manage").then((r) => r.json()),
-      fetch("/api/clips").then((r) => r.json()).catch(() => []),
-    ])
-      .then(([campaignData, clipsData]) => {
+      fetch("/api/campaigns/spend").then((r) => r.json()),
+      fetch("/api/campaigns/members").then((r) => r.json()),
+    ];
+    // Owner also fetches pending edits
+    if (isOwner) {
+      fetches.push(fetch("/api/admin/pending-edits").then((r) => r.json()));
+    }
+    Promise.all(fetches)
+      .then(([campaignData, spendData, membersData, editsData]) => {
         setCampaigns(Array.isArray(campaignData) ? campaignData : []);
-        const map: Record<string, number> = {};
-        const clips = Array.isArray(clipsData) ? clipsData : [];
-        for (const clip of clips) {
-          if (clip.campaignId && clip.status === "APPROVED" && clip.earnings > 0) {
-            map[clip.campaignId] = (map[clip.campaignId] || 0) + clip.earnings;
-          }
+        setSpendByCampaign(typeof spendData === "object" && spendData !== null ? spendData : {});
+        setMemberStats(typeof membersData === "object" && membersData !== null ? membersData : {});
+        if (editsData) {
+          const pending = Array.isArray(editsData) ? editsData.filter((e: any) => e.status === "PENDING") : [];
+          setPendingEdits(pending);
         }
-        setSpendByCampaign(map);
       })
       .catch(() => setCampaigns([]))
       .finally(() => setLoading(false));
@@ -78,8 +86,9 @@ export default function AdminCampaignsPage() {
     ? campaigns.filter((c: any) => filterStatuses.includes(c.status))
     : campaigns;
 
-  // Check if current user owns a campaign
-  const isMyCreation = (c: any) => c.createdById === userId;
+  // All campaigns in the admin's list are manageable — the API already filters by access
+  // (creator, direct CampaignAdmin assignment, or team membership)
+  const canManageCampaign = (_c: any) => true;
 
   // Draft persistence
   const DRAFT_KEY = "clippers_hq_campaign_draft";
@@ -106,9 +115,11 @@ export default function AdminCampaignsPage() {
     setForm({
       name: c.name || "", clientName: c.clientName || "",
       platforms: c.platform ? c.platform.split(",").map((p: string) => p.trim()) : [],
-      budget: c.budget?.toString() || "", cpmRate: c.cpmRate?.toString() || "",
+      clipperCpm: (c.clipperCpm ?? c.cpmRate ?? "")?.toString() || "",
+      budget: c.budget?.toString() || "",
       payoutRule: c.payoutRule || "", minViews: c.minViews?.toString() || "",
       maxPayoutPerClip: c.maxPayoutPerClip?.toString() || "",
+      maxClipsPerUserPerDay: c.maxClipsPerUserPerDay?.toString() || "3",
       requirementsList: reqs.length > 0 ? reqs : [""],
       examples: c.examples || "", soundLink: c.soundLink || "", assetLink: c.assetLink || "",
       imageUrl: c.imageUrl || "", captionRules: c.captionRules || "", hashtagRules: c.hashtagRules || "",
@@ -128,8 +139,10 @@ export default function AdminCampaignsPage() {
       const requirements = form.requirementsList.filter((r) => r.trim()).join("\n");
       const payload: Record<string, any> = {
         name: form.name, clientName: form.clientName, platform: form.platforms.join(", "),
-        budget: form.budget, cpmRate: form.cpmRate, payoutRule: form.payoutRule,
-        minViews: form.minViews, maxPayoutPerClip: form.maxPayoutPerClip, requirements,
+        clipperCpm: form.clipperCpm, budget: form.budget,
+        payoutRule: form.payoutRule,
+        minViews: form.minViews, maxPayoutPerClip: form.maxPayoutPerClip,
+        maxClipsPerUserPerDay: form.maxClipsPerUserPerDay, requirements,
         examples: form.examples, soundLink: form.soundLink, assetLink: form.assetLink,
         imageUrl: form.imageUrl, captionRules: form.captionRules, hashtagRules: form.hashtagRules,
         startDate: form.startDate,
@@ -159,7 +172,7 @@ export default function AdminCampaignsPage() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to create campaign");
-        toast.success("Campaign created.");
+        toast.success(isOwner ? "Campaign created." : "Campaign submitted for owner review.");
       }
 
       setShowModal(false);
@@ -215,6 +228,39 @@ export default function AdminCampaignsPage() {
     setDeleting(false);
   };
 
+  // ── Owner: approve/reject DRAFT campaign ──
+  const reviewCampaign = async (campaignId: string, approve: boolean) => {
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: approve ? "ACTIVE" : "COMPLETED" }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success(approve ? "Campaign approved and now live." : "Campaign rejected.");
+      load();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to review campaign.");
+    }
+  };
+
+  // ── Owner: approve/reject pending edit ──
+  const reviewEdit = async (editId: string, approve: boolean) => {
+    try {
+      const res = await fetch(`/api/admin/pending-edits/${editId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: approve ? "APPROVED" : "REJECTED" }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success(approve ? "Edit approved and applied." : "Edit rejected.");
+      setReviewingEdit(null);
+      load();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to review edit.");
+    }
+  };
+
   const updateField = (field: string, value: string) => setForm({ ...form, [field]: value });
   const addRequirement = () => setForm({ ...form, requirementsList: [...form.requirementsList, ""] });
   const removeRequirement = (idx: number) => {
@@ -241,6 +287,78 @@ export default function AdminCampaignsPage() {
 
       <MultiDropdown label="Status" options={statusFilterOptions} values={filterStatuses} onChange={setFilterStatuses} allLabel="All statuses" />
 
+      {/* ── Owner Review Section: Pending Campaigns + Pending Edits ── */}
+      {isOwner && !loading && (pendingEdits.length > 0 || filteredCampaigns.some((c: any) => c.status === "DRAFT")) && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
+            <Clock className="h-5 w-5 text-amber-400" />
+            Pending Review
+          </h2>
+
+          {/* Draft campaigns awaiting approval */}
+          {filteredCampaigns.filter((c: any) => c.status === "DRAFT").map((c: any) => (
+            <Card key={`review-${c.id}`} className="border-amber-500/20">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  {c.imageUrl && (
+                    <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
+                      <img src={c.imageUrl} alt="" className="h-full w-full object-cover" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-[var(--text-primary)]">{c.name}</span>
+                      <Badge variant="pending">In Review</Badge>
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{c.platform?.replace(/,\s*/g, " · ")} {c.clientName && `· ${c.clientName}`}</p>
+                    <p className="text-xs text-[var(--text-muted)]">New campaign submitted by admin · {formatDate(c.createdAt)}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button size="sm" onClick={() => openEdit(c)} variant="outline" icon={<Pencil className="h-3 w-3" />}>View</Button>
+                  <Button size="sm" onClick={() => reviewCampaign(c.id, true)} icon={<CheckCircle className="h-3 w-3" />}>Approve</Button>
+                  <Button size="sm" variant="danger" onClick={() => reviewCampaign(c.id, false)} icon={<XCircle className="h-3 w-3" />}>Reject</Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+
+          {/* Pending edits awaiting approval */}
+          {pendingEdits.map((edit: any) => {
+            let changes: Record<string, any> = {};
+            try { changes = JSON.parse(edit.changes); } catch {}
+            const changedFields = Object.keys(changes);
+            return (
+              <Card key={`edit-${edit.id}`} className="border-blue-500/20">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <FileEdit className="h-4 w-4 text-blue-400" />
+                      <span className="text-sm font-medium text-[var(--text-primary)]">{edit.campaign?.name || "Campaign"}</span>
+                      <Badge variant="pending">Edit Request</Badge>
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                      By {edit.requestedBy?.username || "admin"} · {changedFields.length} field{changedFields.length !== 1 ? "s" : ""} changed
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {changedFields.slice(0, 5).map((f) => (
+                        <span key={f} className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] text-blue-400">{f}</span>
+                      ))}
+                      {changedFields.length > 5 && <span className="text-[11px] text-[var(--text-muted)]">+{changedFields.length - 5} more</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => setReviewingEdit(edit)} icon={<Pencil className="h-3 w-3" />}>View diff</Button>
+                    <Button size="sm" onClick={() => reviewEdit(edit.id, true)} icon={<CheckCircle className="h-3 w-3" />}>Approve</Button>
+                    <Button size="sm" variant="danger" onClick={() => reviewEdit(edit.id, false)} icon={<XCircle className="h-3 w-3" />}>Reject</Button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-color)] border-t-accent" />
@@ -251,7 +369,7 @@ export default function AdminCampaignsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {filteredCampaigns.map((c: any) => {
-            const canManage = isOwner || isMyCreation(c);
+            const canManage = isOwner || canManageCampaign(c);
             return (
               <Card key={c.id}>
                 <div className="flex items-start gap-4">
@@ -285,17 +403,35 @@ export default function AdminCampaignsPage() {
                   );
                 })()}
                 <div className="mt-3 flex flex-wrap gap-3 text-sm text-[var(--text-muted)]">
-                  {c.cpmRate != null && <span>CPM: {formatCurrency(c.cpmRate)}</span>}
+                  {(c.clipperCpm ?? c.cpmRate) != null && <span>CPM: {formatCurrency(c.clipperCpm ?? c.cpmRate)}</span>}
                   {c.budget != null && <span>Budget: {formatCurrency(c.budget)}</span>}
                   {c.minViews != null && <span>Min: {formatNumber(c.minViews)}</span>}
                   <span>{formatDate(c.createdAt)}</span>
                 </div>
+                {memberStats[c.id] && (
+                  <div className="mt-2 flex items-center gap-3 text-sm">
+                    <span className="flex items-center gap-1 text-[var(--text-secondary)]">
+                      <Users className="h-3.5 w-3.5" />
+                      {memberStats[c.id].clippers} clipper{memberStats[c.id].clippers !== 1 ? "s" : ""}
+                    </span>
+                    <span className="text-[var(--text-muted)]">
+                      {memberStats[c.id].accounts} account{memberStats[c.id].accounts !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                )}
                 {/* Actions — only show for campaigns user can manage */}
                 {canManage && (
                   <div className="mt-4 flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => openEdit(c)} icon={<Pencil className="h-3 w-3" />}>
                       {isOwner ? "Edit" : "Request edit"}
                     </Button>
+                    {/* OWNER: approve/reject DRAFT campaigns */}
+                    {isOwner && c.status === "DRAFT" && (
+                      <>
+                        <Button size="sm" onClick={() => reviewCampaign(c.id, true)} icon={<CheckCircle className="h-3 w-3" />}>Approve</Button>
+                        <Button size="sm" variant="danger" onClick={() => reviewCampaign(c.id, false)} icon={<XCircle className="h-3 w-3" />}>Reject</Button>
+                      </>
+                    )}
                     {/* Only OWNER can pause/resume and delete */}
                     {isOwner && (c.status === "ACTIVE" || c.status === "PAUSED") && (
                       <Button size="sm" variant="outline" onClick={() => toggleStatus(c)}
@@ -312,7 +448,7 @@ export default function AdminCampaignsPage() {
                   </div>
                 )}
                 {!canManage && (
-                  <p className="mt-3 text-xs text-[var(--text-muted)]">View only — assigned by owner</p>
+                  <p className="mt-3 text-xs text-[var(--text-muted)]">View only (assigned by owner)</p>
                 )}
               </Card>
             );
@@ -324,7 +460,7 @@ export default function AdminCampaignsPage() {
       <Modal open={showModal} onClose={() => { setShowModal(false); setEditingId(null); }} title={editingId ? (isOwner ? "Edit campaign" : "Request campaign edit") : "Create campaign"} className="max-w-2xl">
         {!isOwner && editingId && (
           <div className="mb-4 rounded-xl border border-accent/20 bg-accent/5 px-4 py-2.5">
-            <p className="text-sm text-accent">Changes will be submitted for owner review — not applied immediately.</p>
+            <p className="text-sm text-accent">Changes will be submitted for owner review, not applied immediately.</p>
           </div>
         )}
         <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-5 overflow-y-auto pr-2">
@@ -362,12 +498,30 @@ export default function AdminCampaignsPage() {
               <Plus className="h-3.5 w-3.5" /> Add requirement
             </button>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Input id="budget" label="Budget ($)" type="number" value={form.budget} onChange={(e) => updateField("budget", e.target.value)} />
-            <Input id="cpmRate" label="CPM rate ($)" type="number" step="0.01" value={form.cpmRate} onChange={(e) => updateField("cpmRate", e.target.value)} />
+          {/* Campaign payout settings */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input id="clipperCpm" label="Clipper CPM ($)" type="number" step="0.01" placeholder="e.g. 1.00" value={form.clipperCpm} onChange={(e) => updateField("clipperCpm", e.target.value)} />
+            <Input id="budget" label="Campaign budget ($)" type="number" placeholder="e.g. 5000" value={form.budget} onChange={(e) => updateField("budget", e.target.value)} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
             <Input id="maxPayoutPerClip" label="Max payout / clip ($)" type="number" step="0.01" value={form.maxPayoutPerClip} onChange={(e) => updateField("maxPayoutPerClip", e.target.value)} />
           </div>
-          <Input id="minViews" label="Min views threshold" type="number" value={form.minViews} onChange={(e) => updateField("minViews", e.target.value)} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input id="minViews" label="Min views threshold" type="number" value={form.minViews} onChange={(e) => updateField("minViews", e.target.value)} />
+            <div>
+              <label htmlFor="maxClipsPerUserPerDay" className="mb-1 block text-sm font-medium text-[var(--text-secondary)]">Max clips / user / day</label>
+              <select
+                id="maxClipsPerUserPerDay"
+                value={form.maxClipsPerUserPerDay}
+                onChange={(e) => updateField("maxClipsPerUserPerDay", e.target.value)}
+                className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <option key={n} value={n}>{n} clip{n > 1 ? "s" : ""} per day</option>
+                ))}
+              </select>
+            </div>
+          </div>
           <ImageUpload label="Campaign image" value={form.imageUrl} onChange={(url) => updateField("imageUrl", url)} />
           <Textarea id="examples" label="Examples (links or descriptions)" placeholder="https://tiktok.com/..." value={form.examples} onChange={(e) => updateField("examples", e.target.value)} />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -421,6 +575,49 @@ export default function AdminCampaignsPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Pending Edit Diff Modal */}
+      <Modal open={!!reviewingEdit} onClose={() => setReviewingEdit(null)} title="Review edit request" className="max-w-lg">
+        {reviewingEdit && (() => {
+          let changes: Record<string, any> = {};
+          try { changes = JSON.parse(reviewingEdit.changes); } catch {}
+          return (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-2.5">
+                <p className="text-sm text-blue-400">
+                  <strong>{reviewingEdit.requestedBy?.username || "Admin"}</strong> requested changes to <strong>{reviewingEdit.campaign?.name}</strong>
+                </p>
+              </div>
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                {Object.entries(changes).map(([field, val]: [string, any]) => {
+                  const oldVal = val?.old ?? "-";
+                  const newVal = val?.new ?? val ?? "-";
+                  return (
+                    <div key={field} className="rounded-xl border border-[var(--border-color)] p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">{field}</p>
+                      <div className="grid gap-2 sm:grid-cols-2 text-sm">
+                        <div>
+                          <p className="text-[10px] text-red-400 mb-0.5">Before</p>
+                          <p className="text-[var(--text-secondary)] break-words">{String(oldVal).substring(0, 200) || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-emerald-400 mb-0.5">After</p>
+                          <p className="text-[var(--text-primary)] break-words">{String(newVal).substring(0, 200) || "-"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="ghost" onClick={() => setReviewingEdit(null)}>Cancel</Button>
+                <Button variant="danger" onClick={() => reviewEdit(reviewingEdit.id, false)} icon={<XCircle className="h-4 w-4" />}>Reject</Button>
+                <Button onClick={() => reviewEdit(reviewingEdit.id, true)} icon={<CheckCircle className="h-4 w-4" />}>Approve</Button>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );

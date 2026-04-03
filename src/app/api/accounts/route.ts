@@ -1,6 +1,10 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 
 function generateVerificationCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -14,6 +18,9 @@ function generateVerificationCode(): string {
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json([], { status: 401 });
+
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
   // Only OWNER can view all accounts. Admin blocked from global accounts view.
@@ -41,6 +48,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
+
+  // Rate limit: 5 account creations per hour per user
+  const rl = checkRateLimit(`account-add:${session.user.id}`, 5, 3_600_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   let data: any;
   try {

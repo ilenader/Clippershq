@@ -71,7 +71,7 @@ export default function DevLoginPage() {
     {
       role: "OWNER" as const,
       label: "Continue as Owner",
-      description: "Full access — dashboard, analytics, settings",
+      description: "Full access: dashboard, analytics, settings",
       icon: <Crown className="h-6 w-6" />,
       color: "text-yellow-400",
       borderColor: "hover:border-yellow-400/50",

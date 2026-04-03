@@ -23,7 +23,7 @@ export function EarningsChart({
   showEmptyMessage = true,
 }: EarningsChartProps) {
   const data = buildEarningsChart(clips, days, filters);
-  const hasEarnings = clips.some((c) => c.earnings > 0);
+  const hasEarnings = clips.some((c) => c.status === "APPROVED" && c.earnings > 0);
 
   return (
     <Card>

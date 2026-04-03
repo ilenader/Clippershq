@@ -27,8 +27,8 @@ html {
   --border-color: #232327;
   --border-subtle: #1c1c20;
   --text-primary: #ffffff;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
+  --text-secondary: #ffffff;
+  --text-muted: #ffffff;
   --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.03);
   --shadow-elevated: 0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
 }
@@ -44,8 +44,8 @@ html {
   --border-color: #e4e4e7;
   --border-subtle: #ececef;
   --text-primary: #09090b;
-  --text-secondary: #52525b;
-  --text-muted: #a1a1aa;
+  --text-secondary: #18181b;
+  --text-muted: #27272a;
   --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
   --shadow-elevated: 0 4px 24px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05);
 }

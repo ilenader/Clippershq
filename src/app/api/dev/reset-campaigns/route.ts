@@ -1,3 +1,4 @@
+import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
 
@@ -13,6 +14,12 @@ async function truncate(table: string): Promise<string> {
 export async function POST() {
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Require authenticated OWNER even in dev
+  const session = await getSession();
+  if (!session?.user || (session.user as any).role !== "OWNER") {
+    return NextResponse.json({ error: "Owner role required" }, { status: 403 });
   }
 
   if (!db) {

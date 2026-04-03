@@ -70,6 +70,7 @@ export function isDevBypassEnabled(): boolean {
 export function isDevBypassEnabledClient(): boolean {
   return (
     typeof window !== "undefined" &&
+    process.env.NODE_ENV !== "production" &&
     process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true"
   );
 }

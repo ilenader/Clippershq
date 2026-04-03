@@ -3,10 +3,38 @@
 import { useSession, signOut } from "next-auth/react";
 import { useDevAuth } from "@/components/dev-auth-provider";
 import { useTheme } from "@/components/theme-provider";
-import { Sun, Moon, LogOut, ChevronDown, ArrowRightLeft } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { Sun, Moon, LogOut, ChevronDown, ArrowRightLeft, Bell } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+
+// ─── Notification Sound (different from chat) ─────────────
+let notifSoundAudio: HTMLAudioElement | null = null;
+if (typeof window !== "undefined") {
+  try {
+    notifSoundAudio = new Audio("/sounds/chat-ping.wav");
+    notifSoundAudio.volume = 0.7;
+    notifSoundAudio.preload = "auto";
+  } catch {}
+}
+function playNotifSound() {
+  try {
+    if (!notifSoundAudio) {
+      notifSoundAudio = new Audio("/sounds/chat-ping.wav");
+      notifSoundAudio.volume = 0.7;
+      notifSoundAudio.preload = "auto";
+    }
+    notifSoundAudio.currentTime = 0;
+    notifSoundAudio.play().catch(() => {});
+  } catch {}
+}
+
+function formatNotifTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  } catch { return ""; }
+}
 
 export function Navbar() {
   const { data: session } = useSession();
@@ -17,12 +45,76 @@ export function Navbar() {
   const router = useRouter();
 
   const effectiveUser = isDevMode && devSession ? devSession.user : session?.user;
+  const [notifCount, setNotifCount] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const prevNotifCountRef = useRef(0);
+  const sseRef = useRef<EventSource | null>(null);
+
+  // Fetch full notification list (for dropdown content)
+  const fetchNotifList = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications");
+      const data = await res.json();
+      if (data.notifications) setNotifications(data.notifications.slice(0, 8));
+      const newCount = data.unreadCount || 0;
+      prevNotifCountRef.current = newCount;
+      setNotifCount(newCount);
+    } catch {}
+  }, []);
+
+  // SSE connection for instant notification delivery
+  // Browsers do NOT throttle SSE in background tabs (unlike setInterval)
+  useEffect(() => {
+    // Initial fetch for notification list
+    fetchNotifList();
+
+    const es = new EventSource("/api/notifications/sse");
+    sseRef.current = es;
+
+    es.addEventListener("notif", (e) => {
+      try {
+        const { count } = JSON.parse(e.data);
+        // Play sound if count increased
+        if (count > prevNotifCountRef.current && prevNotifCountRef.current >= 0) {
+          playNotifSound();
+        }
+        prevNotifCountRef.current = count;
+        setNotifCount(count);
+        // Refresh notification list when count changes
+        if (count > 0) {
+          fetchNotifList();
+        }
+      } catch {}
+    });
+
+    es.onerror = () => {
+      // SSE reconnects automatically — EventSource handles this
+    };
+
+    return () => {
+      es.close();
+      sseRef.current = null;
+    };
+  }, [fetchNotifList]);
+
+  const markAllRead = async () => {
+    try {
+      await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "markRead" }),
+      });
+      setNotifCount(0);
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch {}
+  };
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -48,7 +140,7 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--border-color)] bg-[var(--bg-glass)] px-6 backdrop-blur-xl backdrop-saturate-150 transition-theme">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--border-color)] bg-[var(--bg-glass)] px-4 lg:px-6 backdrop-blur-xl backdrop-saturate-150 transition-theme">
       <div>
         {isDevMode && devRole && (
           <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/20 bg-yellow-500/5 px-2.5 py-1">
@@ -59,6 +151,46 @@ export function Navbar() {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Notification bell */}
+        <div className="relative" ref={notifRef}>
+          <button onClick={() => { setNotifOpen(!notifOpen); if (!notifOpen) fetchNotifList(); }}
+            className="relative rounded-xl p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all cursor-pointer">
+            <Bell className="h-4 w-4" />
+            {notifCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-white">
+                {notifCount > 9 ? "9+" : notifCount}
+              </span>
+            )}
+          </button>
+          {notifOpen && (
+            <div className="fixed sm:absolute right-2 sm:right-0 top-14 sm:top-full sm:mt-1 w-[calc(100vw-16px)] sm:w-80 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-elevated)] overflow-hidden z-50">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border-subtle)]">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">Notifications</p>
+                {notifCount > 0 && (
+                  <button onClick={markAllRead} className="text-xs text-accent hover:underline cursor-pointer">Mark all read</button>
+                )}
+              </div>
+              <div className="max-h-72 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">No notifications yet</p>
+                ) : (
+                  notifications.map((n: any) => (
+                    <div key={n.id} className={`px-4 py-2.5 border-b border-[var(--border-subtle)] last:border-b-0 ${!n.isRead ? "bg-accent/5" : ""}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-[var(--text-primary)]">{n.title}</p>
+                        {n.createdAt && (
+                          <span className="text-[11px] text-[var(--text-muted)] tabular-nums flex-shrink-0">{formatNotifTime(n.createdAt)}</span>
+                        )}
+                      </div>
+                      {n.body && <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">{n.body}</p>}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         <button
           onClick={toggleTheme}
           className="rounded-xl p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all cursor-pointer"

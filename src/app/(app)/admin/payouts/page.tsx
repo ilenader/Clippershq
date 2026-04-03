@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Wallet, Check, X, Eye } from "lucide-react";
+import { Wallet, Check, X, Eye, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { formatRelative, formatCurrency } from "@/lib/utils";
 
@@ -27,16 +28,20 @@ export default function AdminPayoutsPage() {
   const [rejectModal, setRejectModal] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [acting, setActing] = useState(false);
+  const [calls, setCalls] = useState<any[]>([]);
 
   const load = () => {
-    fetch("/api/payouts")
-      .then((r) => r.json())
-      .then(setPayouts)
+    Promise.all([
+      fetch("/api/payouts").then((r) => r.json()),
+      fetch("/api/calls").then((r) => r.json()).catch(() => []),
+    ])
+      .then(([p, c]) => { setPayouts(Array.isArray(p) ? p : []); setCalls(Array.isArray(c) ? c : []); })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
+  useAutoRefresh(load, 15000);
 
   const filteredPayouts = filterStatuses.length > 0
     ? payouts.filter((p: any) => filterStatuses.includes(p.status))
@@ -60,6 +65,25 @@ export default function AdminPayoutsPage() {
     }
     setActing(false);
   };
+
+  const requestCall = async (payoutId: string) => {
+    setActing(true);
+    try {
+      const res = await fetch("/api/calls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payoutId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      toast.success("Call request sent! The clipper will be notified to pick a time.");
+      load();
+    } catch (err: any) { toast.error(err.message); }
+    setActing(false);
+  };
+
+  const getCallForPayout = (payoutId: string) =>
+    calls.find((c: any) => c.payoutId === payoutId && c.status !== "CANCELLED");
 
   const statusMap: Record<string, string> = {
     REQUESTED: "pending", UNDER_REVIEW: "pending",
@@ -86,12 +110,14 @@ export default function AdminPayoutsPage() {
           description={filterStatuses.length > 0 ? "No payouts matching selected filters." : "No payouts found."}
         />
       ) : (
-        <Table>
+        <div className="overflow-x-auto -mx-4 px-4 lg:mx-0 lg:px-0 pb-2"><Table>
           <TableHeader>
             <TableRow>
               <TableHead>User</TableHead>
+              <TableHead>Campaign</TableHead>
               <TableHead>Amount</TableHead>
               <TableHead>Wallet</TableHead>
+              <TableHead>Asset / Chain</TableHead>
               <TableHead>Discord</TableHead>
               <TableHead>Note</TableHead>
               <TableHead>Requested</TableHead>
@@ -102,47 +128,78 @@ export default function AdminPayoutsPage() {
           <TableBody>
             {filteredPayouts.map((payout: any) => (
               <TableRow key={payout.id}>
-                <TableCell className="font-medium text-[var(--text-primary)]">{payout.user?.username || "—"}</TableCell>
-                <TableCell className="font-semibold">{formatCurrency(payout.amount)}</TableCell>
-                <TableCell className="max-w-[150px] truncate text-xs">{payout.walletAddress}</TableCell>
-                <TableCell className="text-sm text-[var(--text-primary)]">{payout.discordUsername || "—"}</TableCell>
-                <TableCell className="max-w-[200px] truncate text-xs">{payout.proofNote || "—"}</TableCell>
+                <TableCell className="font-medium text-[var(--text-primary)]">{payout.user?.username || "-"}</TableCell>
+                <TableCell className="text-sm text-[var(--text-primary)]">{payout.campaign?.name || "All"}</TableCell>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold">{payout.finalAmount != null ? formatCurrency(payout.finalAmount) : formatCurrency(payout.amount)}</p>
+                    {payout.finalAmount != null && (
+                      <p className="text-[11px] text-[var(--text-muted)] tabular-nums whitespace-nowrap">
+                        {formatCurrency(payout.amount)} req
+                        {payout.feeAmount > 0 && <span className="text-red-400"> -{formatCurrency(payout.feeAmount)}</span>}
+                        {payout.bonusAmount > 0 && <span className="text-emerald-400"> +{formatCurrency(payout.bonusAmount)}</span>}
+                      </p>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="max-w-[150px] truncate text-xs" title={payout.walletAddress}>{payout.walletAddress}</TableCell>
+                <TableCell className="text-xs text-[var(--text-primary)]">
+                  {payout.walletAsset || payout.walletChain ? (
+                    <div>
+                      {payout.walletAsset && <span className="block">{payout.walletAsset}</span>}
+                      {payout.walletChain && <span className="block text-[var(--text-muted)]">{payout.walletChain}</span>}
+                    </div>
+                  ) : "-"}
+                </TableCell>
+                <TableCell className="text-sm text-[var(--text-primary)]">{payout.discordUsername || "-"}</TableCell>
+                <TableCell className="max-w-[200px] truncate text-xs">{payout.proofNote || "-"}</TableCell>
                 <TableCell>{formatRelative(payout.createdAt)}</TableCell>
                 <TableCell><Badge variant={statusMap[payout.status] as any}>{payout.status.replace("_", " ")}</Badge></TableCell>
                 <TableCell>
-                  {payout.status === "REQUESTED" && (
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => handleReview(payout.id, "UNDER_REVIEW")} loading={acting} icon={<Eye className="h-3 w-3" />}>
-                        Review
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleReview(payout.id, "APPROVED")} loading={acting} icon={<Check className="h-3 w-3" />}>
-                        Approve
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setRejectModal(payout.id)} icon={<X className="h-3 w-3" />}>
-                        Reject
-                      </Button>
-                    </div>
-                  )}
-                  {payout.status === "UNDER_REVIEW" && (
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => handleReview(payout.id, "APPROVED")} loading={acting} icon={<Check className="h-3 w-3" />}>
-                        Approve
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setRejectModal(payout.id)} icon={<X className="h-3 w-3" />}>
-                        Reject
-                      </Button>
-                    </div>
-                  )}
-                  {payout.status === "APPROVED" && (
-                    <Button size="sm" onClick={() => handleReview(payout.id, "PAID")} loading={acting}>
-                      Mark paid
-                    </Button>
-                  )}
+                  <div className="space-y-1">
+                    {payout.status === "REQUESTED" && (
+                      <div className="flex gap-1 flex-wrap">
+                        <Button size="sm" variant="ghost" onClick={() => handleReview(payout.id, "UNDER_REVIEW")} loading={acting} icon={<Eye className="h-3 w-3" />}>Review</Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleReview(payout.id, "APPROVED")} loading={acting} icon={<Check className="h-3 w-3" />}>Approve</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setRejectModal(payout.id)} icon={<X className="h-3 w-3" />}>Reject</Button>
+                      </div>
+                    )}
+                    {payout.status === "UNDER_REVIEW" && (
+                      <div className="flex gap-1 flex-wrap">
+                        <Button size="sm" variant="ghost" onClick={() => handleReview(payout.id, "APPROVED")} loading={acting} icon={<Check className="h-3 w-3" />}>Approve</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setRejectModal(payout.id)} icon={<X className="h-3 w-3" />}>Reject</Button>
+                      </div>
+                    )}
+                    {payout.status === "APPROVED" && (
+                      <Button size="sm" onClick={() => handleReview(payout.id, "PAID")} loading={acting}>Mark paid</Button>
+                    )}
+                    {/* Call scheduling */}
+                    {(() => {
+                      const call = getCallForPayout(payout.id);
+                      if (call) {
+                        if (call.status === "PENDING") return <p className="text-xs text-yellow-400">⏳ Waiting for clipper to pick time</p>;
+                        if (call.status === "CONFIRMED") {
+                          const dt = call.scheduledAt ? new Date(call.scheduledAt).toLocaleString("en-US", { timeZone: "Europe/Belgrade", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "TBD";
+                          return <p className="text-xs text-accent">📞 Call: {dt} — {call.discordUsername}</p>;
+                        }
+                        if (call.status === "COMPLETED") return <p className="text-xs text-emerald-400">✅ Call completed</p>;
+                        if (call.status === "MISSED") return <p className="text-xs text-red-400">❌ Clipper missed the call</p>;
+                      }
+                      if (payout.status === "REQUESTED" || payout.status === "UNDER_REVIEW") {
+                        return (
+                          <Button size="sm" variant="outline" onClick={() => requestCall(payout.id)} loading={acting} icon={<Phone className="h-3 w-3" />}>
+                            Schedule Call
+                          </Button>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table></div>
       )}
 
       <Modal open={!!rejectModal} onClose={() => setRejectModal(null)} title="Reject payout">

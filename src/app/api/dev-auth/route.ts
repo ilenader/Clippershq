@@ -6,8 +6,12 @@ import { NextRequest, NextResponse } from "next/server";
  * Body: { role: "CLIPPER" | "ADMIN" | "OWNER" } to log in, or { logout: true } to clear.
  *
  * Only works in development with DEV_AUTH_BYPASS=true.
+ * BLOCKED entirely in production regardless of env vars.
  */
 export async function POST(req: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   if (!isDevBypassEnabled()) {
     return NextResponse.json({ error: "Not available" }, { status: 403 });
   }
@@ -38,6 +42,9 @@ export async function POST(req: NextRequest) {
 
 /** GET /api/dev-auth — Check current dev session */
 export async function GET(req: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   if (!isDevBypassEnabled()) {
     return NextResponse.json({ enabled: false });
   }

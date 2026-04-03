@@ -1,21 +1,27 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
+import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-/** GET — list campaign admin assignments. OWNER sees all. */
+/** GET — list campaign admin assignments. OWNER sees all. ADMIN sees own. */
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json([], { status: 401 });
 
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
+
   const role = (session.user as any).role;
-  if (role !== "OWNER") {
+  if (role !== "OWNER" && role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
+    const where = role === "OWNER" ? {} : { userId: session.user.id };
     const assignments = await db.campaignAdmin.findMany({
+      where,
       include: {
         user: { select: { id: true, username: true, email: true, role: true } },
         campaign: { select: { id: true, name: true } },
@@ -32,6 +38,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const banCheck2 = checkBanStatus(session);
+  if (banCheck2) return banCheck2;
 
   const role = (session.user as any).role;
   if (role !== "OWNER") {
@@ -71,6 +80,9 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const banCheck3 = checkBanStatus(session);
+  if (banCheck3) return banCheck3;
 
   const role = (session.user as any).role;
   if (role !== "OWNER") {

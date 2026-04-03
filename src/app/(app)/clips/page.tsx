@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,9 +16,20 @@ import { toast } from "sonner";
 import { formatRelative, formatNumber, formatCurrency } from "@/lib/utils";
 
 export default function ClipsPage() {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const userRole = (session?.user as any)?.role;
+
+  // Role isolation: clips page is clipper-only
+  useEffect(() => {
+    if (session && userRole && userRole !== "CLIPPER") {
+      router.replace("/admin");
+    }
+  }, [session, userRole, router]);
   const [clips, setClips] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [joinedCampaignIds, setJoinedCampaignIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -27,22 +40,46 @@ export default function ClipsPage() {
     note: "",
   });
 
-  const load = () => {
-    Promise.all([
-      fetch("/api/clips/mine").then((r) => r.json()),
-      fetch("/api/campaigns?status=ACTIVE").then((r) => r.json()),
-      fetch("/api/accounts/mine?status=APPROVED").then((r) => r.json()),
-    ])
-      .then(([clipsData, campaignsData, accountsData]) => {
-        setClips(clipsData);
-        setCampaigns(campaignsData);
-        setAccounts(accountsData);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const load = async () => {
+    try {
+      const ts = Date.now();
+      const [clipsRes, campaignsRes, accountsRes, joinsRes] = await Promise.all([
+        fetch(`/api/clips/mine?_t=${ts}`, { cache: "no-store" }),
+        fetch(`/api/campaigns?status=ACTIVE&_t=${ts}`, { cache: "no-store" }),
+        fetch(`/api/accounts/mine?status=APPROVED&_t=${ts}`, { cache: "no-store" }),
+        fetch(`/api/campaign-accounts?_t=${ts}`, { cache: "no-store" }),
+      ]);
+      const [clipsData, campaignsData, accountsData, joinsData] = await Promise.all([
+        clipsRes.json(),
+        campaignsRes.json(),
+        accountsRes.json(),
+        joinsRes.json(),
+      ]);
+      setClips(Array.isArray(clipsData) ? clipsData : []);
+      setCampaigns(Array.isArray(campaignsData) ? campaignsData : []);
+      setAccounts(Array.isArray(accountsData) ? accountsData : []);
+      const joinsArr = Array.isArray(joinsData) ? joinsData : [];
+      setJoinedCampaignIds(new Set(joinsArr.map((j: any) => j.campaignId)));
+    } catch (err) {
+      console.error("Failed to load clips page data:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
+
+  // Compute remaining daily submissions per campaign
+  const getDailyRemaining = (campaignId: string): { remaining: number; limit: number } => {
+    const campaign = campaigns.find((c: any) => c.id === campaignId);
+    const limit = campaign?.maxClipsPerUserPerDay ?? 3;
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const todayCount = clips.filter(
+      (c: any) => c.campaignId === campaignId && new Date(c.createdAt) >= startOfDay && !c.isDeleted
+    ).length;
+    return { remaining: Math.max(0, limit - todayCount), limit };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +87,24 @@ export default function ClipsPage() {
       toast.error("Please fill in all required fields.");
       return;
     }
+
+    // Frontend platform match check
+    const selectedAccount = accounts.find((a: any) => a.id === form.clipAccountId);
+    if (selectedAccount) {
+      const url = form.clipUrl.toLowerCase();
+      const plat = selectedAccount.platform;
+      const platformUrls: Record<string, string[]> = {
+        TikTok: ["tiktok.com"],
+        Instagram: ["instagram.com", "instagr.am"],
+        YouTube: ["youtube.com", "youtu.be"],
+      };
+      const expected = platformUrls[plat] || [];
+      if (expected.length > 0 && !expected.some((d) => url.includes(d))) {
+        toast.error(`Platform mismatch: your account is ${plat} but the URL is not a ${plat} link.`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/clips", {
@@ -61,10 +116,11 @@ export default function ClipsPage() {
         const data = await res.json();
         throw new Error(data.error || "Failed to submit");
       }
-      toast.success("Your clip was submitted successfully.");
       setShowModal(false);
       setForm({ campaignId: "", clipAccountId: "", clipUrl: "", note: "" });
-      load();
+      // Await load so clips list is updated before success toast
+      await load();
+      toast.success("Your clip was submitted successfully.");
     } catch (err: any) {
       toast.error(err.message || "Submission failed. Please try again or contact support.");
     }
@@ -103,52 +159,35 @@ export default function ClipsPage() {
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[var(--border-color)]">
-          {/* Header */}
-          <div className="grid grid-cols-[160px_140px_80px_72px_72px_72px_72px_80px_72px] gap-2 px-4 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-            <span>Account</span>
-            <span>Campaign</span>
-            <span>Clip</span>
-            <span className="text-right">Views</span>
-            <span className="text-right">Likes</span>
-            <span className="text-right">Comments</span>
-            <span className="text-right">Shares</span>
-            <span className="text-right">Earned</span>
-            <span>Status</span>
-          </div>
-          {/* Rows */}
+        <div className="space-y-2">
           {clips.map((clip: any) => {
             const stat = clip.stats?.[0];
             return (
-              <div key={clip.id} className="grid grid-cols-[160px_140px_80px_72px_72px_72px_72px_80px_72px] gap-2 items-center px-4 py-2.5 border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors">
-                {/* Account */}
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                    {clip.clipAccount?.username || "—"}
-                  </p>
-                  <p className="text-[11px] text-[var(--text-muted)]">{formatRelative(clip.createdAt)}</p>
+              <div key={clip.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 hover:bg-[var(--bg-card-hover)] transition-colors">
+                {/* Top: account + campaign + status */}
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{clip.clipAccount?.username || "-"}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{clip.campaign?.name || "-"} · {formatRelative(clip.createdAt)}</p>
+                  </div>
+                  <Badge variant={clip.status.toLowerCase() as any}>{clip.status}</Badge>
                 </div>
-                {/* Campaign */}
-                <p className="text-sm text-[var(--text-secondary)] truncate">{clip.campaign?.name || "—"}</p>
-                {/* Clip link */}
-                <a
-                  href={clip.clipUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-accent/15 bg-accent/5 px-2.5 py-1 text-xs font-medium text-accent hover:bg-accent/10 transition-colors truncate"
-                >
-                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                  Open
-                </a>
-                {/* Metrics */}
-                <span className="text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">{stat ? formatNumber(stat.views) : "0"}</span>
-                <span className="text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">{stat ? formatNumber(stat.likes) : "0"}</span>
-                <span className="text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">{stat ? formatNumber(stat.comments) : "0"}</span>
-                <span className="text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">{stat ? formatNumber(stat.shares) : "0"}</span>
-                {/* Earnings */}
-                <span className="text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">{clip.earnings > 0 ? formatCurrency(clip.earnings) : "—"}</span>
-                {/* Status */}
-                <Badge variant={clip.status.toLowerCase() as any}>{clip.status}</Badge>
+                {/* Middle: link + stats */}
+                <div className="flex items-center gap-4 flex-wrap">
+                  <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-accent/15 bg-accent/5 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10 transition-colors">
+                    <ExternalLink className="h-3 w-3" /> Open clip
+                  </a>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.views) : "0"}</span> <span className="text-[var(--text-muted)]">views</span></span>
+                    <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.likes) : "0"}</span> <span className="text-[var(--text-muted)]">likes</span></span>
+                    <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.comments) : "0"}</span> <span className="text-[var(--text-muted)]">comments</span></span>
+                    <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.shares) : "0"}</span> <span className="text-[var(--text-muted)]">shares</span></span>
+                    {clip.status === "APPROVED" && clip.earnings > 0 && <span className="font-medium text-accent tabular-nums">{formatCurrency(clip.earnings)}</span>}
+                  </div>
+                </div>
+                {clip.status === "REJECTED" && clip.rejectionReason && (
+                  <div className="mt-2 rounded-lg bg-red-500/5 px-3 py-1.5 text-xs text-red-400">Reason: {clip.rejectionReason}</div>
+                )}
               </div>
             );
           })}
@@ -164,12 +203,28 @@ export default function ClipsPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Select id="campaignId" label="Campaign *" options={campaigns.map((c: any) => ({ value: c.id, label: `${c.name} (${c.platform})` }))} placeholder="Select campaign" value={form.campaignId} onChange={(e) => setForm({ ...form, campaignId: e.target.value })} />
+            <Select id="campaignId" label="Campaign *" options={campaigns.filter((c: any) => joinedCampaignIds.has(c.id)).map((c: any) => ({ value: c.id, label: `${c.name} (${c.platform})` }))} placeholder={joinedCampaignIds.size === 0 ? "Join a campaign first" : "Select campaign"} value={form.campaignId} onChange={(e) => setForm({ ...form, campaignId: e.target.value })} />
             <Select id="clipAccountId" label="Account *" options={accounts.map((a: any) => ({ value: a.id, label: `${a.username} (${a.platform})` }))} placeholder="Select approved account" value={form.clipAccountId} onChange={(e) => setForm({ ...form, clipAccountId: e.target.value })} />
-            <Input id="clipUrl" label="Clip URL *" placeholder="https://tiktok.com/..." value={form.clipUrl} onChange={(e) => setForm({ ...form, clipUrl: e.target.value })} />
+            <Input id="clipUrl" label="Clip URL *" placeholder="https://tiktok.com/@user/video/..." value={form.clipUrl} onChange={(e) => setForm({ ...form, clipUrl: e.target.value })} />
             <Textarea id="note" label="Note (optional)" placeholder="Any additional info..." value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2.5">
-              <p className="text-xs text-[var(--text-muted)]">Submitted clips are reviewed within 24–48 hours.</p>
+            {form.campaignId && (() => {
+              const { remaining, limit } = getDailyRemaining(form.campaignId);
+              return (
+                <div className={`rounded-lg px-3 py-2 text-xs font-medium ${remaining === 0 ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-accent/10 text-accent border border-accent/20"}`}>
+                  {remaining === 0
+                    ? "You reached the maximum number of uploaded clips for this campaign today."
+                    : `You have ${remaining} of ${limit} submission${limit > 1 ? "s" : ""} remaining today for this campaign.`
+                  }
+                </div>
+              );
+            })()}
+            <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-3 py-2.5 space-y-1">
+              <p className="text-xs font-medium text-yellow-400">Important rules</p>
+              <p className="text-xs text-[var(--text-muted)]">• You must join a campaign before submitting clips to it</p>
+              <p className="text-xs text-[var(--text-muted)]">• The clip URL must match your account platform (TikTok account → TikTok link)</p>
+              <p className="text-xs text-[var(--text-muted)]">• You must submit the clip within 2 hours after posting</p>
+              <p className="text-xs text-accent">• Post time is verified automatically from the platform</p>
+              <p className="text-xs text-[var(--text-muted)]">• Clips are reviewed within 24–48 hours</p>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>

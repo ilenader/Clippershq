@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { SimpleLineChart, SimpleMultiLineChart } from "@/components/ui/simple-chart";
-import { TrendingUp, Eye, Users, Film, Megaphone, UserCircle, Calendar, Heart } from "lucide-react";
+import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-select";
+import { TrendingUp, Eye, Users, Film, Megaphone, Calendar, Heart, CheckCircle, Clock, DollarSign } from "lucide-react";
 import { formatNumber, formatCurrency } from "@/lib/utils";
 
 type MetricKey = "views" | "likes" | "comments" | "shares";
@@ -55,6 +56,25 @@ function buildPlatformDist(accounts: any[]): { name: string; count: number; perc
     .sort((a, b) => b.count - a.count);
 }
 
+function buildPlatformViewDist(clips: any[]): { name: string; clips: number; views: number; viewPercent: number }[] {
+  const data: Record<string, { clips: number; views: number }> = {};
+  for (const clip of clips) {
+    const platform = clip.clipAccount?.platform || clip.campaign?.platform?.split(",")[0]?.trim() || "Other";
+    if (!data[platform]) data[platform] = { clips: 0, views: 0 };
+    data[platform].clips++;
+    data[platform].views += clip.stats?.[0]?.views || 0;
+  }
+  const totalViews = Object.values(data).reduce((s, d) => s + d.views, 0) || 1;
+  return Object.entries(data)
+    .map(([name, d]) => ({
+      name,
+      clips: d.clips,
+      views: d.views,
+      viewPercent: Math.round((d.views / totalViews) * 1000) / 10,
+    }))
+    .sort((a, b) => b.views - a.views);
+}
+
 function isToday(dateStr: string): boolean {
   const d = new Date(dateStr);
   const n = new Date();
@@ -81,6 +101,7 @@ export default function AdminAnalyticsPage() {
   const [allAccounts, setAllAccounts] = useState<any[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(["views"]);
+  const [timeframeDays, setTimeframeDays] = useState(15);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -98,9 +119,10 @@ export default function AdminAnalyticsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredClips = selectedCampaigns.length > 0
+  const campaignFilteredClips = selectedCampaigns.length > 0
     ? allClips.filter((c: any) => selectedCampaigns.includes(c.campaignId))
     : allClips;
+  const filteredClips = filterByTimeframe(campaignFilteredClips, timeframeDays);
 
   const uniqueClippers = new Set(filteredClips.map((c: any) => c.userId).filter(Boolean));
   const totalViews = filteredClips.reduce((sum: number, c: any) => sum + (c.stats?.[0]?.views || 0), 0);
@@ -108,11 +130,14 @@ export default function AdminAnalyticsPage() {
   const activeCampaigns = allCampaigns.filter((c: any) => c.status === "ACTIVE");
   const withCpm = activeCampaigns.filter((c: any) => c.cpmRate > 0);
   const avgCpm = withCpm.length > 0 ? withCpm.reduce((s: number, c: any) => s + c.cpmRate, 0) / withCpm.length : 0;
-  const approvedAccounts = allAccounts.filter((a: any) => a.status === "APPROVED").length;
+  const approvedClips = filteredClips.filter((c: any) => c.status === "APPROVED").length;
+  const pendingClips = filteredClips.filter((c: any) => c.status === "PENDING").length;
+  const totalEarnings = filteredClips.filter((c: any) => c.status === "APPROVED").reduce((s: number, c: any) => s + (c.earnings || 0), 0);
   const clipsToday = filteredClips.filter((c: any) => c.createdAt && isToday(c.createdAt)).length;
 
-  const clipsPerDay = buildDailyChart(filteredClips, 14);
+  const clipsPerDay = buildDailyChart(filteredClips, timeframeDays);
   const platformDist = buildPlatformDist(allAccounts);
+  const platformViewDist = buildPlatformViewDist(filteredClips);
   const campaignOptions = allCampaigns.map((c: any) => ({ value: c.id, label: c.name }));
 
   const activeMetrics = selectedMetrics.length > 0 ? selectedMetrics : ["views"];
@@ -120,7 +145,7 @@ export default function AdminAnalyticsPage() {
   // Build series for multi-line chart
   const chartSeries = activeMetrics.map((m) => ({
     label: metricOptions.find((o) => o.value === m)?.label || m,
-    data: buildMetricByDay(filteredClips, 14, m as MetricKey),
+    data: buildMetricByDay(filteredClips, timeframeDays, m as MetricKey),
     color: metricColors[m] || "#2596be",
   }));
 
@@ -145,21 +170,24 @@ export default function AdminAnalyticsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
+        <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
         <MultiDropdown label="Campaign" options={campaignOptions} values={selectedCampaigns} onChange={setSelectedCampaigns} allLabel="All campaigns" />
         <MultiDropdown label="Metrics" options={metricOptions} values={selectedMetrics} onChange={setSelectedMetrics} allLabel="All metrics" />
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Active campaigns", value: activeCampaigns.length, icon: <Megaphone className="h-5 w-5" />, color: "text-accent" },
-          { label: "Approved accounts", value: approvedAccounts, icon: <UserCircle className="h-5 w-5" />, color: "text-accent" },
           { label: "Total clips", value: filteredClips.length, icon: <Film className="h-5 w-5" />, color: "text-accent" },
+          { label: "Active clippers", value: uniqueClippers.size, icon: <Users className="h-5 w-5" />, color: "text-accent" },
           { label: "Clips today", value: clipsToday, icon: <Calendar className="h-5 w-5" />, color: "text-accent" },
+          { label: "Approved clips", value: approvedClips, icon: <CheckCircle className="h-5 w-5" />, color: "text-emerald-400" },
+          { label: "Pending clips", value: pendingClips, icon: <Clock className="h-5 w-5" />, color: "text-amber-400" },
           { label: "Total views", value: formatNumber(totalViews), icon: <Eye className="h-5 w-5" />, color: "text-[var(--text-muted)]" },
+          { label: "Total earnings", value: formatCurrency(totalEarnings), icon: <DollarSign className="h-5 w-5" />, color: "text-emerald-400" },
           { label: "Total likes", value: formatNumber(totalLikes), icon: <Heart className="h-5 w-5" />, color: "text-[var(--text-muted)]" },
-          { label: "Active clippers", value: uniqueClippers.size, icon: <Users className="h-5 w-5" />, color: "text-[var(--text-muted)]" },
-          { label: "Avg. CPM", value: avgCpm > 0 ? formatCurrency(avgCpm) : "0", icon: <TrendingUp className="h-5 w-5" />, color: "text-[var(--text-muted)]" },
+          { label: "Avg. CPM", value: avgCpm > 0 ? formatCurrency(avgCpm) : "$0", icon: <TrendingUp className="h-5 w-5" />, color: "text-[var(--text-muted)]" },
         ].map((stat) => (
           <Card key={stat.label}>
             <div className="flex items-center justify-between">
@@ -174,6 +202,8 @@ export default function AdminAnalyticsPage() {
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
+          {/* Spacer to match the legend height in the multi-line chart */}
+          <div className="mb-3 h-5" />
           <SimpleLineChart data={clipsPerDay} title="Clips submitted per day" color="#2596be" height={200} valueSuffix=" clips" />
           {filteredClips.length === 0 && <p className="mt-3 text-sm text-[var(--text-muted)]">No clips submitted yet.</p>}
         </Card>
@@ -188,29 +218,56 @@ export default function AdminAnalyticsPage() {
       </div>
 
       {/* Platform Distribution */}
-      <Card>
-        <h3 className="mb-4 text-[15px] font-semibold text-[var(--text-primary)]">Platform distribution</h3>
-        {platformDist.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">No accounts submitted yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {platformDist.map((platform) => (
-              <div key={platform.name}>
-                <div className="flex justify-between text-sm mb-1.5">
-                  <span className="text-[var(--text-primary)] font-medium">{platform.name}</span>
-                  <span className="text-[var(--text-muted)] tabular-nums">{platform.count} account{platform.count !== 1 ? "s" : ""} · {platform.percent}%</span>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <h3 className="mb-4 text-[15px] font-semibold text-[var(--text-primary)]">Platform: accounts</h3>
+          {platformDist.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No accounts submitted yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {platformDist.map((platform) => (
+                <div key={platform.name}>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span className="text-[var(--text-primary)] font-medium">{platform.name}</span>
+                    <span className="text-[var(--text-muted)] tabular-nums">{platform.count} account{platform.count !== 1 ? "s" : ""} · {platform.percent}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-[var(--bg-input)]">
+                    <div
+                      className="h-full rounded-full bg-accent transition-all duration-500"
+                      style={{ width: `${Math.max(platform.percent, 2)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-2 rounded-full bg-[var(--bg-input)]">
-                  <div
-                    className="h-full rounded-full bg-accent transition-all duration-500"
-                    style={{ width: `${Math.max(platform.percent, 2)}%` }}
-                  />
+              ))}
+            </div>
+          )}
+        </Card>
+        <Card>
+          <h3 className="mb-4 text-[15px] font-semibold text-[var(--text-primary)]">Platform: views & clips</h3>
+          {platformViewDist.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No clips submitted yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {platformViewDist.map((p) => (
+                <div key={p.name}>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span className="text-[var(--text-primary)] font-medium">{p.name}</span>
+                    <span className="text-[var(--text-muted)] tabular-nums">
+                      {p.clips} clip{p.clips !== 1 ? "s" : ""} · {formatNumber(p.views)} views · {p.viewPercent}%
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-[var(--bg-input)]">
+                    <div
+                      className="h-full rounded-full bg-accent transition-all duration-500"
+                      style={{ width: `${Math.max(p.viewPercent, 2)}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

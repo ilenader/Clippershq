@@ -1,11 +1,18 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { getUserCampaignIds } from "@/lib/campaign-access";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json([], { status: 401 });
+
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
   const status = req.nextUrl.searchParams.get("status") || undefined;
@@ -55,6 +62,9 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
+
   const role = (session.user as any).role;
   if (role !== "ADMIN" && role !== "OWNER") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -65,6 +75,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
+  // Rate limit: 10 campaign creations per hour per user
+  const rl = checkRateLimit(`campaign-create:${session.user.id}`, 10, 3_600_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   if (!data.name || !data.platform) {
     return NextResponse.json({ error: "Name and platform are required" }, { status: 400 });
   }
@@ -74,7 +88,7 @@ export async function POST(req: NextRequest) {
     clientName: data.clientName || null,
     platform: data.platform,
     budget: data.budget ? parseFloat(data.budget) : null,
-    cpmRate: data.cpmRate ? parseFloat(data.cpmRate) : null,
+    clipperCpm: data.clipperCpm ? parseFloat(data.clipperCpm) : null,
     payoutRule: data.payoutRule || null,
     minViews: data.minViews ? parseInt(data.minViews) : null,
     maxPayoutPerClip: data.maxPayoutPerClip ? parseFloat(data.maxPayoutPerClip) : null,
@@ -99,17 +113,18 @@ export async function POST(req: NextRequest) {
 
   try {
     // Build clean create data — only include non-null values
+    // ADMIN-created campaigns go to DRAFT for owner review; OWNER campaigns go ACTIVE
     const createData: Record<string, any> = {
       name: campaignData.name,
       platform: campaignData.platform,
-      status: campaignData.status || "ACTIVE",
+      status: role === "ADMIN" ? "DRAFT" : (campaignData.status || "ACTIVE"),
       createdById: session.user.id,
     };
 
     // Optional fields — only include if they have actual values
     if (campaignData.clientName) createData.clientName = campaignData.clientName;
     if (campaignData.budget) createData.budget = campaignData.budget;
-    if (campaignData.cpmRate) createData.cpmRate = campaignData.cpmRate;
+    if (campaignData.clipperCpm) createData.clipperCpm = campaignData.clipperCpm;
     if (campaignData.payoutRule) createData.payoutRule = campaignData.payoutRule;
     if (campaignData.minViews) createData.minViews = campaignData.minViews;
     if (campaignData.maxPayoutPerClip) createData.maxPayoutPerClip = campaignData.maxPayoutPerClip;
@@ -127,6 +142,9 @@ export async function POST(req: NextRequest) {
     if (campaignData.reviewTiming) createData.reviewTiming = campaignData.reviewTiming;
     if (campaignData.startDate) createData.startDate = new Date(campaignData.startDate);
     if (campaignData.endDate) createData.endDate = new Date(campaignData.endDate);
+    // Max clips per user per day (validated 1-6, default 3)
+    const maxClips = data.maxClipsPerUserPerDay ? parseInt(data.maxClipsPerUserPerDay) : 3;
+    createData.maxClipsPerUserPerDay = Math.max(1, Math.min(6, isNaN(maxClips) ? 3 : maxClips));
 
     const campaign = await db.campaign.create({ data: createData });
     return NextResponse.json(campaign, { status: 201 });

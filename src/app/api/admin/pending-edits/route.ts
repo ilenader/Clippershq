@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
+import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = await getSession();
   if (!session?.user) return NextResponse.json([], { status: 401 });
+
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
   if (role !== "ADMIN" && role !== "OWNER") {
@@ -35,6 +39,9 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const banCheck2 = checkBanStatus(session);
+  if (banCheck2) return banCheck2;
+
   const role = (session.user as any).role;
   if (role !== "ADMIN") {
     return NextResponse.json({ error: "Only admins submit edit requests" }, { status: 403 });
@@ -51,12 +58,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "campaignId and changes required" }, { status: 400 });
   }
 
-  // Verify admin created this campaign
+  // Verify admin has access to this campaign (creator, assigned, or team)
   try {
     const campaign = await db.campaign.findUnique({ where: { id: body.campaignId } });
     if (!campaign) return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
-    if (campaign.createdById !== session.user.id) {
-      return NextResponse.json({ error: "You can only edit your own campaigns" }, { status: 403 });
+    const isCreator = campaign.createdById === session.user.id;
+    let hasAccess = isCreator;
+    if (!hasAccess) {
+      const directAssign = await db.campaignAdmin.findUnique({
+        where: { userId_campaignId: { userId: session.user.id, campaignId: body.campaignId } },
+      });
+      hasAccess = !!directAssign;
+    }
+    if (!hasAccess) {
+      const myTeams = await db.teamMember.findMany({
+        where: { userId: session.user.id }, select: { teamId: true },
+      });
+      if (myTeams.length > 0) {
+        const teamCampaign = await db.teamCampaign.findFirst({
+          where: { campaignId: body.campaignId, teamId: { in: myTeams.map((t: any) => t.teamId) } },
+        });
+        hasAccess = !!teamCampaign;
+      }
+    }
+    if (!hasAccess) {
+      return NextResponse.json({ error: "You do not have access to this campaign" }, { status: 403 });
     }
 
     const edit = await db.pendingCampaignEdit.create({

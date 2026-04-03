@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
+import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -8,6 +9,9 @@ export async function POST(
 ) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
   if (role !== "ADMIN" && role !== "OWNER") {

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -9,6 +11,15 @@ import { Star } from "lucide-react";
 import Link from "next/link";
 
 export default function FavoritesPage() {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const userRole = (session?.user as any)?.role;
+
+  useEffect(() => {
+    if (session && userRole && userRole !== "CLIPPER") {
+      router.replace("/admin");
+    }
+  }, [session, userRole, router]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [clipsByCampaign, setClipsByCampaign] = useState<Record<string, number>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -22,18 +33,11 @@ export default function FavoritesPage() {
 
     Promise.all([
       fetch("/api/campaigns").then((r) => r.json()),
-      fetch("/api/clips/mine").then((r) => r.json()),
+      fetch("/api/campaigns/spend").then((r) => r.json()),
     ])
-      .then(([campaignData, clipsData]) => {
+      .then(([campaignData, spendData]) => {
         setCampaigns(Array.isArray(campaignData) ? campaignData : []);
-        const spendMap: Record<string, number> = {};
-        const clips = Array.isArray(clipsData) ? clipsData : [];
-        for (const clip of clips) {
-          if (clip.campaignId && clip.earnings > 0) {
-            spendMap[clip.campaignId] = (spendMap[clip.campaignId] || 0) + clip.earnings;
-          }
-        }
-        setClipsByCampaign(spendMap);
+        setClipsByCampaign(typeof spendData === "object" && spendData !== null ? spendData : {});
       })
       .catch(() => {})
       .finally(() => setLoading(false));

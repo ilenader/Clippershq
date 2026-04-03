@@ -4,15 +4,20 @@ import { useEffect, useState } from "react";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
-import { Archive, RotateCcw, Film, Eye, Heart } from "lucide-react";
+import { Archive, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ArchivePage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [clips, setClips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [destroyTarget, setDestroyTarget] = useState<any | null>(null);
+  const [destroyConfirm, setDestroyConfirm] = useState("");
+  const [destroying, setDestroying] = useState(false);
 
   const load = () => {
     Promise.all([
@@ -41,14 +46,32 @@ export default function ArchivePage() {
     }
   };
 
+  const permanentDelete = async () => {
+    if (!destroyTarget) return;
+    setDestroying(true);
+    try {
+      const res = await fetch(`/api/campaigns/${destroyTarget.id}/destroy`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      toast.success("Campaign permanently deleted.");
+      setDestroyTarget(null);
+      setDestroyConfirm("");
+      load();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete.");
+    }
+    setDestroying(false);
+  };
+
   const getCampaignStats = (campaignId: string) => {
     const campaignClips = clips.filter((c: any) => c.campaignId === campaignId);
-    const totalClips = campaignClips.length;
-    const approved = campaignClips.filter((c: any) => c.status === "APPROVED").length;
-    const totalViews = campaignClips.reduce((s: number, c: any) => s + (c.stats?.[0]?.views || 0), 0);
-    const totalLikes = campaignClips.reduce((s: number, c: any) => s + (c.stats?.[0]?.likes || 0), 0);
-    const totalEarned = campaignClips.reduce((s: number, c: any) => s + (c.earnings || 0), 0);
-    return { totalClips, approved, totalViews, totalLikes, totalEarned };
+    return {
+      totalClips: campaignClips.length,
+      approved: campaignClips.filter((c: any) => c.status === "APPROVED").length,
+      totalViews: campaignClips.reduce((s: number, c: any) => s + (c.stats?.[0]?.views || 0), 0),
+      totalLikes: campaignClips.reduce((s: number, c: any) => s + (c.stats?.[0]?.likes || 0), 0),
+      totalEarned: campaignClips.reduce((s: number, c: any) => s + (c.earnings || 0), 0),
+    };
   };
 
   if (loading) {
@@ -78,49 +101,109 @@ export default function ArchivePage() {
             const stats = getCampaignStats(c.id);
             return (
               <Card key={c.id}>
-                <div className="flex items-start justify-between mb-4">
-                  <div>
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="min-w-0">
                     <CardTitle>{c.name}</CardTitle>
                     <CardDescription>
                       {c.platform?.replace(/,\s*/g, " · ")}
                       {c.clientName && ` · ${c.clientName}`}
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="archived">Archived</Badge>
-                    <Button size="sm" variant="outline" onClick={() => restore(c.id)} icon={<RotateCcw className="h-3 w-3" />}>
-                      Restore
-                    </Button>
+                  <Badge variant="archived">Archived</Badge>
+                </div>
+
+                {/* Stats — responsive, no overflow */}
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4">
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Clips</p>
+                    <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalClips}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Approved</p>
+                    <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.approved}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Views</p>
+                    <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{formatNumber(stats.totalViews)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Likes</p>
+                    <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{formatNumber(stats.totalLikes)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Budget</p>
+                    <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{c.budget ? formatCurrency(c.budget) : "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Spent</p>
+                    <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{formatCurrency(stats.totalEarned)}</p>
                   </div>
                 </div>
 
-                {/* Stats grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {[
-                    { label: "Total clips", value: stats.totalClips, icon: <Film className="h-3.5 w-3.5" /> },
-                    { label: "Approved", value: stats.approved },
-                    { label: "Views", value: formatNumber(stats.totalViews), icon: <Eye className="h-3.5 w-3.5" /> },
-                    { label: "Likes", value: formatNumber(stats.totalLikes), icon: <Heart className="h-3.5 w-3.5" /> },
-                    { label: "Budget", value: c.budget ? formatCurrency(c.budget) : "—" },
-                    { label: "Total spent", value: formatCurrency(stats.totalEarned) },
-                  ].map((stat) => (
-                    <div key={stat.label}>
-                      <p className="text-xs text-[var(--text-muted)]">{stat.label}</p>
-                      <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stat.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-3 flex gap-4 text-xs text-[var(--text-muted)]">
+                {/* Dates */}
+                <div className="flex flex-wrap gap-4 text-xs text-[var(--text-muted)] mb-4">
                   <span>Created: {formatDate(c.createdAt)}</span>
                   {c.archivedAt && <span>Archived: {formatDate(c.archivedAt)}</span>}
-                  {c.cpmRate && <span>CPM: {formatCurrency(c.cpmRate)}</span>}
+                  {(c.clipperCpm ?? c.cpmRate) != null && <span>CPM: {formatCurrency(c.clipperCpm ?? c.cpmRate)}</span>}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => restore(c.id)} icon={<RotateCcw className="h-3 w-3" />}>
+                    Restore
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setDestroyTarget(c); setDestroyConfirm(""); }}
+                    icon={<Trash2 className="h-3 w-3" />}
+                    className="text-red-400 hover:text-red-300 hover:border-red-400/30"
+                  >
+                    Permanently delete
+                  </Button>
                 </div>
               </Card>
             );
           })}
         </div>
       )}
+
+      {/* Permanent delete confirmation */}
+      <Modal open={!!destroyTarget} onClose={() => setDestroyTarget(null)} title="Permanently delete campaign">
+        {destroyTarget && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3">
+              <p className="text-sm text-red-400 font-medium mb-1">This action is irreversible.</p>
+              <p className="text-sm text-red-400/80">
+                All data tied to <strong>{destroyTarget.name}</strong> will be permanently deleted: clips, stats, payouts, tracking history, and the campaign itself.
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-[var(--text-secondary)] mb-2">
+                Type <code className="rounded bg-[var(--bg-input)] px-1.5 py-0.5 text-xs font-bold text-red-400">PERMANENTLY DELETE</code> to confirm:
+              </p>
+              <Input
+                id="destroyConfirm"
+                placeholder="PERMANENTLY DELETE"
+                value={destroyConfirm}
+                onChange={(e) => setDestroyConfirm(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="ghost" onClick={() => setDestroyTarget(null)}>Cancel</Button>
+              <Button
+                variant="danger"
+                loading={destroying}
+                disabled={destroyConfirm !== "PERMANENTLY DELETE"}
+                onClick={permanentDelete}
+              >
+                Delete forever
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

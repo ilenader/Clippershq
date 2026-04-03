@@ -20,6 +20,9 @@ import {
   Shield,
   MessageCircle,
   Archive,
+  HelpCircle,
+  Trophy,
+  Phone,
 } from "lucide-react";
 
 interface NavItem {
@@ -42,7 +45,10 @@ const clipperNav: NavSection[] = [
       { label: "Accounts", href: "/accounts", icon: <UserCircle className="h-[18px] w-[18px]" /> },
       { label: "Clips", href: "/clips", icon: <Film className="h-[18px] w-[18px]" /> },
       { label: "Earnings", href: "/earnings", icon: <DollarSign className="h-[18px] w-[18px]" /> },
+      { label: "Progress", href: "/progress", icon: <Trophy className="h-[18px] w-[18px]" /> },
+      { label: "Referrals", href: "/referrals", icon: <Users className="h-[18px] w-[18px]" /> },
       { label: "Payouts", href: "/payouts", icon: <Wallet className="h-[18px] w-[18px]" /> },
+      { label: "Help", href: "/help", icon: <HelpCircle className="h-[18px] w-[18px]" /> },
     ],
   },
 ];
@@ -60,6 +66,8 @@ const adminNav: NavSection[] = [
     items: [
       { label: "Campaigns", href: "/admin/campaigns", icon: <Megaphone className="h-[18px] w-[18px]" /> },
       { label: "Clips", href: "/admin/clips", icon: <Film className="h-[18px] w-[18px]" /> },
+      { label: "Analytics", href: "/admin/analytics", icon: <Activity className="h-[18px] w-[18px]" /> },
+      { label: "Referrals", href: "/admin/referrals", icon: <Users className="h-[18px] w-[18px]" /> },
     ],
   },
 ];
@@ -70,7 +78,7 @@ const ownerManageNav: NavSection = {
   items: [
     { label: "Accounts", href: "/admin/accounts", icon: <ClipboardList className="h-[18px] w-[18px]" /> },
     { label: "Payouts", href: "/admin/payouts", icon: <Wallet className="h-[18px] w-[18px]" /> },
-    { label: "Users", href: "/admin/users", icon: <Users className="h-[18px] w-[18px]" /> },
+    { label: "Calls", href: "/admin/calls", icon: <Phone className="h-[18px] w-[18px]" /> },
     { label: "Flags", href: "/admin/flags", icon: <Flag className="h-[18px] w-[18px]" /> },
   ],
 };
@@ -78,10 +86,10 @@ const ownerManageNav: NavSection = {
 const ownerExtraNav: NavSection = {
   title: "Owner",
   items: [
-    { label: "Analytics", href: "/admin/analytics", icon: <Activity className="h-[18px] w-[18px]" /> },
+    { label: "Progress", href: "/progress", icon: <Trophy className="h-[18px] w-[18px]" /> },
     { label: "Archive", href: "/admin/archive", icon: <Archive className="h-[18px] w-[18px]" /> },
     { label: "Team", href: "/admin/team", icon: <Shield className="h-[18px] w-[18px]" /> },
-    { label: "Settings", href: "/admin/settings", icon: <Settings className="h-[18px] w-[18px]" /> },
+    { label: "Gamification", href: "/admin/settings", icon: <Settings className="h-[18px] w-[18px]" /> },
   ],
 };
 

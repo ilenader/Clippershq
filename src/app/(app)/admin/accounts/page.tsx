@@ -95,41 +95,34 @@ export default function AdminAccountsPage() {
           description={filterStatuses.length > 0 ? "No accounts matching selected filters." : "No accounts found."}
         />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[var(--border-color)]">
-          {/* Header */}
-          <div className="grid grid-cols-[1fr_100px_100px_100px_160px] gap-3 px-5 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
-            <span>Account</span>
-            <span>Platform</span>
-            <span>Submitted</span>
-            <span>Status</span>
-            <span></span>
-          </div>
-          {/* Rows */}
+        <div className="space-y-2">
           {filteredAccounts.map((account: any) => (
-            <div key={account.id} className="grid grid-cols-[1fr_100px_100px_100px_160px] gap-3 items-center px-5 py-3 border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors">
-              <div className="min-w-0">
-                <a href={account.profileLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm font-medium text-accent hover:underline truncate">
-                  {account.username} <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                </a>
-                <p className="text-xs text-[var(--text-muted)] truncate">{account.user?.username || "—"}</p>
+            <div key={account.id} className="rounded-xl border border-[var(--border-color)] p-4 hover:bg-[var(--bg-card-hover)] transition-colors">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <a href={account.profileLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm font-medium text-accent hover:underline truncate">
+                    {account.username} <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                  </a>
+                  <p className="text-xs text-[var(--text-muted)] truncate">{account.user?.username || "-"}</p>
+                </div>
+                <Badge variant={(statusBadge[account.status] || "pending") as any}>
+                  {statusLabel[account.status] || account.status}
+                </Badge>
               </div>
-              <span className="text-sm text-[var(--text-primary)]">{account.platform}</span>
-              <span className="text-xs text-[var(--text-muted)]">{formatRelative(account.createdAt)}</span>
-              <Badge variant={(statusBadge[account.status] || "pending") as any}>
-                {statusLabel[account.status] || account.status}
-              </Badge>
-              <div className="flex gap-1">
-                {(account.status === "PENDING" || account.status === "VERIFIED") && (
-                  <>
-                    <Button size="sm" variant="ghost" onClick={() => handleReview(account.id, "APPROVED")} loading={acting} icon={<Check className="h-3 w-3" />}>
-                      Approve
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setRejectModal(account.id)} icon={<X className="h-3 w-3" />}>
-                      Reject
-                    </Button>
-                  </>
-                )}
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">
+                <span className="font-medium text-[var(--text-primary)]">{account.platform}</span>
+                <span>{formatRelative(account.createdAt)}</span>
               </div>
+              {(account.status === "PENDING" || account.status === "VERIFIED") && (
+                <div className="mt-3 flex gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => handleReview(account.id, "APPROVED")} loading={acting} icon={<Check className="h-3 w-3" />}>
+                    Approve
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setRejectModal(account.id)} icon={<X className="h-3 w-3" />}>
+                    Reject
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>

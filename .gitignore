@@ -44,3 +44,17 @@ next-env.d.ts
 
 # dev persistence
 /.dev-data
+
+# user uploads (generated at runtime)
+/public/uploads/*.png
+/public/uploads/*.jpg
+/public/uploads/*.gif
+/public/uploads/*.webp
+
+# generated audit/docs
+AUDIT.txt
+
+# stray files
+/git
+/structure.txt
+/pr

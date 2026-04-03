@@ -1,37 +1,70 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { Megaphone, Star } from "lucide-react";
+import { Megaphone, Star, UserPlus, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
 import Link from "next/link";
 
 export default function CampaignsPage() {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const userRole = (session?.user as any)?.role || "CLIPPER";
+  const isClipper = userRole === "CLIPPER";
+
+  useEffect(() => {
+    if (session && userRole && userRole !== "CLIPPER") {
+      router.replace("/admin/campaigns");
+    }
+  }, [session, userRole, router]);
+
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [clipsByCampaign, setClipsByCampaign] = useState<Record<string, number>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Join system state
+  const [joinedCampaignIds, setJoinedCampaignIds] = useState<Set<string>>(new Set());
+  const [approvedAccounts, setApprovedAccounts] = useState<any[]>([]);
+  const [joinsByAccount, setJoinsByAccount] = useState<any[]>([]);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinTargetCampaign, setJoinTargetCampaign] = useState<any>(null);
+  const [selectedAccount, setSelectedAccount] = useState("");
+  const [joining, setJoining] = useState(false);
+
+  const loadJoins = async () => {
+    try {
+      const res = await fetch("/api/campaign-accounts");
+      const joins = await res.json();
+      const arr = Array.isArray(joins) ? joins : [];
+      setJoinsByAccount(arr);
+      setJoinedCampaignIds(new Set(arr.map((j: any) => j.campaignId)));
+    } catch {}
+  };
+
   useEffect(() => {
     Promise.all([
       fetch("/api/campaigns").then((r) => r.json()),
-      fetch("/api/clips/mine").then((r) => r.json()),
+      fetch("/api/campaigns/spend").then((r) => r.json()),
+      fetch("/api/accounts/mine?status=APPROVED").then((r) => r.json()),
+      fetch("/api/campaign-accounts").then((r) => r.json()),
     ])
-      .then(([campaignData, clipsData]) => {
+      .then(([campaignData, spendData, accountsData, joinsData]) => {
         const arr = Array.isArray(campaignData) ? campaignData : [];
         setCampaigns(arr.filter((c: any) => c.status === "ACTIVE" || c.status === "PAUSED"));
-
-        // Sum earnings per campaign from user's clips
-        const spendMap: Record<string, number> = {};
-        const clips = Array.isArray(clipsData) ? clipsData : [];
-        for (const clip of clips) {
-          if (clip.campaignId && clip.earnings > 0) {
-            spendMap[clip.campaignId] = (spendMap[clip.campaignId] || 0) + clip.earnings;
-          }
-        }
-        setClipsByCampaign(spendMap);
+        setClipsByCampaign(typeof spendData === "object" && spendData !== null ? spendData : {});
+        setApprovedAccounts(Array.isArray(accountsData) ? accountsData : []);
+        const joinsArr = Array.isArray(joinsData) ? joinsData : [];
+        setJoinsByAccount(joinsArr);
+        setJoinedCampaignIds(new Set(joinsArr.map((j: any) => j.campaignId)));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -54,6 +87,51 @@ export default function CampaignsPage() {
     });
   };
 
+  const openJoinModal = (e: React.MouseEvent, campaign: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (approvedAccounts.length === 0) {
+      toast.error("You need an approved account before joining campaigns.");
+      return;
+    }
+    setJoinTargetCampaign(campaign);
+    setSelectedAccount("");
+    setShowJoinModal(true);
+  };
+
+  const handleJoin = async () => {
+    if (!selectedAccount || !joinTargetCampaign) {
+      toast.error("Please select an account.");
+      return;
+    }
+    setJoining(true);
+    try {
+      const res = await fetch("/api/campaign-accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clipAccountId: selectedAccount, campaignId: joinTargetCampaign.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to join");
+      toast.success(`Joined ${joinTargetCampaign.name} successfully!`);
+      setShowJoinModal(false);
+      setJoinTargetCampaign(null);
+      setSelectedAccount("");
+      await loadJoins();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to join campaign.");
+    }
+    setJoining(false);
+  };
+
+  // Get accounts available for a specific campaign (not already joined)
+  const getAvailableAccounts = (campaignId: string) => {
+    const joinedAccountIds = new Set(
+      joinsByAccount.filter((j: any) => j.campaignId === campaignId).map((j: any) => j.clipAccountId)
+    );
+    return approvedAccounts.filter((a: any) => !joinedAccountIds.has(a.id));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -66,7 +144,7 @@ export default function CampaignsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Campaigns</h1>
-        <p className="text-[15px] text-[var(--text-secondary)]">Browse campaigns and view requirements.</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Browse campaigns and join to start submitting clips.</p>
       </div>
 
       {campaigns.length === 0 ? (
@@ -82,6 +160,7 @@ export default function CampaignsPage() {
             const spent = clipsByCampaign[campaign.id] || 0;
             const budget = campaign.budget || 0;
             const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+            const isJoined = joinedCampaignIds.has(campaign.id);
 
             return (
               <Link key={campaign.id} href={`/campaigns/${campaign.id}`}>
@@ -111,7 +190,7 @@ export default function CampaignsPage() {
                     </div>
                   </div>
 
-                  {/* Budget progress bar — between title and stats */}
+                  {/* Budget progress bar */}
                   {budget > 0 && (
                     <div className="mt-4">
                       <div className="flex items-center justify-between mb-2">
@@ -136,10 +215,10 @@ export default function CampaignsPage() {
 
                   {/* Key payout info */}
                   <div className="mt-3 grid grid-cols-3 gap-3">
-                    {campaign.cpmRate != null && campaign.cpmRate > 0 && (
+                    {(campaign.clipperCpm ?? campaign.cpmRate) != null && (campaign.clipperCpm ?? campaign.cpmRate) > 0 && (
                       <div>
                         <p className="text-xs text-[var(--text-muted)]">CPM</p>
-                        <p className="text-[15px] font-semibold text-[var(--text-primary)]">{formatCurrency(campaign.cpmRate)}</p>
+                        <p className="text-[15px] font-semibold text-[var(--text-primary)]">{formatCurrency(campaign.clipperCpm ?? campaign.cpmRate)}</p>
                       </div>
                     )}
                     {campaign.maxPayoutPerClip != null && campaign.maxPayoutPerClip > 0 && (
@@ -155,12 +234,74 @@ export default function CampaignsPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Join status / button — clipper only */}
+                  {isClipper && (
+                  <div className="mt-4 pt-3 border-t border-[var(--border-subtle)]">
+                    {isJoined ? (
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle className="h-4 w-4 text-emerald-400" />
+                        <span className="text-sm font-medium text-emerald-400">Joined</span>
+                      </div>
+                    ) : campaign.status === "ACTIVE" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => openJoinModal(e, campaign)}
+                        icon={<UserPlus className="h-3.5 w-3.5" />}
+                      >
+                        Join Campaign
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-[var(--text-muted)]">Campaign paused</span>
+                    )}
+                  </div>
+                  )}
                 </Card>
               </Link>
             );
           })}
         </div>
       )}
+
+      {/* Join Modal */}
+      <Modal open={showJoinModal} onClose={() => { setShowJoinModal(false); setJoinTargetCampaign(null); }} title="Join campaign">
+        {joinTargetCampaign && (() => {
+          const available = getAvailableAccounts(joinTargetCampaign.id);
+          return available.length === 0 ? (
+            <div className="py-6 text-center">
+              <p className="text-[15px] text-[var(--text-secondary)]">
+                {approvedAccounts.length === 0
+                  ? "You need an approved account first."
+                  : "All your approved accounts have already joined this campaign."}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-[15px] text-[var(--text-secondary)]">
+                Select an approved account to join <span className="font-medium text-[var(--text-primary)]">{joinTargetCampaign.name}</span>:
+              </p>
+              <Select
+                id="joinAccount"
+                label="Account"
+                options={available.map((a: any) => ({
+                  value: a.id,
+                  label: `${a.username} (${a.platform})`,
+                }))}
+                placeholder="Select account"
+                value={selectedAccount}
+                onChange={(e) => setSelectedAccount(e.target.value)}
+              />
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="ghost" onClick={() => { setShowJoinModal(false); setJoinTargetCampaign(null); }}>Cancel</Button>
+                <Button onClick={handleJoin} loading={joining} icon={<UserPlus className="h-4 w-4" />}>
+                  Join campaign
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
     </div>
   );
 }

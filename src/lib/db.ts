@@ -19,8 +19,6 @@ function createPrismaClient() {
   }
 }
 
-export const db = globalForPrisma.prisma || createPrismaClient();
-
-if (process.env.NODE_ENV !== "production" && db) {
-  globalForPrisma.prisma = db;
-}
+// Always reuse the cached client to avoid MaxClientsInSessionMode errors.
+// In development, store on globalThis so hot-reload doesn't create new clients.
+export const db = (globalForPrisma.prisma ||= createPrismaClient());

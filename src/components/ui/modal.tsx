@@ -36,12 +36,14 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center overflow-y-auto bg-black/50 backdrop-blur-sm p-2 sm:p-4">
       {/* Clicking outside does NOT close the modal — only X button or Escape */}
       <div
         className={cn(
           "w-full max-w-lg rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6",
           "shadow-[var(--shadow-elevated)]",
+          "max-h-[calc(100dvh-2rem)] overflow-y-auto",
+          "pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
           className
         )}
       >

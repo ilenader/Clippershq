@@ -55,17 +55,22 @@ export function buildEarningsChart(
     map[`${d.getMonth() + 1}/${d.getDate()}`] = 0;
   }
 
-  const showAll = filters.length === 0 || filters.includes("total");
+  // Determine which statuses to include
+  // Default (no filter or "total"): only APPROVED — consistent with "Total earnings" card
+  // "approved": only APPROVED
+  // "pending": only PENDING
+  const activeFilters = filters.length === 0 ? ["approved"] : filters;
+  const includeApproved = activeFilters.includes("total") || activeFilters.includes("approved");
+  const includePending = activeFilters.includes("pending");
 
   for (const clip of clips) {
     if (!clip.createdAt || !clip.earnings) continue;
 
-    // Apply status filter
-    if (!showAll) {
-      const matchesApproved = filters.includes("approved") && clip.status === "APPROVED";
-      const matchesPending = filters.includes("pending") && clip.status === "PENDING";
-      if (!matchesApproved && !matchesPending) continue;
-    }
+    // Only count clips whose status matches the selected filters
+    if (clip.status === "APPROVED" && !includeApproved) continue;
+    if (clip.status === "PENDING" && !includePending) continue;
+    // REJECTED / FLAGGED / other statuses are NEVER included
+    if (clip.status !== "APPROVED" && clip.status !== "PENDING") continue;
 
     const d = new Date(clip.createdAt);
     const key = `${d.getMonth() + 1}/${d.getDate()}`;
