@@ -1,38 +1,45 @@
-FOUR TASKS — Summary
+TWO TASKS — Summary
 ======================
 
-TASK 1: Cron to hourly
-  File: vercel.json
-  Changed: "0 0 * * *" → "0 * * * *" (every hour on the hour, Vercel Pro)
+TASK 1: Fix broken campaign images
+------------------------------------
+Created: src/components/ui/campaign-image.tsx
 
-TASK 2: Delete debug endpoints
-  Deleted: src/app/api/debug/ (entire directory)
-  - /api/debug/auth-check (temporary env diagnostic)
-  - /api/debug/session (OWNER-only session viewer)
-  Both removed — no longer needed.
+CampaignImage component:
+- Props: src (string|null), name (string), className (optional)
+- If src is empty or image fails to load (onError): shows a placeholder div
+  with the first letter of the campaign name, accent blue background, white text
+- Uses React state (failed) to track load errors
+- Prevents the broken image icon from ever showing
 
-TASK 3: Image URL input for campaigns
-  File: src/app/(app)/admin/campaigns/page.tsx
-  Added text input below the ImageUpload component:
-    Label: "Or paste an image URL"
-    Placeholder: "https://example.com/image.jpg"
-    Bound to form.imageUrl (same field as the upload)
-  If user pastes a URL, it's stored directly as imageUrl.
-  If they upload a file, the upload component sets imageUrl.
-  If both: the text input shows the current value either way.
-  This works on Vercel (no filesystem needed for URL-based images).
+Replaced <img> tags in 5 files (7 locations total):
+- src/app/(app)/campaigns/page.tsx (1 location)
+- src/app/(app)/campaigns/[id]/page.tsx (1 location)
+- src/app/(app)/favorites/page.tsx (1 location)
+- src/app/(app)/admin/campaigns/page.tsx (2 locations: review section + grid)
 
-TASK 4: Production safety audit
-  Verified all guards are in place:
+All now show the placeholder even when imageUrl is empty (previously showed
+nothing). Broken URLs now show the placeholder instead of the browser's
+broken image icon.
 
-  ✓ /api/dev-auth POST+GET: returns 404 when NODE_ENV=production
-  ✓ /api/dev/reset-campaigns: returns 403 when NODE_ENV=production
-  ✓ /api/dev/run-tracking: returns 403 when NODE_ENV=production
-  ✓ /api/cron/tracking: checks Bearer CRON_SECRET in production
-  ✓ isDevBypassEnabled(): requires NODE_ENV !== "production" AND DEV_AUTH_BYPASS=true
-  ✓ /dev-login page: shows "not enabled" when isDevMode is false
-  ✓ No console.log statements leak secrets/tokens/passwords
-  ✓ Operational logs ([TRACKING], [EMAIL], [Clip Submit]) kept — no sensitive data
-  ✓ Debug endpoints now deleted (Task 2)
+TASK 2: Supabase Storage uploads
+-----------------------------------
+Installed: @supabase/supabase-js (^2.101.1)
+
+Rewritten: src/app/api/upload/route.ts
+- Removed: fs.writeFileSync, local /public/uploads/ storage
+- Added: Supabase Storage client using NEXT_PUBLIC_SUPABASE_URL + ANON_KEY
+- Upload flow:
+  1. Validate file (type, size — same checks as before)
+  2. Generate unique filename (timestamp + random)
+  3. Upload to Supabase Storage bucket "uploads" via supabase.storage.upload()
+  4. Get public URL via supabase.storage.getPublicUrl()
+  5. Return the permanent Supabase URL
+- If Supabase not configured: returns error "Storage not configured. Use an image URL instead."
+- If upload fails: returns helpful error suggesting image URL alternative
+
+MANUAL STEP REQUIRED:
+Go to Supabase Dashboard → Storage → Create bucket "uploads" → Set to PUBLIC.
+Without this, uploads will fail with a "bucket not found" error.
 
 BUILD: ✓ (prisma generate + next build, 33/33 pages)

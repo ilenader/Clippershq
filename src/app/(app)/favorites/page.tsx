@@ -7,6 +7,7 @@ import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { CampaignImage } from "@/components/ui/campaign-image";
 import { Star } from "lucide-react";
 import Link from "next/link";
 
@@ -85,11 +86,9 @@ export default function FavoritesPage() {
               <Link key={campaign.id} href={`/campaigns/${campaign.id}`}>
                 <Card hover className="h-full">
                   <div className="flex items-start gap-4">
-                    {campaign.imageUrl && (
-                      <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
-                        <img src={campaign.imageUrl} alt="" className="h-full w-full object-cover" />
-                      </div>
-                    )}
+                    <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
+                      <CampaignImage src={campaign.imageUrl} name={campaign.name} />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div>

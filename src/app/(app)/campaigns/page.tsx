@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { CampaignImage } from "@/components/ui/campaign-image";
 import { Megaphone, Star, UserPlus, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -167,11 +168,9 @@ export default function CampaignsPage() {
                 <Card hover className={`h-full ${isPaused ? "opacity-70" : ""}`}>
                   {/* Top row: image + title + badge */}
                   <div className="flex items-start gap-4">
-                    {campaign.imageUrl && (
-                      <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
-                        <img src={campaign.imageUrl} alt="" className="h-full w-full object-cover" />
-                      </div>
-                    )}
+                    <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
+                      <CampaignImage src={campaign.imageUrl} name={campaign.name} />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div>

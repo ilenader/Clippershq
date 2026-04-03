@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
+import { CampaignImage } from "@/components/ui/campaign-image";
 import { Plus, Megaphone, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit } from "lucide-react";
 import { toast } from "sonner";
 
@@ -300,11 +301,9 @@ export default function AdminCampaignsPage() {
             <Card key={`review-${c.id}`} className="border-amber-500/20">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3">
-                  {c.imageUrl && (
-                    <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
-                      <img src={c.imageUrl} alt="" className="h-full w-full object-cover" />
-                    </div>
-                  )}
+                  <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
+                    <CampaignImage src={c.imageUrl} name={c.name} />
+                  </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-[var(--text-primary)]">{c.name}</span>
@@ -373,11 +372,9 @@ export default function AdminCampaignsPage() {
             return (
               <Card key={c.id}>
                 <div className="flex items-start gap-4">
-                  {c.imageUrl && (
-                    <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
-                      <img src={c.imageUrl} alt="" className="h-full w-full object-cover" />
-                    </div>
-                  )}
+                  <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
+                    <CampaignImage src={c.imageUrl} name={c.name} />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div>

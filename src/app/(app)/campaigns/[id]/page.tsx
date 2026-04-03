@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { CampaignImage } from "@/components/ui/campaign-image";
 import { ArrowLeft, ExternalLink, UserPlus, CheckCircle, Music, LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -128,11 +129,9 @@ export default function CampaignDetailPage() {
       </button>
 
       <div className="flex items-start gap-5">
-        {campaign.imageUrl && (
-          <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl border border-[var(--border-color)]">
-            <img src={campaign.imageUrl} alt="" className="h-full w-full object-cover" />
-          </div>
-        )}
+        <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl border border-[var(--border-color)]">
+          <CampaignImage src={campaign.imageUrl} name={campaign.name} />
+        </div>
         <div className="flex-1">
           <div className="flex items-start justify-between">
             <div>
