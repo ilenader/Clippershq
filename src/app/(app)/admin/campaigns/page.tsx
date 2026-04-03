@@ -523,6 +523,7 @@ export default function AdminCampaignsPage() {
             </div>
           </div>
           <ImageUpload label="Campaign image" value={form.imageUrl} onChange={(url) => updateField("imageUrl", url)} />
+          <Input id="imageUrl" label="Or paste an image URL" placeholder="https://example.com/image.jpg" value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} />
           <Textarea id="examples" label="Examples (links or descriptions)" placeholder="https://tiktok.com/..." value={form.examples} onChange={(e) => updateField("examples", e.target.value)} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Textarea id="captionRules" label="Caption rules" value={form.captionRules} onChange={(e) => updateField("captionRules", e.target.value)} />

@@ -1,22 +1,38 @@
-TEMPORARY DEBUG ENDPOINT — Summary
-=====================================
+FOUR TASKS — Summary
+======================
 
-Created: src/app/api/debug/auth-check/route.ts
+TASK 1: Cron to hourly
+  File: vercel.json
+  Changed: "0 0 * * *" → "0 * * * *" (every hour on the hour, Vercel Pro)
 
-GET /api/debug/auth-check — no auth required (temporary diagnostic)
+TASK 2: Delete debug endpoints
+  Deleted: src/app/api/debug/ (entire directory)
+  - /api/debug/auth-check (temporary env diagnostic)
+  - /api/debug/session (OWNER-only session viewer)
+  Both removed — no longer needed.
 
-Returns JSON with status of all auth-related env variables:
-- AUTH_SECRET: SET (length) or MISSING
-- AUTH_DISCORD_ID: SET (length) or MISSING
-- AUTH_DISCORD_SECRET: SET (length) or MISSING
-- AUTH_URL: value or MISSING
-- NEXTAUTH_URL: value or MISSING
-- AUTH_TRUST_HOST: value or MISSING
-- AUTH_OWNER_EMAIL: SET or MISSING
-- DATABASE_URL: SET (pgbouncer check) or MISSING
-- NODE_ENV: value
+TASK 3: Image URL input for campaigns
+  File: src/app/(app)/admin/campaigns/page.tsx
+  Added text input below the ImageUpload component:
+    Label: "Or paste an image URL"
+    Placeholder: "https://example.com/image.jpg"
+    Bound to form.imageUrl (same field as the upload)
+  If user pastes a URL, it's stored directly as imageUrl.
+  If they upload a file, the upload component sets imageUrl.
+  If both: the text input shows the current value either way.
+  This works on Vercel (no filesystem needed for URL-based images).
 
-Does NOT expose actual secret values — only presence and length.
-REMEMBER TO DELETE THIS ENDPOINT after debugging is complete.
+TASK 4: Production safety audit
+  Verified all guards are in place:
 
-BUILD: ✓ (33/33 pages, /api/debug/auth-check registered)
+  ✓ /api/dev-auth POST+GET: returns 404 when NODE_ENV=production
+  ✓ /api/dev/reset-campaigns: returns 403 when NODE_ENV=production
+  ✓ /api/dev/run-tracking: returns 403 when NODE_ENV=production
+  ✓ /api/cron/tracking: checks Bearer CRON_SECRET in production
+  ✓ isDevBypassEnabled(): requires NODE_ENV !== "production" AND DEV_AUTH_BYPASS=true
+  ✓ /dev-login page: shows "not enabled" when isDevMode is false
+  ✓ No console.log statements leak secrets/tokens/passwords
+  ✓ Operational logs ([TRACKING], [EMAIL], [Clip Submit]) kept — no sensitive data
+  ✓ Debug endpoints now deleted (Task 2)
+
+BUILD: ✓ (prisma generate + next build, 33/33 pages)
