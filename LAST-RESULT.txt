@@ -1,50 +1,31 @@
-PUSH TO GITHUB — Commands
-===========================
+TWO CHANGES — Summary
+=======================
 
-Your repo is already initialized and connected to:
-  origin → https://github.com/ilenader/Clippershq.git
+1. Vercel cron schedule
+   File: vercel.json
+   Changed: "*/5 * * * *" → "0 * * * *"
+   Effect: cron runs every hour on the hour (fits Vercel free tier)
 
-The .gitignore has been updated to exclude:
-  node_modules, .next, .env*, .dev-data, src/generated/prisma,
-  public/uploads (user images), AUDIT.txt, stray files (git, structure.txt, pr)
+2. Tracking nextCheckAt — round to clean hour marks
+   File: src/lib/tracking.ts
 
-Run these commands in order:
+   Added roundToNextSlot(intervalMin) helper:
+   - 60 min → next round hour (5:37 PM → 6:00 PM)
+   - 120 min → next even hour (5:37 PM → 6:00 PM, 6:05 PM → 8:00 PM)
+   - 240 min → next 4-hour mark (midnight, 4AM, 8AM, noon, 4PM, 8PM)
+   - 480 min → next 8-hour mark (midnight, 8AM, 4PM)
+   - 1440 min → next midnight UTC
+   - 4320 min → midnight UTC + 3 days
 
-────────────────────────────────────────
-cd "C:\Users\Game Centar\OneDrive\Desktop\clippers-hq"
+   Replaced: new Date(Date.now() + newInterval * 60 * 1000)
+   With: roundToNextSlot(newInterval)
 
-git add -A
+   Error retry (30 min) unchanged — still uses raw offset since it's a retry, not a scheduled slot.
 
-git status
+   How it works with hourly cron:
+   - Cron fires at :00 every hour
+   - Picks up all jobs where nextCheckAt <= now
+   - After processing, each job's nextCheckAt is set to a clean future hour mark
+   - Jobs naturally align to the cron's hourly cadence
 
-git commit -m "Full platform update: security, fraud, rate limiting, monetization, call scheduling, referrals, streak grace period, UI redesign, ban system, role isolation, auto-refresh, tooltips, onboarding checklist"
-
-git push origin main
-────────────────────────────────────────
-
-If git push fails with "rejected" (remote has changes you don't have):
-  git pull origin main --rebase
-  git push origin main
-
-If git push asks for authentication:
-  - Use a GitHub Personal Access Token (not your password)
-  - Or use: gh auth login (GitHub CLI)
-
-WHAT GETS PUSHED (118 files changed, 56 new files):
-- Security: ban system, rate limiting, auth hardening, dev-auth production guard
-- Fraud: 8-signal detection, auto-flagging, stored scores
-- Monetization: single clipper CPM model (removed split CPM)
-- Features: call scheduling, referral pages, auto-refresh, tooltips, getting started
-- UI: progress page redesign, accounts cleanup, help page rewrite
-- Tracking: tiered schedule (60min → 4320min), no deactivation on flats
-- Streaks: 48-hour grace period for clip approval
-- Role isolation: clipper/admin/owner data separation
-- Platform: removed Twitter/Snapchat, Belgrade references cleaned
-
-WHAT DOES NOT GET PUSHED:
-- .env / .env.local (secrets)
-- node_modules (dependencies)
-- .next (build output)
-- src/generated/prisma (generated client)
-- public/uploads/*.png (user images)
-- .dev-data (dev persistence)
+BUILD: tsc ✓ | next build ✓ (33/33 pages)

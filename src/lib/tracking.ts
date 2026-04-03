@@ -52,6 +52,35 @@ function getNextInterval(
 }
 
 /**
+ * Round to the next clean hour slot based on interval.
+ * 60min → next round hour. 120min → next even hour. 240min → next 4h mark. etc.
+ */
+function roundToNextSlot(intervalMin: number): Date {
+  const now = new Date();
+  const hour = now.getUTCHours();
+
+  if (intervalMin <= 60) {
+    const next = new Date(now);
+    next.setUTCMinutes(0, 0, 0);
+    next.setUTCHours(hour + 1);
+    return next;
+  }
+
+  const intervalHours = intervalMin / 60;
+  const nextSlotHour = Math.ceil((hour + 1) / intervalHours) * intervalHours;
+  const next = new Date(now);
+  next.setUTCMinutes(0, 0, 0);
+  if (nextSlotHour >= 24) {
+    next.setUTCHours(0);
+    next.setUTCDate(next.getUTCDate() + Math.floor(nextSlotHour / 24));
+    next.setUTCHours(nextSlotHour % 24);
+  } else {
+    next.setUTCHours(nextSlotHour);
+  }
+  return next;
+}
+
+/**
  * Execute all due tracking jobs. Called by the cron endpoint.
  * Returns { processed, errors, details }
  */
@@ -214,7 +243,7 @@ export async function runDueTrackingJobs(): Promise<{ processed: number; errors:
 
         // ── Calculate next interval using tiered schedule ──
         const newInterval = getNextInterval(job.checkIntervalMin, stats.views, clip.createdAt);
-        const nextCheck = new Date(Date.now() + newInterval * 60 * 1000);
+        const nextCheck = roundToNextSlot(newInterval);
 
         await db.trackingJob.update({
           where: { id: job.id },
