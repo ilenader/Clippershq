@@ -1,82 +1,73 @@
-TWO TASKS — Summary
-======================
+SEO/FAVICON + HOMEPAGE REDESIGN — Summary
+============================================
 
-TASK 1: Login page redesign
------------------------------
-File: src/app/login/page.tsx — complete rewrite
+PART 1: SEO & FAVICON
+-----------------------
 
-Design:
-- Dark #09090b background with subtle dot grid pattern (CSS radial-gradient, no images)
-- Centered glass-effect card (backdrop-blur-xl, semi-transparent white border)
-- Accent blue glow behind card (600px blurred circle, accent/5 opacity)
-- Gradient accent line above card (transparent → accent → transparent, 2px)
-- Fade-up animation on load (CSS @keyframes fadeUp, 0.6s ease-out)
+Root layout (src/app/layout.tsx):
+- metadataBase: https://clipershq.com
+- title: "Clippers HQ — Content Clipping Agency for Creators & Brands" (with template for subpages)
+- description: Professional content clipping agency description
+- keywords: content clipping agency, clip management, gaming clips, etc.
+- Open Graph: type=website, siteName, title, description, url
+- Twitter: summary_large_image card
+- Canonical: https://clipershq.com
+- JSON-LD Organization schema in other.script:ld+json
+- <link rel="icon" href="/favicon.ico" sizes="any"> in <head>
 
-Content:
-- Logo icon in accent blue rounded square (accent/10 bg, accent/20 border)
-- "CLIPPERS HQ" title — white with accent blue "HQ"
-- Tagline: "The all-in-one platform for managing clips, campaigns, and payouts."
-- Referral banner (if ?ref= param exists) — accent blue border
-- Large "Sign in with Discord" button — accent blue, shadow, Discord SVG icon
-- "Join thousands of clippers earning from their content" below button
-- Terms text at bottom in muted zinc
+Favicon: src/app/favicon.ico exists (Next.js App Router auto-serves it)
 
-Responsive: max-w-md card, padding scales sm:p-10
-No Belgrade/location references.
+New files:
+- src/app/robots.ts: allows all crawlers, sitemap at clipershq.com/sitemap.xml
+- src/app/sitemap.ts: homepage + /login with lastModified, changeFrequency, priority
+- src/app/login/layout.tsx: sets login page title to "Sign In — Clippers HQ"
 
-Landing page (src/app/page.tsx): left unchanged — already redirects authenticated users, shows a simple landing for unauthenticated.
+PART 2: HOMEPAGE REDESIGN
+---------------------------
 
-TASK 2: Email notifications for clippers
--------------------------------------------
-File: src/lib/email.ts — rewritten with new template system
+File: src/app/page.tsx — complete visual rewrite
 
-Template design:
-- Dark #09090b background, 560px max-width, 16px border-radius
-- Header: "CLIPPERS HQ" in accent blue (#2596be), centered, border-bottom
-- Body: light text (#e4e4e7) on dark bg, clean typography
-- Footer: "© 2026 Clippers HQ — clipershq.com" in muted gray
-- Accent blue for amounts, links, highlights
+Background layers (all CSS, no JS, no images):
+1. Gradient mesh: 3 large radial gradients (cyan #0ea5e9, violet #8b5cf6, dark blue #1e3a5f)
+   with slow drift animations (20s/25s/18s cycles), low opacity (0.06-0.08), 120px blur
+2. Dot grid: radial-gradient dots at 40px spacing, 4% opacity
+3. Floating shapes: 5 translucent geometric elements (circles, rounded squares)
+   with independent float animations (10s-18s cycles), 2-4% opacity borders
 
-6 email functions:
+Nav:
+- Logo triangle (accent blue) + "CLIPPERS HQ" title
+- "Sign In" button with glass style (white/6% bg, white/8% border)
 
-1. sendWelcomeEmail(email, username)
-   Subject: "Welcome to Clippers HQ"
-   Trigger: auth.ts createUser event (new user signup)
-   Only sends to non-OWNER users (clippers)
+Hero:
+- Logo with 40px blur glow behind it
+- "CLIPPERS HQ" — 5xl-7xl responsive, gradient text (white → zinc-400)
+- Subtitle in zinc-400, tagline "Simple, fast, powerful." in zinc-500
+- "Get Started" button: gradient bg (cyan → accent blue) + glow shadow underneath
+  that intensifies on hover. Hover: opacity shifts create pulse effect.
+- All elements use staggered fadeUp animations (0.1s delay between each)
 
-2. sendClipApproved(email, campaignName, earnings)
-   Subject: "Your clip was approved!"
-   Trigger: POST /api/clips/[id]/review (APPROVED action)
-   Shows campaign name and current earnings
+Stats bar:
+- 3 columns: "1,000+ Clips Tracked" | "50+ Active Campaigns" | "24/7 Automated Tracking"
+- Gradient text (white → zinc-400), bordered section top/bottom
+- Staggered fade-in on load
 
-3. sendClipRejected(email, campaignName, reason?)
-   Subject: "Clip update"
-   Trigger: POST /api/clips/[id]/review (REJECTED action)
-   Shows campaign name and rejection reason
+Features (4 cards):
+- Campaign Management, Real-Time Tracking, Instant Payouts, Built for Scale
+- Glass cards: white/2% bg, white/6% border, backdrop-blur-sm
+- Hover: bg brightens to 4%, border to 10%
+- Emoji icons (📋📊💰🚀), small text, staggered animations
 
-4. sendPayoutApproved(email, amount)
-   Subject: "Payout sent!"
-   Trigger: POST /api/payouts/[id]/review (PAID action)
-   Shows payout amount
+Footer:
+- "CLIPPERS HQ © 2026" + Terms | Privacy | Contact links
+- Top border separator, max-width constrained
 
-5. sendPayoutRejected(email, amount, reason?)
-   Subject: "Payout update"
-   Trigger: POST /api/payouts/[id]/review (REJECTED action)
-   Shows amount and reason
+Animations (all @keyframes in inline <style>):
+- drift1/2/3: gradient mesh movement
+- float1/2/3: geometric shape floating
+- fadeUp: element entrance animation (opacity + translateY)
+All smooth 60fps CSS transforms, no JavaScript.
 
-6. sendCallScheduled(email, amount)
-   Subject: "Verification call scheduled"
-   Trigger: POST /api/calls (owner creates call request)
-   Tells clipper to visit Payouts page
+Responsive: mobile-first, scales to desktop with sm/lg breakpoints.
+No location references. No external assets.
 
-Integration points:
-- src/lib/auth.ts: welcome email in createUser event
-- src/app/api/clips/[id]/review/route.ts: clip approved/rejected emails (updated signatures to include campaignName)
-- src/app/api/payouts/[id]/review/route.ts: payout paid/rejected emails (NEW — added import + email sends)
-- src/app/api/calls/route.ts: call scheduled email (NEW — added import + email send)
-
-All emails check user.role === "CLIPPER" before sending (no emails to owner/admin).
-All email sends are wrapped in try/catch — failures don't crash the API.
-Legacy email exports kept for backward compatibility.
-
-BUILD: ✓ (prisma generate + next build, 33/33 pages)
+BUILD: ✓ (prisma generate + next build, 35/35 pages — +2 from robots/sitemap)

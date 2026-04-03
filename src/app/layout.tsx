@@ -14,8 +14,37 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CLIPPERS HQ",
-  description: "Clip management platform for clipping agencies",
+  metadataBase: new URL("https://clipershq.com"),
+  title: {
+    default: "Clippers HQ — Content Clipping Agency for Creators & Brands",
+    template: "%s — Clippers HQ",
+  },
+  description: "Professional content clipping agency. We extract, edit, and distribute your best moments across TikTok, Instagram Reels, and YouTube Shorts. Trusted by streamers and creators.",
+  keywords: "content clipping agency, clip management, gaming clips, streamer clips, short-form content, TikTok clipping, content repurposing",
+  openGraph: {
+    type: "website",
+    siteName: "Clippers HQ",
+    title: "Clippers HQ — Content Clipping Agency for Creators & Brands",
+    description: "Professional content clipping agency. Manage clips, campaigns, and payouts — all in one platform.",
+    url: "https://clipershq.com",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Clippers HQ — Content Clipping Agency",
+    description: "Professional content clipping agency for creators and brands.",
+  },
+  alternates: {
+    canonical: "https://clipershq.com",
+  },
+  other: {
+    "script:ld+json": JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Clippers HQ",
+      "url": "https://clipershq.com",
+      "description": "Professional content clipping agency for creators and brands",
+    }),
+  },
 };
 
 export default function RootLayout({
@@ -29,6 +58,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} dark`}
       suppressHydrationWarning
     >
+      <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+      </head>
       <body className="min-h-screen antialiased">
         <Providers>{children}</Providers>
       </body>
