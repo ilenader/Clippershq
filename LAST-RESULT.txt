@@ -1,45 +1,72 @@
-TWO TASKS — Summary
-======================
+PRODUCTION AUDIT — Vercel Deployment Readiness
+=================================================
 
-TASK 1: Fix broken campaign images
-------------------------------------
-Created: src/components/ui/campaign-image.tsx
+1. HARDCODED LOCALHOST REFERENCES
+   Status: CLEAN ✓
+   Searched for "localhost", "127.0.0.1" in all src/ files.
+   Result: zero matches. All API calls use relative paths ("/api/...").
 
-CampaignImage component:
-- Props: src (string|null), name (string), className (optional)
-- If src is empty or image fails to load (onError): shows a placeholder div
-  with the first letter of the campaign name, accent blue background, white text
-- Uses React state (failed) to track load errors
-- Prevents the broken image icon from ever showing
+2. FILE SYSTEM OPERATIONS
+   Status: CLEAN ✓
+   Only file: src/lib/dev-store.ts (fs read/write)
+   Impact: NONE — this file is never imported by any app code. It's a standalone
+   dev utility for running without a database. No production impact.
+   Upload route (src/app/api/upload/route.ts): already migrated to Supabase Storage.
 
-Replaced <img> tags in 5 files (7 locations total):
-- src/app/(app)/campaigns/page.tsx (1 location)
-- src/app/(app)/campaigns/[id]/page.tsx (1 location)
-- src/app/(app)/favorites/page.tsx (1 location)
-- src/app/(app)/admin/campaigns/page.tsx (2 locations: review section + grid)
+3. IN-MEMORY STATE
+   Status: ACCEPTABLE ✓ (documented)
+   - src/lib/rate-limit.ts: in-memory Map for rate limiting
+     Impact: on Vercel serverless, each cold start gets a fresh Map.
+     Rate limits won't be perfectly enforced across instances but still
+     provide meaningful per-instance burst protection. ACCEPTABLE.
+   - src/lib/db.ts: globalThis Prisma singleton
+     Impact: correct pattern for serverless — reuses connection within
+     warm instances. CORRECT.
+   - src/lib/dev-store.ts: globalThis dev cache
+     Impact: NONE — not imported in production code.
 
-All now show the placeholder even when imageUrl is empty (previously showed
-nothing). Broken URLs now show the placeholder instead of the browser's
-broken image icon.
+4. SSE (Server-Sent Events)
+   Status: CLEAN ✓
+   - /api/notifications/sse: has 15-second heartbeat ✓
+   - /api/chat/sse: has 15-second heartbeat ✓
+   Both handle abort signals properly and clean up intervals.
+   Vercel Pro allows 60-second SSE connections. With 15s heartbeat,
+   connections stay alive and auto-reconnect on timeout.
 
-TASK 2: Supabase Storage uploads
------------------------------------
-Installed: @supabase/supabase-js (^2.101.1)
+5. IMAGE/ASSET REFERENCES
+   Status: CLEAN ✓
+   Searched for "/uploads/", "public/uploads" in all src/ files.
+   Result: zero matches. Upload route now returns Supabase Storage URLs.
+   CampaignImage component handles broken images with placeholder fallback.
 
-Rewritten: src/app/api/upload/route.ts
-- Removed: fs.writeFileSync, local /public/uploads/ storage
-- Added: Supabase Storage client using NEXT_PUBLIC_SUPABASE_URL + ANON_KEY
-- Upload flow:
-  1. Validate file (type, size — same checks as before)
-  2. Generate unique filename (timestamp + random)
-  3. Upload to Supabase Storage bucket "uploads" via supabase.storage.upload()
-  4. Get public URL via supabase.storage.getPublicUrl()
-  5. Return the permanent Supabase URL
-- If Supabase not configured: returns error "Storage not configured. Use an image URL instead."
-- If upload fails: returns helpful error suggesting image URL alternative
+6. ENVIRONMENT VARIABLE HANDLING
+   Status: CLEAN ✓
+   - AUTH_DISCORD_ID/SECRET: use `!` assertion — clear crash if missing (correct)
+   - DATABASE_URL: checked with `if (!connectionString)` → returns null gracefully
+   - APIFY_API_KEY: throws clear error "APIFY_API_KEY is not set" if missing
+   - EMAIL_API_KEY: falls back to console preview mode if missing
+   - CRON_SECRET: checked in production, returns 401 if missing/wrong
+   - AUTH_OWNER_EMAIL: checked with `if (OWNER_EMAIL && ...)` — no crash if missing
+   - SUPABASE_URL/KEY: checked in upload route, returns error if missing
 
-MANUAL STEP REQUIRED:
-Go to Supabase Dashboard → Storage → Create bucket "uploads" → Set to PUBLIC.
-Without this, uploads will fail with a "bucket not found" error.
+7. COOKIE/SESSION CONFIGURATION
+   Status: CLEAN ✓
+   - trustHost: true ✓ (line 132 in auth.ts)
+   - PKCE cookie: sameSite: "none", secure: true ✓ (lines 134-140)
+   - No localhost-specific cookie settings
+
+8. CORS
+   Status: CLEAN ✓
+   No Access-Control headers, no CORS restrictions anywhere.
+   Next.js API routes default to same-origin which is correct.
+
+9. PUBLIC SOUND FILES
+   Status: CLEAN ✓
+   - /sounds/chat-ping.wav → public/sounds/chat-ping.wav EXISTS ✓
+   - /sounds/whoosh-notification-ding-betacut-1-00-01.mp3 → EXISTS ✓
+   These are served as static assets by Vercel from public/ directory.
+
+SUMMARY: Zero production-breaking issues found.
+All systems are Vercel-ready. No changes needed.
 
 BUILD: ✓ (prisma generate + next build, 33/33 pages)
