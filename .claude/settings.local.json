@@ -109,7 +109,17 @@
       "Bash(sed -i '/hero-bg\\\\.jpg.*preload/d' brands.html)",
       "Bash(sed -i '/hero-fg\\\\.png.*preload/d' brands.html)",
       "Bash(sed -i 's|<img class=\"hero-bg\"|<img class=\"hero-bg\" style=\"display:none\"|' brands.html)",
-      "Bash(sed -i 's|<img class=\"hero-fg\"|<img class=\"hero-fg\" style=\"display:none\"|' brands.html)"
+      "Bash(sed -i 's|<img class=\"hero-fg\"|<img class=\"hero-fg\" style=\"display:none\"|' brands.html)",
+      "Bash(sed:*)",
+      "Bash(sed -i 's/—/ /g' clipper.html)",
+      "Bash(sed -i 's/—/ /g' brands.html)",
+      "Bash(sed -i 's/&mdash;/ /g' clipper.html)",
+      "Bash(sed -i 's/&mdash;/ /g' brands.html)",
+      "Bash(sed -i 's|<a href=\"#\">Privacy Policy</a>|<a href=\"/privacy.html\">Privacy Policy</a>|g' clipper.html)",
+      "Bash(sed -i 's|<a href=\"#\">Terms of Service</a>|<a href=\"/terms.html\">Terms of Service</a>|g' clipper.html)",
+      "Bash(sed -i 's|<a href=\"#\">Cookie Policy</a>|<a href=\"/cookies.html\">Cookie Policy</a>|g' clipper.html)",
+      "Bash(sed -i 's|<a href=\"#\">Privacy Policy</a>|<a href=\"/privacy.html\">Privacy Policy</a>|g' brands.html)",
+      "Bash(sed -i 's|<a href=\"#\">Terms of Service</a>|<a href=\"/terms.html\">Terms of Service</a>|g' brands.html)"
     ]
   }
 }
