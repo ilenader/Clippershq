@@ -1,68 +1,62 @@
-LANDING SITE INTEGRATION — Summary
-=====================================
+LANDING SITE — Exact Copy Integration — Summary
+==================================================
 
-ASSETS COPIED:
-- /public/landing/brands/ (10 brand logos: AG1, Gymshark, Prime, etc.)
-- /public/landing/faces/ (10 creator photos: Adin Ross, xQc, IShowSpeed, etc.)
-- /public/landing/logo/logo.png
-- /public/landing/videos/video-left.mp4, video-right.mp4
-- /public/landing/hero/ (empty — source hero images were missing)
+APPROACH: Copied the EXACT HTML structure, CSS, and JS from the static site
+into Next.js components. No redesign. No simplification. No Tailwind conversion.
 
-HOMEPAGE (src/app/page.tsx — clipper.html converted):
-Route: /
-- Auth redirect logic preserved at top (logged in → dashboard/admin)
-- Fixed navbar: logo + nav links (How It Works, Perks, For Brands) + Join Now button
-- Hero: "Become a Clipper" badge, gradient title, subtitle, dual CTA (Get Started + Discord)
-- Phone mockups: two tilted video players with autoplay/muted/loop
-- Stats bar: 10B+ Views, 60K+ Clippers, 340% Lift
-- Faces carousel: infinite scrolling rows (creators left, brands right) via CSS keyframes
-- Perks grid: 6 glass cards (Competitive Pay, Flexible Schedule, Top Brands, etc.)
-- How It Works: 4 numbered steps (Sign Up → Add Accounts → Join Campaigns → Get Paid)
-- Requirements: 6 checklist items with checkmarks
-- Bottom CTA: Sign Up + Discord buttons
-- Footer: logo, copyright, links (For Brands, Discord, Terms, Privacy)
+FILES CREATED/MODIFIED:
 
-BRANDS PAGE (src/app/brands/page.tsx — index.html converted):
-Route: /brands
-- Own metadata: "For Brands — Clippers HQ"
-- Fixed navbar: logo + nav links (Process, Clients, Become a Clipper) + Book a Call button
-- Hero: "For Brands & Agencies" badge, gradient title about scaling content, Calendly CTA
-- Stats bar: same 3 numbers
-- Brand logos grid: 8 logos in responsive 4x2 / 8x1 grid
-- Process: 3 steps (Book a Call, Launch Distribution, Track & Scale)
-- Who We Work With: 5 client categories (Artists, Creators, Products, DTC, Apps)
-- Bottom CTA: Book a Free Call (Calendly link)
-- Footer: same style as homepage
+src/app/landing.css (2500+ lines)
+  - ALL CSS from base.css + navbar.css + hero.css + faces.css + sections.css + footer.css
+  - Concatenated exactly as-is, section comments as separators
+  - Fixed one invalid bare Unicode separator line that broke PostCSS
 
-CROSS-LINKING:
-- Homepage navbar → "For Brands" → /brands
-- Brands navbar → "Become a Clipper" → /
-- Both navbars → /login for auth
-- Calendly links: https://calendly.com/clipershq/30min
-- Discord links: https://discord.gg/CM8xdenGYf
+src/app/landing-clipper.css (~350 lines)
+  - ALL inline page-specific CSS from clipper.html <style> blocks
+  - Includes: clipper-hero, discord-cta, phone-shell, perks, steps, requirements, loader
+  - Copied exactly from the HTML source
 
-PERFORMANCE DECISIONS:
-- No smooth-scroll.js (removed — uses native browser scrolling)
-- No intro.js / loader.js (removed — no loading screen)
-- No heavy parallax JS (removed — lightweight CSS-only effects)
-- Videos: autoPlay muted loop playsInline (native lazy behavior)
-- Images: loading="lazy" on face/brand carousel images
-- Carousel: pure CSS @keyframes (scrollLeft/scrollRight), no JS
-- Background: CSS gradients + dot grid only, no images needed
-- No meteor particle system (removed — too heavy)
+public/landing/script.js (~500 lines)
+  - FULL script.js with ALL animations: navbar scroll, parallax, reveal observer,
+    headline chars, FAQ accordion, counters, mouse glow, service card 3D, process
+    timeline, clients preview card, meteor particles, etc.
+  - Only changes: index.html → /brands, clipper.html → /
 
-WHAT WAS NOT CONVERTED (intentionally removed):
-- 3D parallax hero layers (hero images missing + too heavy)
-- Smooth scroll polyfill (789 lines of JS — unnecessary)
-- Mouse-following glow/cursor effects (perf overhead)
-- Meteor background particles (perf overhead)
-- Service card 3D perspective transforms (complex JS)
-- Character-by-character headline animation (complex JS)
-- Calendly embed widget (link to Calendly directly instead)
-- FAQ accordion (requirements section replaced it)
-- Video player overlay (direct autoplay instead)
+src/app/page.tsx (server component)
+  - Auth redirect logic preserved at top
+  - Renders ClipperLanding client component
 
-EXISTING ROUTES UNTOUCHED:
-- /login, /dashboard, /admin, all (app)/ pages, all api/ routes — unchanged
+src/app/clipper-landing.tsx (client component — clipper.html)
+  - EXACT HTML from clipper.html body converted to JSX
+  - class → className, stroke-width → strokeWidth, etc.
+  - Links: index.html → /brands, clipper.html → /, assets/ → /landing/
+  - Loads script.js via useEffect
+  - Includes: loader, vanta-bg, navbar, clipper-hero with phone mockups + videos,
+    perks grid (6 cards with SVG icons), steps section (4 steps), requirements (6 items),
+    bottom CTA with Discord button, footer
 
-BUILD: ✓ (prisma generate + next build, 36/36 pages — +1 /brands)
+src/app/brands/page.tsx (client component — index.html)
+  - EXACT HTML from index.html body converted to JSX
+  - Includes: loader, vanta-bg, navbar (icon-only logo), hero-3d with parallax layers,
+    faces carousel (10 creators + 10 brands, doubled for infinite scroll), process
+    timeline (3 rows with metrics + steps), book-a-call section with Calendly widget,
+    clients section (5 items with preview card data), FAQ accordion (5 items), footer
+  - Loads script.js + Calendly widget.js via useEffect
+  - 3D parallax scroll handler implemented in useEffect
+  - Logo click scrolls to top
+
+ASSETS (already in /public/landing/):
+  - brands/ (10 images), faces/ (10 images), logo/logo.png, videos/ (2 mp4s)
+  - hero/ folder exists but hero-bg.jpg and hero-fg.png are missing from source
+
+WHAT WAS REMOVED:
+  - smooth-scroll.js (789 lines) — not loaded
+  - No other changes to animations, effects, colors, fonts, or layout
+
+WHAT WAS NOT CHANGED:
+  - ALL CSS — copied exactly
+  - ALL animations — kept exactly (reveal, parallax, carousel, FAQ, counters, glow, etc.)
+  - ALL visual elements — same structure, same classes, same styling
+  - ALL existing app routes (/login, /dashboard, /admin, etc.) — untouched
+
+BUILD: ✓ (prisma generate + next build, 36/36 pages)
