@@ -285,6 +285,7 @@ model Clip {
   fraudScore      Int        @default(0)
   fraudReasons    String?    @db.Text // JSON array of reason strings
   fraudCheckedAt  DateTime?
+  isOwnerOverride Boolean    @default(false)
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 

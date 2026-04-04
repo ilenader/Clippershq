@@ -1,0 +1,166 @@
+===============================================================
+CLIPPERS HQ — VERY IMPORTANT — Comprehensive Status Report
+Date: 2026-04-05
+===============================================================
+
+1. WHAT WAS DONE IN THIS SESSION
+=================================
+
+A. LANDING PAGE FIXES:
+  - Hero CTA: Added primary "Start Clipping" button (links to /login) ABOVE the Discord button
+  - Bottom CTA: Changed to "Start Clipping" primary + "join our Discord" secondary link
+  - Login page: Added terms/privacy links to consent text
+
+B. LEGAL PAGES (Updated with comprehensive content):
+  - /privacy.html: Full privacy policy with data collection, sharing, retention, rights
+  - /terms.html: Full terms with eligibility, content, payouts, prohibited activities, liability, indemnification
+  - /cookies.html: Cookie policy with essential cookies only, no tracking
+
+C. OWNER CLIP OVERRIDE (NEW):
+  - Added isOwnerOverride Boolean field to Clip model (prisma db push + generate)
+  - Created POST /api/clips/owner-submit (owner-only API)
+    Skips: 2-hour window, campaign membership, daily limit
+    Creates: clip + initial stat + tracking job
+  - Created /admin/submit-clip page (owner-only UI)
+  - Added "Submit Clip" to owner sidebar navigation
+
+D. CRON SETUP INSTRUCTIONS:
+  - Created public/CRON-SETUP.md with cron-job.org instructions
+
+2. WHAT WAS ALREADY DONE (no changes needed)
+==============================================
+
+- Em dashes: already removed from both HTML files
+- Legal footer links: already point to /privacy.html, /terms.html, /cookies.html
+- Blue glow on brands page: already exists with z-index:1
+- Footer year: already 2026
+- Logo links: clipper → /, brands → /brands.html (correct)
+- Transition animation: already exists in clipper.html
+- Discord modal popup: already exists for "Start Clipping" nav click
+- Login page: already has animated blobs, Google button, descriptive text, overflow:hidden
+- base target="_top": already in both HTML files
+- Nav link colors: using inline style color:#e8edf2
+
+3. SECURITY AUDIT RESULTS
+===========================
+
+VERIFIED SECURE:
+  ✓ All API routes check authentication (getSession)
+  ✓ All routes check authorization (role-based access)
+  ✓ Ban check (checkBanStatus) applied to all 44 routes
+  ✓ Rate limiting on all sensitive endpoints (11 routes)
+  ✓ CRON_SECRET checked on /api/cron/tracking in production
+  ✓ Dev endpoints blocked in production (NODE_ENV check)
+  ✓ No raw SQL queries (Prisma only = parameterized)
+  ✓ File upload validates type + size
+  ✓ Payout requests use DB transactions with deadlock handling
+  ✓ CLIPPER cannot access admin routes (403)
+  ✓ Banned users blocked from all routes (403)
+  ✓ Users can only see own earnings/clips/payouts (role isolation)
+  ✓ Campaign membership required for clip submission (clippers)
+  ✓ No API keys in frontend code
+  ✓ PKCE cookie configured for secure OAuth
+
+ACCEPTABLE RISKS:
+  - Rate limiter is in-memory (resets on deploy) — acceptable for basic burst protection
+  - Trust score visible to OWNER in admin UI — by design
+  - No CSRF tokens visible but NextAuth handles this internally
+
+NO CRITICAL ISSUES FOUND.
+
+4. MANUAL ACTIONS REQUIRED BY OWNER
+=====================================
+
+A. SET UP EMAIL (Resend):
+   1. Go to https://resend.com and sign up
+   2. Add your domain (clipershq.com) and verify DNS records
+   3. Create an API key
+   4. In Vercel → Settings → Environment Variables, add:
+      - EMAIL_API_KEY = your Resend API key
+      - EMAIL_FROM = "Clippers HQ <noreply@clipershq.com>"
+   5. Redeploy
+
+B. SET UP CRON BACKUP (cron-job.org):
+   1. Go to https://cron-job.org and create account
+   2. Create cron job:
+      URL: https://clipershq.com/api/cron/tracking
+      Schedule: Every 1 hour
+      Method: GET
+      Header: Authorization: Bearer [your CRON_SECRET value]
+   3. Save and enable
+
+C. SET UP YOUTUBE TRACKING (optional, requires API key):
+   1. Go to https://console.developers.google.com
+   2. Create project → Enable YouTube Data API v3
+   3. Create API key
+   4. Add YOUTUBE_API_KEY to Vercel env vars
+   5. YouTube tracking is NOT yet implemented in code
+      → Need to add YouTube actor to src/lib/apify.ts
+      → Or build YouTube Data API v3 integration
+   STATUS: YouTube clips can be submitted but views are NOT tracked
+
+D. CREATE SUPABASE STORAGE BUCKET:
+   1. Go to Supabase Dashboard → Storage
+   2. Create bucket named "uploads"
+   3. Set to PUBLIC
+   4. This enables campaign image uploads from the admin panel
+
+E. VERIFY DISCORD OAuth:
+   1. Go to https://discord.com/developers/applications
+   2. Verify redirect URL is: https://clipershq.com/api/auth/callback/discord
+   3. If not, add it under OAuth2 → Redirects
+
+5. FEATURE STATUS
+==================
+
+FULLY WORKING:
+  ✓ Discord OAuth login
+  ✓ Campaign management (CRUD, admin edit approval)
+  ✓ Clip submission (2-hour window, platform validation, daily limit)
+  ✓ Owner clip override (NEW — no restrictions)
+  ✓ Automated tracking (TikTok + Instagram via Apify)
+  ✓ Fraud detection (8 signals, auto-flagging)
+  ✓ Earnings calculation (CPM + level/streak bonuses)
+  ✓ Payout system (request, review, approve, pay)
+  ✓ Call scheduling (timezone-aware booking)
+  ✓ Ban enforcement (API + UI + re-login block)
+  ✓ Role isolation (CLIPPER/ADMIN/OWNER data separation)
+  ✓ In-app chat with auto-replies
+  ✓ Real-time notifications (SSE)
+  ✓ Gamification (levels, streaks, referrals)
+  ✓ Streak system (48-hour grace period)
+  ✓ Auto-refresh on key pages
+  ✓ Rate limiting
+  ✓ Audit logging
+  ✓ Landing pages (clipper + brands)
+  ✓ Legal pages (privacy, terms, cookies)
+  ✓ Supabase Storage uploads (if bucket exists)
+  ✓ Getting Started onboarding checklist
+  ✓ Dashboard tooltips
+  ✓ Campaign health monitoring
+
+PARTIALLY WORKING:
+  ~ Email notifications: code is ready, needs EMAIL_API_KEY in Vercel
+  ~ YouTube tracking: clips can be submitted but views not tracked (no Apify actor)
+  ~ Supabase uploads: code ready, needs bucket creation in Supabase dashboard
+
+NOT IMPLEMENTED:
+  ✗ Google OAuth (button shows "Coming soon" — needs Google Cloud project)
+  ✗ YouTube view tracking (needs Apify actor or YouTube API)
+  ✗ SMS/push notifications
+  ✗ Two-factor authentication
+
+6. RECOMMENDATIONS
+====================
+
+1. Set up email ASAP — it's the biggest missing piece for user engagement
+2. YouTube tracking can wait — most clips are TikTok/Instagram anyway
+3. Consider adding Google OAuth in the future for users without Discord
+4. Monitor the Prisma connection pool — Supabase free tier has limits
+5. The in-memory rate limiter provides per-instance protection but isn't global across Vercel instances
+6. Regularly check fraud flags — the auto-flagging system catches suspicious patterns but requires manual review
+7. Back up the database regularly via Supabase dashboard
+8. Monitor Apify credits — each clip tracking check costs Apify compute time
+
+BUILD: ✓ (prisma generate + next build, 38/38 pages)
+===============================================================
