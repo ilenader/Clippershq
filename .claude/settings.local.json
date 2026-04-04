@@ -89,7 +89,14 @@
       "Bash(sed -i 's|src=\"assets/|src=\"/landing/|g' clipper.html)",
       "Bash(sed -i 's|href=\"css/|href=\"/landing/css/|g' clipper.html)",
       "Bash(sed -i 's|src=\"js/|src=\"/landing/js/|g' clipper.html)",
-      "Bash(sed -i 's|href=\"index.html|href=\"/brands.html|g' clipper.html)"
+      "Bash(sed -i 's|href=\"index.html|href=\"/brands.html|g' clipper.html)",
+      "Bash(sed -i 's|<a href=\"https://discord.gg/CM8xdenGYf\" target=\"_blank\" class=\"discord-cta\">|<a href=\"/login\" class=\"discord-cta\">|g' clipper.html)",
+      "Bash(sed -i '/<svg width=\"26\" height=\"20\" viewBox=\"0 0 24 18\" fill=\"currentColor\">/,/<\\\\/svg>/d' clipper.html)",
+      "Bash(sed -i 's|Join Our Discord Server|Start Clipping|g' clipper.html)",
+      "Bash(sed -i 's|<a href=\"/brands.html#book-call\" class=\"nav-cta\">Book a Call</a>|<a href=\"/brands.html\" class=\"nav-cta\">Launch a Campaign</a>|g' clipper.html)",
+      "Bash(sed -i 's|<a href=\"/\" style=\"color:var\\(--white\\)\">Become a Clipper</a>|<a href=\"/brands.html\" style=\"color:var\\(--white\\)\">For Brands</a>|g' clipper.html)",
+      "Bash(sed -i 's|href=\"/clipper.html\"|href=\"/\"|g' brands.html)",
+      "Bash(sed -i 's|<a href=\"/brands.html\" class=\"logo\">|<a href=\"/\" class=\"logo\">|g' brands.html)"
     ]
   }
 }
