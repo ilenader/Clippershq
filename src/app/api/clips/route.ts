@@ -128,10 +128,19 @@ export async function POST(req: NextRequest) {
     // ── RULE: Max clips per user per day per campaign ──
     const campaign = await db.campaign.findUnique({
       where: { id: data.campaignId },
-      select: { maxClipsPerUserPerDay: true, status: true },
+      select: { maxClipsPerUserPerDay: true, status: true, budget: true },
     });
     if (!campaign || (campaign.status !== "ACTIVE" && campaign.status !== "PAUSED")) {
       return NextResponse.json({ error: "This campaign is not available for submissions right now." }, { status: 400 });
+    }
+
+    // ── RULE: Budget cap — check if campaign budget is exhausted ──
+    if (campaign.budget != null && campaign.budget > 0) {
+      const { getCampaignBudgetStatus } = await import("@/lib/balance");
+      const budgetStatus = await getCampaignBudgetStatus(data.campaignId);
+      if (budgetStatus?.isOverBudget) {
+        return NextResponse.json({ error: "This campaign's budget has been reached. Check out other active campaigns!" }, { status: 400 });
+      }
     }
     const maxPerDay = campaign.maxClipsPerUserPerDay ?? 3;
     const startOfDay = new Date();

@@ -86,6 +86,44 @@ export function computeCampaignBalances(input: BalanceInput): CampaignBalance[] 
   }));
 }
 
+/**
+ * Get campaign budget status. Uses DB directly.
+ * Returns { budget, spent, remaining, isOverBudget }
+ */
+export async function getCampaignBudgetStatus(campaignId: string): Promise<{
+  budget: number;
+  spent: number;
+  remaining: number;
+  isOverBudget: boolean;
+} | null> {
+  try {
+    const { db } = await import("@/lib/db");
+    if (!db) return null;
+
+    const campaign = await db.campaign.findUnique({
+      where: { id: campaignId },
+      select: { budget: true },
+    });
+    if (!campaign || campaign.budget == null) return null;
+
+    const earningsAgg = await db.clip.aggregate({
+      where: { campaignId, isDeleted: false, status: "APPROVED" },
+      _sum: { earnings: true },
+    });
+    const spent = round2(earningsAgg._sum.earnings ?? 0);
+    const remaining = round2(Math.max(campaign.budget - spent, 0));
+
+    return {
+      budget: campaign.budget,
+      spent,
+      remaining,
+      isOverBudget: spent >= campaign.budget,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Round to 2 decimal places safely */
 function round2(n: number): number {
   return Math.round(n * 100) / 100;

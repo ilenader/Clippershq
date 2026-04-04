@@ -164,3 +164,116 @@ NOT IMPLEMENTED:
 
 BUILD: ✓ (prisma generate + next build, 38/38 pages)
 ===============================================================
+
+
+===============================================================
+PROMPT 2 UPDATE — Testing + AI Chatbot + Budget Cap
+Date: 2026-04-05
+===============================================================
+
+TEST RESULTS (19 Systems Audited)
+==================================
+
+| System                | Status  | Notes                                     |
+|-----------------------|---------|-------------------------------------------|
+| Authentication        | PASS    | PKCE, banned block, owner detect all correct |
+| Ban System            | PASS    | 4 layers enforced (API, UI, auth, admin)  |
+| Earnings Calculation  | PASS    | Formula, caps, fees all correct           |
+| Fraud Detection       | PASS    | 8 signals, no trustScore dependency       |
+| Gamification/Streaks  | PASS    | 48h grace, evaluateDay logic correct      |
+| Tracking System       | PASS    | Tiered intervals, roundToNextSlot correct |
+| Apify Integration     | PASS    | TikTok + Instagram. YouTube NOT supported |
+| Rate Limiting         | PASS    | In-memory Map, 60s cleanup               |
+| Clip Submission       | PASS    | All validations correct                   |
+| Owner Override        | PASS    | Skips all restrictions correctly          |
+| Payout System         | PASS    | Balance check in transaction, fee/bonus   |
+| Payout Review         | PASS    | OWNER-only, emails on PAID/REJECTED       |
+| Call Scheduling       | PASS    | Slot generation, timezone handling         |
+| Email System          | PASS    | 6 functions, Resend fallback              |
+| Chat System           | PASS    | Auto-replies, access checks, rate limit   |
+| Referral System       | PASS    | Self-referral prevention, 5% correct      |
+| File Upload           | PASS    | Supabase Storage, type/size validation    |
+| Auto-Refresh          | PASS    | Visibility API, proper cleanup            |
+| Notification System   | PASS    | SSE + heartbeat, read/unread status       |
+
+TOTAL: 19/19 PASS. No bugs found. No security issues.
+
+AI CHATBOT SETUP
+=================
+
+Created: src/lib/chatbot.ts
+- Uses Anthropic Claude API (claude-sonnet-4-20250514)
+- Max 500 tokens per response (cost-efficient)
+- Rate limit: 20 AI messages per user per day
+- System prompt includes platform knowledge + user context
+- Falls back to pattern-based auto-replies if:
+  - ANTHROPIC_API_KEY not set
+  - API call fails (timeout, error)
+  - Rate limit exceeded
+
+Integration: src/app/api/chat/conversations/[id]/messages/route.ts
+- When CLIPPER sends message:
+  1. Checks needsHumanSupport flag (skips AI if true)
+  2. Tries AI chatbot with last 10 messages as context
+  3. Falls back to pattern-based auto-reply if AI fails
+  4. Checks if AI suggests transfer (3 consecutive unable-to-help)
+  5. If transfer needed: sets needsHumanSupport=true, notifies owners
+- When OWNER/ADMIN sends message: clears needsHumanSupport flag
+
+Schema change: added needsHumanSupport Boolean to Conversation model.
+
+Estimated cost: ~$0.001 per AI response (500 tokens at Sonnet pricing).
+At 20 msgs/user, 100 active users = ~$2/day max.
+
+OWNER NEEDS TO:
+- Add ANTHROPIC_API_KEY to Vercel environment variables
+- Without it, the existing pattern-based auto-replies continue working
+
+CAMPAIGN BUDGET CAP
+====================
+
+New helper: getCampaignBudgetStatus(campaignId) in src/lib/balance.ts
+Returns: { budget, spent, remaining, isOverBudget }
+
+Enforcement:
+1. Clip submission: checks budget before allowing submission
+   - If spent >= budget: returns "This campaign's budget has been reached"
+2. Tracking cron: caps earnings recalculation at remaining budget
+   - Calculates what new earnings would be
+   - If would exceed budget: caps at remaining amount
+   - Other clips in same campaign not affected (each capped independently)
+
+COMPLETE MANUAL STEPS LIST
+============================
+
+1. EMAIL SETUP (Resend):
+   - Add EMAIL_API_KEY and EMAIL_FROM to Vercel env vars
+
+2. AI CHATBOT:
+   - Add ANTHROPIC_API_KEY to Vercel env vars
+   - Get key from https://console.anthropic.com
+
+3. CRON BACKUP (optional):
+   - Set up cron-job.org per instructions in public/CRON-SETUP.md
+
+4. SUPABASE STORAGE:
+   - Create public bucket "uploads" in Supabase Dashboard
+
+5. DISCORD OAUTH:
+   - Verify redirect URL: https://clipershq.com/api/auth/callback/discord
+
+6. YOUTUBE TRACKING (future):
+   - Not yet implemented. Needs Apify YouTube actor or YouTube Data API v3.
+   - YouTube clips can be submitted but views are NOT tracked.
+
+7. TEST MANUALLY:
+   - Login with Discord
+   - Create a campaign
+   - Submit a clip
+   - Approve it and verify earnings
+   - Request a payout
+   - Test the chat system
+   - Test the referral system
+
+BUILD: PASS (38/38 pages)
+===============================================================

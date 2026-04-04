@@ -487,10 +487,11 @@ model Note {
 // ─── Chat System ────────────────────────────────────────────
 
 model Conversation {
-  id         String   @id @default(cuid())
-  campaignId String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  campaignId          String?
+  needsHumanSupport   Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   campaign     Campaign?                 @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]

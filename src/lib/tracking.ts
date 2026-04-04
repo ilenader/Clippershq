@@ -206,13 +206,26 @@ export async function runDueTrackingJobs(): Promise<{ processed: number; errors:
           console.error(`[TRACKING] Fraud detection error for clip ${clip.id}:`, fraudErr.message);
         }
 
-        // Recalculate earnings if clip is approved
+        // Recalculate earnings if clip is approved (with budget cap)
         if (clip.status === "APPROVED" && clip.campaign) {
-          const newEarnings = recalculateClipEarnings({
+          let newEarnings = recalculateClipEarnings({
             stats: [{ views: stats.views }],
             campaign: clip.campaign,
             user: clip.user,
           });
+
+          // Budget cap: don't exceed campaign budget
+          try {
+            const { getCampaignBudgetStatus } = await import("@/lib/balance");
+            const budgetStatus = await getCampaignBudgetStatus(clip.campaignId);
+            if (budgetStatus && budgetStatus.budget > 0) {
+              const otherClipsSpent = budgetStatus.spent - (clip.earnings || 0);
+              const maxAllowed = Math.max(budgetStatus.budget - otherClipsSpent, 0);
+              newEarnings = Math.min(newEarnings, maxAllowed);
+              newEarnings = Math.round(newEarnings * 100) / 100;
+            }
+          } catch {}
+
           if (newEarnings !== clip.earnings) {
             await db.clip.update({
               where: { id: clip.id },

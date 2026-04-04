@@ -186,56 +186,116 @@ export async function POST(
       }),
     ]);
 
-    // Auto-reply for clipper messages — sent as the campaign creator
+    // Auto-reply for clipper messages — AI chatbot with pattern fallback
     if (role === "CLIPPER") {
-      const autoReply = findAutoReply(content);
-      if (autoReply) {
-        // Look up the campaign linked to this conversation to find its creator
+      try {
+        // Check if conversation needs human support (skip AI)
         const convo = await db.conversation.findUnique({
           where: { id: conversationId },
-          select: { campaignId: true },
+          select: { campaignId: true, needsHumanSupport: true },
         });
-        let responderId: string | null = null;
 
-        if (convo?.campaignId) {
-          const campaign = await db.campaign.findUnique({
-            where: { id: convo.campaignId },
-            select: { createdById: true },
-          });
-          if (campaign?.createdById) {
-            // Verify creator is active admin/owner
-            const creator = await db.user.findUnique({
-              where: { id: campaign.createdById },
-              select: { id: true, role: true, status: true },
+        if (!convo?.needsHumanSupport) {
+          // Find responder ID (campaign creator or fallback admin/owner)
+          let responderId: string | null = null;
+          if (convo?.campaignId) {
+            const campaign = await db.campaign.findUnique({
+              where: { id: convo.campaignId },
+              select: { createdById: true },
             });
-            if (creator && creator.status === "ACTIVE" && (creator.role === "ADMIN" || creator.role === "OWNER")) {
-              responderId = creator.id;
+            if (campaign?.createdById) {
+              const creator = await db.user.findUnique({
+                where: { id: campaign.createdById },
+                select: { id: true, role: true, status: true },
+              });
+              if (creator && creator.status === "ACTIVE" && (creator.role === "ADMIN" || creator.role === "OWNER")) {
+                responderId = creator.id;
+              }
+            }
+          }
+          if (!responderId) {
+            const participants = await db.conversationParticipant.findMany({
+              where: { conversationId, userId: { not: userId } },
+              include: { user: { select: { id: true, role: true } } },
+            });
+            const fallback = participants.find((p: any) => p.user.role === "ADMIN")
+              || participants.find((p: any) => p.user.role === "OWNER")
+              || participants[0];
+            if (fallback) responderId = fallback.userId;
+          }
+
+          if (responderId) {
+            let replyContent: string | null = null;
+
+            // Try AI chatbot first
+            try {
+              const { generateChatbotResponse, shouldTransferToAgent } = await import("@/lib/chatbot");
+              const userData = await db.user.findUnique({
+                where: { id: userId },
+                select: { username: true, level: true, totalEarnings: true, currentStreak: true },
+              });
+              // Get conversation history for context
+              const history = await db.message.findMany({
+                where: { conversationId },
+                orderBy: { createdAt: "desc" },
+                take: 10,
+                select: { senderId: true, content: true },
+              });
+              const chatHistory = history.reverse().map((m: any) => ({
+                role: m.senderId === userId ? "user" as const : "assistant" as const,
+                content: m.content,
+              }));
+
+              replyContent = await generateChatbotResponse(content, chatHistory, {
+                username: userData?.username || "Clipper",
+                role: "CLIPPER",
+                level: userData?.level || 0,
+                earnings: userData?.totalEarnings || 0,
+                streak: userData?.currentStreak || 0,
+              });
+
+              // Check if AI suggests transfer after 3 consecutive unable-to-help responses
+              if (replyContent) {
+                const recentAI = history.filter((m: any) => m.senderId === responderId).slice(0, 3).map((m: any) => m.content);
+                recentAI.push(replyContent);
+                if (shouldTransferToAgent(recentAI)) {
+                  await db.conversation.update({ where: { id: conversationId }, data: { needsHumanSupport: true } });
+                  // Notify owners
+                  const { createNotification } = await import("@/lib/notifications");
+                  const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true } });
+                  for (const owner of owners) {
+                    await createNotification(owner.id, "CLIP_FLAGGED", "Live support requested", `${userData?.username || "A clipper"} needs help in chat.`, { conversationId });
+                  }
+                }
+              }
+            } catch {
+              // AI failed — will fall back to pattern matching below
+            }
+
+            // Fallback to pattern-based auto-reply if AI returned nothing
+            if (!replyContent) {
+              replyContent = findAutoReply(content);
+            }
+
+            if (replyContent) {
+              await db.message.create({
+                data: { conversationId, senderId: responderId, content: replyContent },
+              });
+              await db.conversation.update({
+                where: { id: conversationId },
+                data: { updatedAt: new Date() },
+              });
             }
           }
         }
+      } catch {}
+    }
 
-        // Fallback: use any admin/owner participant in the conversation
-        if (!responderId) {
-          const participants = await db.conversationParticipant.findMany({
-            where: { conversationId, userId: { not: userId } },
-            include: { user: { select: { id: true, role: true } } },
-          });
-          const fallback = participants.find((p: any) => p.user.role === "ADMIN")
-            || participants.find((p: any) => p.user.role === "OWNER")
-            || participants[0];
-          if (fallback) responderId = fallback.userId;
-        }
-
-        if (responderId) {
-          await db.message.create({
-            data: { conversationId, senderId: responderId, content: autoReply },
-          });
-          await db.conversation.update({
-            where: { id: conversationId },
-            data: { updatedAt: new Date() },
-          });
-        }
-      }
+    // When OWNER/ADMIN sends a message, clear needsHumanSupport flag
+    if (role === "OWNER" || role === "ADMIN") {
+      try {
+        await db.conversation.update({ where: { id: conversationId }, data: { needsHumanSupport: false } });
+      } catch {}
     }
 
     return NextResponse.json(message, { status: 201 });
