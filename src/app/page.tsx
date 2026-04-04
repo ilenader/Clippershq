@@ -2,7 +2,6 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { isDevBypassEnabled, DEV_AUTH_COOKIE } from "@/lib/dev-auth";
 import { cookies } from "next/headers";
-import { ClipperLanding } from "./clipper-landing";
 
 export default async function LandingPage() {
   if (isDevBypassEnabled()) {
@@ -21,5 +20,10 @@ export default async function LandingPage() {
     redirect("/dashboard");
   }
 
-  return <ClipperLanding />;
+  return (
+    <iframe
+      src="/clipper.html"
+      style={{ width: "100%", height: "100vh", border: "none", display: "block" }}
+    />
+  );
 }

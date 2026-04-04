@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Instant background colour — no flash of white, no opacity block -->
+  <style id="__pre-paint">html,body{background:#080c10!important}</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clippers HQ — Content Clipping Agency</title>
+  <link rel="icon" href="/landing/logo/logo.png" type="image/png" />
+
+  <!-- ── PRELOAD CRITICAL HERO IMAGES ─────────────────────────────────────── -->
+  <!-- Browser fetches these at highest priority before any other resource    -->
+  <link rel="preload" as="image" href="/landing/hero/hero-bg.jpg" fetchpriority="high" />
+  <link rel="preload" as="image" href="/landing/hero/hero-fg.png" fetchpriority="high" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=Space+Grotesk:wght@700&family=Syne:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/landing/css/base.css" />
+  <link rel="stylesheet" href="/landing/css/navbar.css" />
+  <link rel="stylesheet" href="/landing/css/hero.css" />
+  <link rel="stylesheet" href="/landing/css/faces.css" />
+  <link rel="stylesheet" href="/landing/css/sections.css" />
+  <link rel="stylesheet" href="/landing/css/footer.css" />
+  <script src="/landing/js/loader.js"></script>
+
+  <style>
+    /* ── LOADER ── */
+    #loader {
+      position: fixed; inset: 0; background: #080b10; display: none;
+      flex-direction: column; align-items: center; justify-content: center;
+      z-index: 99999; transition: opacity 0.6s ease, visibility 0.6s ease;
+    }
+    #loader.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+    .ldr-wrap { position: relative; width: 100px; height: 94px; margin-bottom: 36px; }
+    .ldr-svg {
+      width: 100px; height: 94px; overflow: visible;
+      animation: ldrTriGlow 1.2s ease 0.8s forwards;
+      filter: drop-shadow(0 0 0px rgba(255,255,255,0));
+    }
+    @keyframes ldrTriGlow {
+      0%   { filter: drop-shadow(0 0 0px  rgba(255,255,255,0)); }
+      50%  { filter: drop-shadow(0 0 24px rgba(255,255,255,0.85)); }
+      100% { filter: drop-shadow(0 0 10px rgba(255,255,255,0.35)); }
+    }
+    .ldr-fill { fill: white; opacity: 0; animation: ldrFillIn 0.5s ease 0.55s forwards; }
+    .ldr-outline {
+      fill: none; stroke: white; stroke-width: 3; stroke-linejoin: round;
+      stroke-dasharray: 300; stroke-dashoffset: 300;
+      animation: ldrDraw 1s cubic-bezier(0.4,0,0.2,1) 0.2s forwards;
+    }
+    .ldr-glow {
+      position: absolute; bottom: -24px; left: 50%; transform: translateX(-50%);
+      width: 80px; height: 20px;
+      background: radial-gradient(ellipse, rgba(0,149,246,0.5) 0%, transparent 70%);
+      opacity: 0; animation: ldrGlow 1.4s ease 0.7s infinite alternate;
+    }
+    .ldr-scan { display: none; }
+    .ldr-brand {
+      font-family: 'Manrope', sans-serif; font-size: 1.1rem; font-weight: 700;
+      letter-spacing: 0.22em; text-transform: uppercase; color: transparent;
+      animation: ldrText 0.5s ease 0.65s forwards;
+    }
+    .ldr-brand span { color: inherit; }
+    .ldr-progress-wrap {
+      margin-top: 28px; width: 120px; height: 2px;
+      background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden;
+      opacity: 0; animation: ldrText 0.4s ease 0.75s forwards;
+    }
+    .ldr-progress-bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #0095f6, #60c8ff); border-radius: 2px;
+      animation: ldrBar 0.9s cubic-bezier(0.2,0,0,1) 0.75s forwards;
+      box-shadow: 0 0 8px rgba(0,149,246,0.7);
+    }
+    @keyframes ldrDraw  { to { stroke-dashoffset: 0; } }
+    @keyframes ldrFillIn { to { opacity: 1; } }
+    @keyframes ldrGlow  { 0% { opacity: 0.5; width: 70px; } 100% { opacity: 1; width: 100px; } }
+    @keyframes ldrText  { to { color: white; opacity: 1; } }
+    @keyframes ldrBar   { 0%{width:0%} 20%{width:60%} 50%{width:82%} 78%{width:94%} 100%{width:100%} }
+    /* Prevent background layers blocking clicks */
+    #vanta-bg { pointer-events: none !important; }
+    /* Hero fade disabled */
+    .hero-main-fade { display: none !important; }
+  </style>
+  <!-- PAGE ENTRY -->
+  <script>
+    (function(){
+      var nav = sessionStorage.getItem('pt-entry')==='1';
+      if(nav) sessionStorage.removeItem('pt-entry');
+
+      function reveal(ms){
+        var st=document.getElementById('__pre-paint');
+        if(st) st.parentNode.removeChild(st);
+        // Only apply fade transition if meaningful delay; skip for instant loads
+        if(ms > 50){
+          document.body.style.opacity='0';
+          document.body.style.transition='opacity '+ms+'ms ease';
+          requestAnimationFrame(function(){requestAnimationFrame(function(){
+            document.body.style.opacity='1';
+            setTimeout(function(){document.body.style.transition='';},ms+50);
+          });});
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded',function(){
+        var l=document.getElementById('loader');
+
+        if(nav && l){
+          // Navigation arrival: play loader, then reveal
+          ['.ldr-svg','.ldr-fill','.ldr-outline','.ldr-glow','.ldr-brand','.ldr-progress-wrap','.ldr-progress-bar'].forEach(function(sel){
+            var el=l.querySelector(sel); if(!el)return;
+            el.style.animation='none'; void el.offsetWidth; el.style.animation='';
+          });
+          l.style.cssText='display:flex!important;opacity:1!important;visibility:visible!important;position:fixed;inset:0;z-index:2147483647;';
+          var st=document.getElementById('__pre-paint');
+          if(st) st.parentNode.removeChild(st);
+          setTimeout(function(){
+            l.style.transition='opacity 0.5s ease';
+            l.style.opacity='0';
+            reveal(500);
+            setTimeout(function(){l.style.cssText='display:none!important';},600);
+          },1400);
+        } else {
+          // Direct visit / refresh: no loader, instant render
+          if(l) l.style.cssText='display:none!important';
+          // Remove pre-paint style immediately — page is already dark from body bg
+          var st=document.getElementById('__pre-paint');
+          if(st) st.parentNode.removeChild(st);
+          // Very short fade just to prevent abrupt pop-in of text (not images)
+          document.body.style.opacity='0';
+          document.body.style.transition='opacity 200ms ease';
+          requestAnimationFrame(function(){requestAnimationFrame(function(){
+            document.body.style.opacity='1';
+            setTimeout(function(){document.body.style.transition='';},250);
+          });});
+        }
+      });
+    })();
+  </script>
+</head>
+<body>
+
+  <div id="loader">
+    <div class="ldr-wrap">
+      <div class="ldr-scan"></div>
+      <svg class="ldr-svg" viewBox="0 0 100 94" xmlns="http://www.w3.org/2000/svg">
+        <polygon class="ldr-fill" points="50,4 97,90 3,90"/>
+        <polygon class="ldr-outline" points="50,4 97,90 3,90"/>
+      </svg>
+      <div class="ldr-glow"></div>
+    </div>
+    <div class="ldr-brand">Clippers<span>&nbsp;HQ</span></div>
+    <div class="ldr-progress-wrap"><div class="ldr-progress-bar"></div></div>
+  </div>
+
+  <div id="vanta-bg"></div>
+
+  <nav id="navbar">
+    <div class="nav-inner">
+      <!-- Logo: triangle image only, no text -->
+      <a href="/brands.html" id="logo-home" class="logo logo--icon-only">
+        <img src="/landing/logo/logo.png" alt="Clippers HQ" class="logo-img">
+      </a>
+      <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links nav-pill" id="navLinks">
+        <li><a href="#faq">FAQ</a></li>
+        <li><a href="/">Become a Clipper</a></li>
+        <li><a href="#footer">Contact</a></li>
+        <li><a href="#book-call" class="nav-cta">Book a Call</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div id="site-content">
+
+  <section id="hero-main">
+
+    <div class="hero-3d">
+
+      <!-- Layer 1: Background cloud photo -->
+      <img class="hero-bg" src="/landing/hero/hero-bg.jpg" alt="" aria-hidden="true" loading="eager" fetchpriority="high" decoding="sync">
+
+      <!-- Layer 2: Text content -->
+      <div class="hero-content">
+        <h1 class="hero-heading">We Turn Your<br>Content Into<br><em>Viral Clips</em></h1>
+        <p class="hero-subtext">Full-service content clipping for brands and creators who refuse to be ignored. We extract, edit, and distribute your best moments across every short-form platform.</p>
+      </div>
+
+      <!-- Layer 3: Foreground cut-out clouds (overlaps text for 3D depth) -->
+      <img class="hero-fg" src="/landing/hero/hero-fg.png" alt="" aria-hidden="true" loading="eager" fetchpriority="high" decoding="sync">
+
+    </div>
+
+    <div class="hero-bottom-fade" aria-hidden="true"></div>
+
+  </section>
+
+    <section id="faces">
+    <h2 class="section-title faces-headline reveal">Faces and brands you can&#39;t escape this month</h2>
+
+    <div class="faces-rows-wrap">
+
+      <div class="faces-row faces-row--left">
+        <div class="faces-track">
+          <div class="face-card reveal"><img src="/landing/faces/Adin%20Ross.jpg" alt="Adin Ross" class="face-img"><span class="face-card-overlay">Adin Ross</span><div class="face-card-views">Views this month from clips alone:<br/>48,200,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Bbno%24.jpg" alt="Bbno$" class="face-img"><span class="face-card-overlay">Bbno$</span><div class="face-card-views">Views this month from clips alone:<br/>31,700,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Cinna.jpg" alt="Cinna" class="face-img"><span class="face-card-overlay">Cinna</span><div class="face-card-views">Views this month from clips alone:<br/>62,400,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Clavicular.jpg" alt="Clavicular" class="face-img"><span class="face-card-overlay">Clavicular</span><div class="face-card-views">Views this month from clips alone:<br/>19,800,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Lacy.jpg" alt="Lacy" class="face-img"><span class="face-card-overlay">Lacy</span><div class="face-card-views">Views this month from clips alone:<br/>83,100,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/IShowSpeed.jpg" alt="IShowSpeed" class="face-img"><span class="face-card-overlay">IShowSpeed</span><div class="face-card-views">Views this month from clips alone:<br/>27,500,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Jynxzi.jpg" alt="Jynxzi" class="face-img"><span class="face-card-overlay">Jynxzi</span><div class="face-card-views">Views this month from clips alone:<br/>44,900,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Lil%20Baby.jpg" alt="Lil Baby" class="face-img"><span class="face-card-overlay">Lil Baby</span><div class="face-card-views">Views this month from clips alone:<br/>71,300,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Togi.jpg" alt="Togi" class="face-img"><span class="face-card-overlay">Togi</span><div class="face-card-views">Views this month from clips alone:<br/>38,600,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/xQc.jpg" alt="xQc" class="face-img"><span class="face-card-overlay">xQc</span><div class="face-card-views">Views this month from clips alone:<br/>55,000,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Adin%20Ross.jpg" alt="Adin Ross" class="face-img"><span class="face-card-overlay">Adin Ross</span><div class="face-card-views">Views this month from clips alone:<br/>48,200,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Bbno%24.jpg" alt="Bbno$" class="face-img"><span class="face-card-overlay">Bbno$</span><div class="face-card-views">Views this month from clips alone:<br/>31,700,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Cinna.jpg" alt="Cinna" class="face-img"><span class="face-card-overlay">Cinna</span><div class="face-card-views">Views this month from clips alone:<br/>62,400,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Clavicular.jpg" alt="Clavicular" class="face-img"><span class="face-card-overlay">Clavicular</span><div class="face-card-views">Views this month from clips alone:<br/>19,800,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Lacy.jpg" alt="Lacy" class="face-img"><span class="face-card-overlay">Lacy</span><div class="face-card-views">Views this month from clips alone:<br/>83,100,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/IShowSpeed.jpg" alt="IShowSpeed" class="face-img"><span class="face-card-overlay">IShowSpeed</span><div class="face-card-views">Views this month from clips alone:<br/>27,500,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Jynxzi.jpg" alt="Jynxzi" class="face-img"><span class="face-card-overlay">Jynxzi</span><div class="face-card-views">Views this month from clips alone:<br/>44,900,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Lil%20Baby.jpg" alt="Lil Baby" class="face-img"><span class="face-card-overlay">Lil Baby</span><div class="face-card-views">Views this month from clips alone:<br/>71,300,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/Togi.jpg" alt="Togi" class="face-img"><span class="face-card-overlay">Togi</span><div class="face-card-views">Views this month from clips alone:<br/>38,600,000</div></div>
+          <div class="face-card reveal"><img src="/landing/faces/xQc.jpg" alt="xQc" class="face-img"><span class="face-card-overlay">xQc</span><div class="face-card-views">Views this month from clips alone:<br/>55,000,000</div></div>
+        </div>
+      </div>
+
+      <div class="faces-row faces-row--right">
+        <div class="faces-track">
+          <div class="face-card reveal"><img src="/landing/brands/AG1.jpg" alt="AG1" class="face-img"><span class="face-card-overlay">AG1</span><div class="face-card-views">Views this month from clips alone:<br/>22,400,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Based.png" alt="Based" class="face-img"><span class="face-card-overlay">Based</span><div class="face-card-views">Views this month from clips alone:<br/>15,300,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Celsius.jpg" alt="Celsius" class="face-img"><span class="face-card-overlay">Celsius</span><div class="face-card-views">Views this month from clips alone:<br/>29,000,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Gorilla%20Mind.jpg" alt="Gorilla Mind" class="face-img"><span class="face-card-overlay">Gorilla Mind</span><div class="face-card-views">Views this month from clips alone:<br/>73,500,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Gymshark.jpg" alt="Gymshark" class="face-img"><span class="face-card-overlay">Gymshark</span><div class="face-card-views">Views this month from clips alone:<br/>33,100,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Manscaped.jpg" alt="Manscaped" class="face-img"><span class="face-card-overlay">Manscaped</span><div class="face-card-views">Views this month from clips alone:<br/>90,200,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Prime%20Hydration.jpg" alt="Prime Hydration" class="face-img"><span class="face-card-overlay">Prime Hydration</span><div class="face-card-views">Views this month from clips alone:<br/>18,600,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/RAW%20Nutrition.jpg" alt="RAW Nutrition" class="face-img"><span class="face-card-overlay">RAW Nutrition</span><div class="face-card-views">Views this month from clips alone:<br/>41,200,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Rizz%20App.jpg" alt="Rizz App" class="face-img"><span class="face-card-overlay">Rizz App</span><div class="face-card-views">Views this month from clips alone:<br/>57,800,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/YoungLA.jpg" alt="YoungLA" class="face-img"><span class="face-card-overlay">YoungLA</span><div class="face-card-views">Views this month from clips alone:<br/>64,500,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/AG1.jpg" alt="AG1" class="face-img"><span class="face-card-overlay">AG1</span><div class="face-card-views">Views this month from clips alone:<br/>22,400,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Based.png" alt="Based" class="face-img"><span class="face-card-overlay">Based</span><div class="face-card-views">Views this month from clips alone:<br/>15,300,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Celsius.jpg" alt="Celsius" class="face-img"><span class="face-card-overlay">Celsius</span><div class="face-card-views">Views this month from clips alone:<br/>29,000,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Gorilla%20Mind.jpg" alt="Gorilla Mind" class="face-img"><span class="face-card-overlay">Gorilla Mind</span><div class="face-card-views">Views this month from clips alone:<br/>73,500,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Gymshark.jpg" alt="Gymshark" class="face-img"><span class="face-card-overlay">Gymshark</span><div class="face-card-views">Views this month from clips alone:<br/>33,100,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Manscaped.jpg" alt="Manscaped" class="face-img"><span class="face-card-overlay">Manscaped</span><div class="face-card-views">Views this month from clips alone:<br/>90,200,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Prime%20Hydration.jpg" alt="Prime Hydration" class="face-img"><span class="face-card-overlay">Prime Hydration</span><div class="face-card-views">Views this month from clips alone:<br/>18,600,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/RAW%20Nutrition.jpg" alt="RAW Nutrition" class="face-img"><span class="face-card-overlay">RAW Nutrition</span><div class="face-card-views">Views this month from clips alone:<br/>41,200,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/Rizz%20App.jpg" alt="Rizz App" class="face-img"><span class="face-card-overlay">Rizz App</span><div class="face-card-views">Views this month from clips alone:<br/>57,800,000</div></div>
+          <div class="face-card reveal"><img src="/landing/brands/YoungLA.jpg" alt="YoungLA" class="face-img"><span class="face-card-overlay">YoungLA</span><div class="face-card-views">Views this month from clips alone:<br/>64,500,000</div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <p class="faces-desc reveal">These are the creators and brands dominating your feed right now. Clipping allows them to stay everywhere at once — turning long-form content into viral distribution machines that constantly reach new audiences.</p>
+  </section>
+  <section id="process">
+    <div class="process-inner">
+
+      <!-- Section header -->
+      <div class="process-header reveal">
+        <span class="section-label">Process</span>
+        <h2 class="process-headline">Launching a campaign has never<br>been easier</h2>
+        <p class="process-subtext">Say goodbye to slow agencies. With Clippers HQ, you can launch, scale, and<br class="process-br"> analyze your viral campaigns in record time.</p>
+      </div>
+
+      <!-- Timeline -->
+      <div class="process-timeline">
+        <div class="process-line"></div>
+
+        <!-- ROW 1: metric left, step right -->
+        <div class="process-row">
+          <div class="process-metric reveal">
+            <span class="process-metric-num">10 Billion+</span>
+            <span class="process-metric-label">Views</span>
+            <span class="process-metric-sub">Campaign reach delivered</span>
+            <p class="process-metric-desc">Start with 3 to 5 distinct hooks and test them simultaneously.</p>
+          </div>
+          <div class="process-dot-wrap">
+            <div class="process-dot"><span>1</span></div>
+          </div>
+          <div class="process-card reveal">
+            <span class="process-step-label">Step</span>
+            <h3>Jump on a call with our team</h3>
+            <p>Bring yourself and your vision to a quick call. We handle strategy, campaign structure, and rollout planning from there.</p>
+          </div>
+        </div>
+
+        <!-- ROW 2: step left, metric right -->
+        <div class="process-row process-row--reverse">
+          <div class="process-card reveal">
+            <span class="process-step-label">Step</span>
+            <h3>Launch the distribution wave</h3>
+            <p>Once live, our network of experienced clippers starts publishing for your brand. They launch wave after wave of content across TikTok, Reels, X, and YouTube Shorts to generate organic reach at scale.</p>
+          </div>
+          <div class="process-dot-wrap">
+            <div class="process-dot"><span>2</span></div>
+          </div>
+          <div class="process-metric reveal">
+            <span class="process-metric-num">60,000+</span>
+            <span class="process-metric-label">Clippers</span>
+            <span class="process-metric-sub">Active creator network</span>
+            <p class="process-metric-desc">Stagger posting windows to maintain momentum and broaden reach.</p>
+          </div>
+        </div>
+
+        <!-- ROW 3: metric left, step right -->
+        <div class="process-row">
+          <div class="process-metric reveal">
+            <span class="process-metric-num">340%</span>
+            <span class="process-metric-label">Lift</span>
+            <span class="process-metric-sub">Engagement spikes</span>
+            <p class="process-metric-desc">Scale only the edits with strong hold rate and repost velocity.</p>
+          </div>
+          <div class="process-dot-wrap">
+            <div class="process-dot"><span>3</span></div>
+          </div>
+          <div class="process-card reveal">
+            <span class="process-step-label">Step</span>
+            <h3>Track performance in real time</h3>
+            <p>We provide a dashboard where you can track videos created, views generated, and the performance patterns shaping the next wave.</p>
+          </div>
+        </div>
+
+      </div><!-- /.process-timeline -->
+    </div><!-- /.process-inner -->
+  </section>
+
+
+  <section id="book-call" class="reveal">
+    <canvas id="book-call-particles"></canvas>
+    <div class="book-bg-glow"></div>
+    <div class="extra-glow"></div>
+    <div class="glow-purple"></div>
+    <div class="glow-pink"></div>
+    <div class="book-inner">
+      <div class="section-label reveal">Get Started</div>
+      <h2 class="book-headline reveal">Ready to become<br/>the brand everyone's<br/>talking about?</h2>
+      <p class="book-desc reveal">Book a free 30-minute strategy call. We'll analyze your current presence, map out a custom distribution plan, and show you exactly what's possible.</p>
+      <a href="https://calendly.com/clipershq/30min" target="_blank" class="btn-primary btn-large reveal" id="ctaBtn"><span class="btn-label">Book a Strategy Call &rarr;</span></a>
+      <!-- Inline Calendly booking widget -->
+      <div class="calendly-inline-widget reveal" data-url="https://calendly.com/clipershq/30min?hide_landing_page_details=1&hide_gdpr_banner=1&background_color=111720&text_color=e8edf2&primary_color=0095f6" style="min-width:320px;height:1050px;"></div>
+      <p class="book-note reveal">No commitment. No pitch decks. Just clarity.</p>
+    </div>
+  </section>
+
+  <!-- ── WHO WE WORK WITH ── -->
+  <section id="clients">
+    <div class="clients-inner">
+      <div class="clients-header-row">
+        <span class="clients-label">Who We Work With</span>
+        <p class="clients-headline">Campaigns across every industry and niche.</p>
+      </div>
+      <div class="clients-list">
+
+        <div class="clients-item"
+          data-bg-word="VIRAL SOUNDS"
+          data-preview-title="Artists &amp; Musicians"
+          data-preview-body="We turn your songs into viral distribution. We create edits using your tracks and push raw TikToks using your sound across TikTok, Reels, and Shorts — driving new listeners, new fans, and constant discovery."
+          data-preview-tags="TikTok · Reels · Shorts · Fan Growth">
+          <span class="clients-num">01</span>
+          <span class="clients-name">Artists</span>
+          <span class="clients-arrow">↗</span>
+        </div>
+
+        <div class="clients-item"
+          data-bg-word="CLIPPING"
+          data-preview-title="Creators &amp; Streamers"
+          data-preview-body="We take your long-form content and turn it into a high-volume clip engine. Podcasts, streams, YouTube videos — we cut, optimize, and distribute at scale to generate millions of views."
+          data-preview-tags="Podcasts · Streams · YouTube · Distribution">
+          <span class="clients-num">02</span>
+          <span class="clients-name">Creators</span>
+          <span class="clients-arrow">↗</span>
+        </div>
+
+        <div class="clients-item"
+          data-bg-word="HOOKS"
+          data-preview-title="Products &amp; E-commerce"
+          data-preview-body="We turn products into scroll-stopping content. From UGC-style clips to fast viral edits, we create content that drives attention and conversions across short-form platforms."
+          data-preview-tags="Product Demos · UGC · Conversion · Discovery">
+          <span class="clients-num">03</span>
+          <span class="clients-name">Products</span>
+          <span class="clients-arrow">↗</span>
+        </div>
+
+        <div class="clients-item"
+          data-bg-word="DISTRIBUTION"
+          data-preview-title="Brands &amp; B2B"
+          data-preview-body="We turn your brand message into a distribution system. Instead of relying on ads, we create organic short-form content that spreads across platforms and builds awareness at scale."
+          data-preview-tags="Brand Awareness · Organic · B2B · Scale">
+          <span class="clients-num">04</span>
+          <span class="clients-name">Brands</span>
+          <span class="clients-arrow">↗</span>
+        </div>
+
+        <div class="clients-item"
+          data-bg-word="GROWTH"
+          data-preview-title="Apps &amp; Startups"
+          data-preview-body="We help apps grow through viral distribution. From launch clips to founder content, we turn your product into content that spreads and brings in users organically."
+          data-preview-tags="Product Launches · Founders · Organic Growth">
+          <span class="clients-num">05</span>
+          <span class="clients-name">Apps / Startups</span>
+          <span class="clients-arrow">↗</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Premium cursor-follow preview card -->
+    <div id="clientsPreview" class="clients-preview" aria-hidden="true">
+      <div class="clients-preview-title"></div>
+      <div class="clients-preview-body"></div>
+      <div class="clients-preview-tags"></div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="section-label reveal">FAQ</div>
+    <h2 class="section-title reveal">Frequently asked<br/>questions</h2>
+    <div class="faq-list">
+      <div class="faq-item reveal">
+        <button class="faq-question" aria-expanded="false">What services do you offer?<span class="faq-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span></button>
+        <div class="faq-answer"><p>We offer end-to-end content clipping, short-form distribution, organic growth strategy, and performance analytics. Think of us as a full clip production department embedded into your brand.</p></div>
+      </div>
+      <div class="faq-item reveal">
+        <button class="faq-question" aria-expanded="false">Who is this service for?<span class="faq-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span></button>
+        <div class="faq-answer"><p>We work best with brands and founders who are already producing long-form content — podcasts, interviews, webinars, streams — and want to extract maximum value from it across short-form platforms.</p></div>
+      </div>
+      <div class="faq-item reveal">
+        <button class="faq-question" aria-expanded="false">How long does it take to see results?<span class="faq-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span></button>
+        <div class="faq-answer"><p>Most clients see measurable reach increases within 2–3 weeks. Significant momentum builds by week 6–8. Full-scale results — viral moments, compounding audiences — emerge in months 2–3 as the distribution flywheel gains speed.</p></div>
+      </div>
+      <div class="faq-item reveal">
+        <button class="faq-question" aria-expanded="false">How does the collaboration work?<span class="faq-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span></button>
+        <div class="faq-answer"><p>After onboarding, you get a dedicated strategist, a clipping team, and access to our analytics dashboard. We meet weekly, you approve clip batches, and we handle distribution from there.</p></div>
+      </div>
+      <div class="faq-item reveal">
+        <button class="faq-question" aria-expanded="false">What platforms do you distribute on?<span class="faq-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span></button>
+        <div class="faq-answer"><p>We distribute across TikTok, Instagram Reels, YouTube Shorts, LinkedIn, and Twitter/X. The mix is determined by your audience and niche — we'll map the right channels in your strategy call.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a href="/brands.html" class="logo"><img src="/landing/logo/logo.png" alt="Clippers HQ" class="logo-img"><span class="logo-text">Clippers HQ</span></a>
+        <p class="footer-tagline">The content clipping engine for ambitious brands.</p>
+        <div class="social-links">
+          <a href="https://www.instagram.com/clipper.hq/" aria-label="Instagram" target="_blank" rel="noopener"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+          <a href="https://discord.gg/" aria-label="Discord" target="_blank" rel="noopener"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.01.02.026.05.045.063a19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg></a>
+        </div>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col"><h4>Company</h4><ul><li><a href="https://calendly.com/clipershq/30min" target="_blank">Contact</a></li></ul></div>
+        <div class="footer-col"><h4>Services</h4><ul><li><a href="#">Content Clipping</a></li><li><a href="#">Distribution</a></li><li><a href="#">Campaign Scaling</a></li><li><a href="#">Analytics</a></li></ul></div>
+        <div class="footer-col"><h4>Legal</h4><ul><li><a href="#">Privacy Policy</a></li><li><a href="#">Terms of Service</a></li><li><a href="#">Cookie Policy</a></li></ul></div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2025 Clippers HQ. All rights reserved.</p>
+      <p>Built for brands that refuse to be ignored.</p>
+    </div>
+  </footer>
+
+  </div><!-- /#site-content -->
+
+  <script src="/landing/js/script.js"></script>
+
+  <script>
+    document.getElementById('logo-home').addEventListener('click', function(e) {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  </script>
+
+  <!-- 3D Cloud Parallax -->
+  <script>
+    (function() {
+      var heroBg = document.querySelector('.hero-bg');
+      var heroFg = document.querySelector('.hero-fg');
+      if (!heroBg || !heroFg) return;
+      var ticking = false;
+      window.addEventListener('scroll', function() {
+        if (!ticking) {
+          requestAnimationFrame(function() {
+            var s = window.pageYOffset;
+            heroBg.style.transform = 'translateZ(0) translateY(' + (s * 0.25) + 'px)';
+            heroFg.style.transform = 'translateZ(0) translateY(' + (s * 0.55) + 'px)';
+            ticking = false;
+          });
+          ticking = true;
+        }
+      }, { passive: true });
+    })();
+  </script>
+
+  <script>
+    (function() {
+      var section = document.getElementById('book-call');
+      var canvas  = document.getElementById('book-call-particles');
+      if (!section || !canvas) return;
+      var ctx = canvas.getContext('2d');
+
+      function resize() {
+        canvas.width  = section.offsetWidth;
+        canvas.height = section.offsetHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      var NUM = 72;
+      var pts = [];
+      for (var i = 0; i < NUM; i++) {
+        pts.push({
+          x:  Math.random(),
+          y:  Math.random(),
+          vx: (Math.random() - 0.5) * 0.00012,
+          vy: (Math.random() - 0.5) * 0.00012,
+          r:  Math.random() * 1.8 + 0.6
+        });
+      }
+
+      var LINK = 0.18;
+
+      function frame() {
+        var w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        for (var i = 0; i < pts.length; i++) {
+          var p = pts[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0) p.x = 1; if (p.x > 1) p.x = 0;
+          if (p.y < 0) p.y = 1; if (p.y > 1) p.y = 0;
+        }
+
+        for (var i = 0; i < pts.length; i++) {
+          for (var j = i + 1; j < pts.length; j++) {
+            var dx   = pts[i].x - pts[j].x;
+            var dy   = pts[i].y - pts[j].y;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < LINK) {
+              var a = (1 - dist / LINK) * 0.18;
+              ctx.beginPath();
+              ctx.moveTo(pts[i].x * w, pts[i].y * h);
+              ctx.lineTo(pts[j].x * w, pts[j].y * h);
+              ctx.strokeStyle = 'rgba(0,0,0,' + a + ')';
+              ctx.lineWidth = 0.7;
+              ctx.stroke();
+            }
+          }
+        }
+
+        for (var i = 0; i < pts.length; i++) {
+          var p = pts[i];
+          ctx.beginPath();
+          ctx.arc(p.x * w, p.y * h, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(0,0,0,0.35)';
+          ctx.fill();
+        }
+
+        requestAnimationFrame(frame);
+      }
+      frame();
+    })();
+  </script>
+
+  <!-- Calendly inline widget script -->
+  <script type="text/javascript" src="https://assets.calendly.com/assets/external/widget.js" async></script>
+
+
+  <!-- Smooth inertia scrolling -->
+  <script>
+    // Tune feel: slightly snappier than default, still weighted and gliding
+      animationTime : 800,   // ms  — default 1000, reduced for crisper response
+      stepSize      : 90,    // px  — default 80, slightly larger per tick
+      accelerationDelta : 35,  // how quickly repeated scrolls accelerate
+      accelerationMax   : 2.5  // max acceleration multiplier
+    };
+  </script>
+
+</body>
+</html>

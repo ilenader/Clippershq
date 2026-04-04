@@ -1,0 +1,136 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #080c10;
+  --bg-2:      #0d1117;
+  --bg-card:   #111720;
+  --border:    rgba(255,255,255,0.07);
+  --border-hi: rgba(255,255,255,0.14);
+  --text:      #e8edf2;
+  --text-muted:#7a8a9a;
+  --accent:    #0095f6;
+  --accent-2:  #3b82f6;
+  --white:     #ffffff;
+  --radius:    14px;
+  --nav-h:     110px;
+  --trans:     0.3s cubic-bezier(0.4,0,0.2,1);
+}
+
+html { scroll-behavior: smooth; font-size: 16px; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  line-height: 1.65;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2722%27%20height%3D%2720%27%20viewBox%3D%270%200%2022%2020%27%3E%3Cpolygon%20points%3D%2711%2C0%2022%2C20%200%2C20%27%20fill%3D%27white%27%2F%3E%3C%2Fsvg%3E") 11 0, auto;
+}
+
+.cursor-glow, #cursor-glow, .cursor-follower, #cursor-follower,
+.cursor-trail, #cursor-trail, .mouse-glow, #mouse-glow,
+[class*="cursor-glow"], [id*="cursor-glow"] {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+a, button, input, textarea, select, label, [role="button"] {
+  cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2722%27%20height%3D%2720%27%20viewBox%3D%270%200%2022%2020%27%3E%3Cpolygon%20points%3D%2711%2C0%2022%2C20%200%2C20%27%20fill%3D%27white%27%2F%3E%3C%2Fsvg%3E") 11 0, pointer;
+}
+
+#vanta-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+img, video { display: block; max-width: 100%; }
+a { text-decoration: none; color: inherit; }
+ul { list-style: none; }
+button { border: none; background: none; font: inherit; color: inherit; }
+
+h1, h2, h3, h4 {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: #2a3545; border-radius: 4px; }
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: var(--accent);
+  color: #000;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-radius: 8px;
+  transition: var(--trans);
+  letter-spacing: 0.02em;
+  position: relative;
+  overflow: hidden;
+}
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.15);
+  transform: translateX(-110%);
+  transition: transform 0.4s ease;
+}
+.btn-primary:hover::before { transform: translateX(0); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(0,149,246,0.35); }
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border: 1px solid var(--border-hi);
+  border-radius: 8px;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+  transition: var(--trans);
+}
+.btn-ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 20px rgba(0,149,246,0.12);
+}
+
+.btn-large { padding: 18px 40px; font-size: 1.05rem; }
+
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#cursor-glow, .cursor-glow, .cursor-trail, .cursor-follower,
+.cursor-dot, .cursor-ring, [class*="cursor-fx"] {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ── PAGE TRANSITION: handled by loader overlay ─────────────────────────────
+   The loader (#loader) covers the screen during navigation.
+   No body transform needed — avoids scroll conflicts and glitches.
+   ────────────────────────────────────────────────────────────────────────── */
+html.page-transitioning { overflow: hidden; }

@@ -82,7 +82,14 @@
       "Bash(cp -r \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\assets\\\\faces\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\landing/\")",
       "Bash(cp -r \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\assets\\\\logo\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\landing/\")",
       "Bash(cp -r \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\assets\\\\videos\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\landing/\")",
-      "Bash(cp -r \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\assets\\\\hero\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\landing/\")"
+      "Bash(cp -r \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\assets\\\\hero\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\landing/\")",
+      "Bash(cp \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\clipper.html\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\clipper.html\")",
+      "Bash(cp \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\index.html\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\brands.html\")",
+      "Bash(sed -i 's|href=\"assets/|href=\"/landing/|g' clipper.html)",
+      "Bash(sed -i 's|src=\"assets/|src=\"/landing/|g' clipper.html)",
+      "Bash(sed -i 's|href=\"css/|href=\"/landing/css/|g' clipper.html)",
+      "Bash(sed -i 's|src=\"js/|src=\"/landing/js/|g' clipper.html)",
+      "Bash(sed -i 's|href=\"index.html|href=\"/brands.html|g' clipper.html)"
     ]
   }
 }

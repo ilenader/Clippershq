@@ -1,0 +1,543 @@
+#hero {
+  position: relative;
+  min-height: auto;
+  display: flex;
+  align-items: flex-start;
+  padding-top: calc(var(--nav-h) + 28px);
+  padding-bottom: 48px;
+  padding-left: 24px;
+  padding-right: 24px;
+  overflow: hidden;
+}
+
+.hero-bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 0%, black 30%, transparent 80%);
+  pointer-events: none;
+}
+
+.hero-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  pointer-events: none;
+}
+.hero-glow-1 {
+  width: 600px; height: 600px;
+  top: -100px; left: -150px;
+  background: rgba(0,149,246,0.07);
+}
+.hero-glow-2 {
+  width: 500px; height: 500px;
+  top: 100px; right: -100px;
+  background: rgba(59,130,246,0.08);
+}
+
+.hero-inner {
+  position: relative;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+  z-index: 2;
+  width: 100%;
+}
+
+.hero-text-block { margin-bottom: 32px; }
+.hero-text-block .hero-badge,
+.hero-text-block .hero-headline,
+.hero-text-block .hero-sub,
+.hero-text-block .hero-ctas {
+  text-shadow: none !important;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-hi);
+  border-radius: 100px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  background: rgba(255,255,255,0.03);
+}
+.badge-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.8); }
+}
+
+.hero-headline {
+  font-size: clamp(2rem, 4.2vw, 3.4rem);
+  color: var(--white);
+  margin-bottom: 14px;
+  animation-delay: 0.1s;
+  text-shadow: none !important;
+}
+.hero-headline em {
+  font-style: normal;
+  color: var(--accent);
+  -webkit-text-fill-color: var(--accent);
+}
+
+.hero-sub {
+  font-size: clamp(0.88rem, 1.2vw, 1rem);
+  color: var(--text-muted);
+  max-width: 520px;
+  margin: 0 auto 22px;
+  font-weight: 300;
+  line-height: 1.65;
+  animation: heroSubFadeIn 1s ease 1s both;
+}
+@keyframes heroSubFadeIn {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hero-ctas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+  animation-delay: 0.3s;
+}
+
+.vsl-wrapper { animation-delay: 0.4s; }
+
+.vsl-frame {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border-hi);
+  background: #0a0f15;
+  aspect-ratio: 16 / 9;
+  max-width: 860px;
+  margin: 0 auto;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.6), 0 0 0 1px var(--border);
+}
+.vsl-frame video {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vsl-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: linear-gradient(to bottom, rgba(8,12,16,0.3), rgba(8,12,16,0.6));
+  transition: opacity 0.4s ease;
+  z-index: 2;
+}
+.vsl-overlay.hidden { opacity: 0; pointer-events: none; }
+
+.vsl-play-btn {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: rgba(0,149,246,0.15);
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--trans);
+  backdrop-filter: blur(10px);
+}
+.vsl-play-btn:hover {
+  background: var(--accent);
+  color: #000;
+  transform: scale(1.1);
+  box-shadow: 0 0 40px rgba(0,149,246,0.4);
+}
+
+.vsl-label {
+  font-size: 0.88rem;
+  color: rgba(255,255,255,0.7);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+}
+
+.vsl-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-top: 28px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.stat-item {
+  flex: 1;
+  padding: 18px 24px;
+  text-align: center;
+}
+.stat-num {
+  display: block;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--white);
+  line-height: 1;
+  margin-bottom: 4px;
+  text-shadow: 0 0 24px rgba(255,255,255,0.3);
+}
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.stat-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .hero-ctas { flex-direction: column; align-items: stretch; }
+  .hero-ctas .btn-primary, .hero-ctas .btn-ghost { justify-content: center; }
+  .vsl-stats { flex-direction: column; }
+  .stat-divider { width: 40px; height: 1px; }
+}
+
+@media (max-width: 480px) {
+  .hero-headline { font-size: 1.9rem; }
+}
+
+/* ═══════════════════════════════════════
+   HERO MAIN — fullscreen 3D cloud scene
+═══════════════════════════════════════ */
+#hero-main {
+  position: relative;
+  height: 100vh;
+  margin-top: -90px;
+  padding: 0;
+  overflow: hidden;
+  z-index: 2;
+  will-change: transform;
+  /* Remove transition — JS drives this every frame; CSS transition causes lag */
+}
+
+/* ════════════════════════════════════════════════
+   3D LAYER SYSTEM
+   z-index: hero-bg=1, hero-content=2, hero-fg=3
+════════════════════════════════════════════════ */
+.hero-3d {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Layer 1: Background clouds ──
+   Oversized to prevent gaps during parallax movement.
+   Starts above viewport so downward parallax shift
+   never reveals the page background beneath.        */
+.hero-bg {
+  position: absolute;
+  top: -5%;
+  left: 0;
+  width: 100%;
+  height: 110%;
+  min-height: 110vh;
+  object-fit: cover;
+  object-position: center center;
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* ── Layer 2: Text content ── */
+.hero-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate3d(-50%, -50%, 0);
+  width: 100%;
+  max-width: 700px;
+  padding: 0 32px;
+  z-index: 2;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── Layer 3: Foreground cut-out clouds —
+   Also oversized + offset by -2px to eliminate
+   any subpixel seam at the top of the image.        */
+.hero-fg {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 100%;
+  height: 110%;
+  min-height: 110vh;
+  object-fit: cover;
+  object-position: center bottom;
+  z-index: 3;
+  pointer-events: none;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* ── Bottom fade: DISABLED — was causing visible horizontal line ── */
+.hero-bottom-fade {
+  display: none !important;
+}
+
+/* ════════════════════════════════════════════════
+   HERO HEADING — cinematic scale
+════════════════════════════════════════════════ */
+.hero-heading {
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(3.2rem, 7vw, 6rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  color: white;
+  margin-bottom: 24px;
+  text-shadow: none !important;
+}
+
+.hero-heading em {
+  font-style: normal;
+  background: linear-gradient(135deg, #0095f6 0%, #60c8ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* margin-bottom: 0 — nothing follows subtext after CTA removal */
+.hero-subtext {
+  font-size: 1.05rem;
+  color: rgba(255,255,255,0.82);
+  line-height: 1.65;
+  margin-bottom: 0;
+  text-align: center;
+  max-width: 520px;
+  text-shadow: none !important;
+}
+
+/* Button styles kept in case used elsewhere */
+.hero-buttons.nav-pill {
+  display: inline-flex;
+  width: auto;
+  margin-bottom: 24px;
+  gap: 2px;
+}
+
+.hero-btn-cta {
+  padding: 10px 24px;
+  background: var(--white);
+  color: #000;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  border-radius: 100px;
+  transition: var(--trans);
+  white-space: nowrap;
+  text-decoration: none;
+}
+.hero-btn-cta:hover {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 18px rgba(0,149,246,0.3);
+}
+
+.hero-btn-link {
+  padding: 10px 20px;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 500;
+  font-size: 1rem;
+  color: rgba(0,0,0,0.75);
+  border-radius: 100px;
+  transition: var(--trans);
+  white-space: nowrap;
+  text-decoration: none;
+}
+.hero-btn-link:hover {
+  color: #000;
+  background: rgba(255,255,255,0.09);
+}
+
+.hero-community {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 16px;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.7);
+}
+
+.hero-socials {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.social-icon {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.7);
+  transition: all 0.25s ease;
+}
+.social-icon:hover {
+  background: rgba(255,255,255,0.1);
+  color: white;
+  border-color: rgba(255,255,255,0.45);
+}
+
+/* ════════════════════════════════════════════════
+   NAVBAR TWEAKS
+════════════════════════════════════════════════ */
+.logo--icon-only .logo-text {
+  display: none;
+}
+
+.hero-main-fade { display: none; }
+
+/* ════════════════════════════════════════════════
+   LEGACY CLASSES — kept for safety
+════════════════════════════════════════════════ */
+.hero-center {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  height: 100%;
+  position: relative;
+  z-index: 5;
+  transition: opacity 0.4s ease;
+}
+
+.hero-main-headline {
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(3.5rem, 8vw, 7rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  color: var(--white);
+}
+.hero-main-headline em {
+  font-style: normal;
+  background: linear-gradient(135deg, #0095f6 0%, #60c8ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-main-sub {
+  font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+  color: rgba(255,255,255,0.45);
+  font-weight: 300;
+  line-height: 1.7;
+  max-width: 560px;
+}
+
+.hero-stats {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.hero-stat { padding: 16px 32px; text-align: center; }
+.hero-stat .stat-num {
+  font-size: 1.5rem;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  color: var(--white);
+  display: block;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.hero-stat .stat-label {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.hero-stat-divider {
+  width: 1px;
+  height: 36px;
+  background: rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+
+@keyframes headlineIn {
+  from { opacity: 0; transform: translate3d(0, 28px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.hero-main-headline.animate-in {
+  animation: headlineIn 0.65s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+.hero-main-headline,
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ════════════════════════════════════════════════
+   RESPONSIVE
+════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  #hero-main { height: 100svh; }
+
+  .hero-content {
+    max-width: calc(100% - 40px);
+    padding: 0 16px;
+    top: 45%;
+    transform: translate3d(-50%, -45%, 0);
+  }
+
+  .hero-heading {
+    font-size: clamp(2.4rem, 9vw, 3.4rem);
+  }
+
+  .hero-stats { flex-direction: column; border-radius: 16px; }
+  .hero-stat-divider { width: 60%; height: 1px; }
+  .hero-main-headline { font-size: 2.4rem; }
+}
+
+@media (max-width: 480px) {
+  .hero-heading { font-size: 2.2rem; }
+}

@@ -1,62 +1,42 @@
-LANDING SITE — Exact Copy Integration — Summary
-==================================================
+LANDING SITE — Static HTML Iframe Approach — Summary
+======================================================
 
-APPROACH: Copied the EXACT HTML structure, CSS, and JS from the static site
-into Next.js components. No redesign. No simplification. No Tailwind conversion.
+APPROACH: Serve the original HTML files as-is from /public/ via iframe.
+No React conversion. No CSS rewriting. The exact original site loads inside Next.js.
 
-FILES CREATED/MODIFIED:
+FILES COPIED:
+- clipper.html → public/clipper.html
+- index.html → public/brands.html
+- css/*.css (6 files) → public/landing/css/
+- js/script.js, js/loader.js, js/intro.js → public/landing/js/
+- smooth-scroll.js → NOT copied (removed)
 
-src/app/landing.css (2500+ lines)
-  - ALL CSS from base.css + navbar.css + hero.css + faces.css + sections.css + footer.css
-  - Concatenated exactly as-is, section comments as separators
-  - Fixed one invalid bare Unicode separator line that broke PostCSS
+PATH UPDATES IN HTML FILES:
+- assets/ → /landing/
+- css/ → /landing/css/
+- js/ → /landing/js/
+- index.html → /brands.html
+- clipper.html → /
+- smooth-scroll.js script tag removed from both files
+- SmoothScrollOptions block removed from brands.html
 
-src/app/landing-clipper.css (~350 lines)
-  - ALL inline page-specific CSS from clipper.html <style> blocks
-  - Includes: clipper-hero, discord-cta, phone-shell, perks, steps, requirements, loader
-  - Copied exactly from the HTML source
+NEXT.JS PAGES:
+- src/app/page.tsx: auth redirect logic at top, then renders <iframe src="/clipper.html">
+- src/app/brands/page.tsx: renders <iframe src="/brands.html">
 
-public/landing/script.js (~500 lines)
-  - FULL script.js with ALL animations: navbar scroll, parallax, reveal observer,
-    headline chars, FAQ accordion, counters, mouse glow, service card 3D, process
-    timeline, clients preview card, meteor particles, etc.
-  - Only changes: index.html → /brands, clipper.html → /
+DELETED (broken React conversion files):
+- src/app/clipper-landing.tsx
+- src/app/landing.css
+- src/app/landing-clipper.css
 
-src/app/page.tsx (server component)
-  - Auth redirect logic preserved at top
-  - Renders ClipperLanding client component
+ASSETS (already in public/landing/ from earlier):
+- brands/ (10 images), faces/ (10 images), logo/logo.png, videos/ (2 mp4s), hero/
 
-src/app/clipper-landing.tsx (client component — clipper.html)
-  - EXACT HTML from clipper.html body converted to JSX
-  - class → className, stroke-width → strokeWidth, etc.
-  - Links: index.html → /brands, clipper.html → /, assets/ → /landing/
-  - Loads script.js via useEffect
-  - Includes: loader, vanta-bg, navbar, clipper-hero with phone mockups + videos,
-    perks grid (6 cards with SVG icons), steps section (4 steps), requirements (6 items),
-    bottom CTA with Discord button, footer
+HOW IT WORKS:
+- Visitor hits / → Next.js checks auth → if logged in, redirects to dashboard
+- If not logged in → renders iframe loading /clipper.html (your exact static site)
+- All CSS, JS, images, videos load from /public/ as static files
+- All animations, effects, interactions work exactly as the original site
+- /brands → iframe loading /brands.html (your exact client page)
 
-src/app/brands/page.tsx (client component — index.html)
-  - EXACT HTML from index.html body converted to JSX
-  - Includes: loader, vanta-bg, navbar (icon-only logo), hero-3d with parallax layers,
-    faces carousel (10 creators + 10 brands, doubled for infinite scroll), process
-    timeline (3 rows with metrics + steps), book-a-call section with Calendly widget,
-    clients section (5 items with preview card data), FAQ accordion (5 items), footer
-  - Loads script.js + Calendly widget.js via useEffect
-  - 3D parallax scroll handler implemented in useEffect
-  - Logo click scrolls to top
-
-ASSETS (already in /public/landing/):
-  - brands/ (10 images), faces/ (10 images), logo/logo.png, videos/ (2 mp4s)
-  - hero/ folder exists but hero-bg.jpg and hero-fg.png are missing from source
-
-WHAT WAS REMOVED:
-  - smooth-scroll.js (789 lines) — not loaded
-  - No other changes to animations, effects, colors, fonts, or layout
-
-WHAT WAS NOT CHANGED:
-  - ALL CSS — copied exactly
-  - ALL animations — kept exactly (reveal, parallax, carousel, FAQ, counters, glow, etc.)
-  - ALL visual elements — same structure, same classes, same styling
-  - ALL existing app routes (/login, /dashboard, /admin, etc.) — untouched
-
-BUILD: ✓ (prisma generate + next build, 36/36 pages)
+BUILD: ✓ (36/36 pages)
