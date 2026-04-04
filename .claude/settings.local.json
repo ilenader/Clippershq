@@ -77,7 +77,12 @@
       "Bash(grep -E '\"\"prisma\"\"|\"\"@prisma/adapter-pg\"\"|\"\"@prisma/client\"\"|\"\"@prisma/pg-worker\"\"' package.json)",
       "Bash(grep -r '\\\\$queryRaw\\\\|\\\\$executeRaw\\\\|\\\\$transaction' src/app/api/payouts/route.ts)",
       "Bash(node /tmp/check-columns.mjs)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(cp -r \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\assets\\\\brands\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\landing/\")",
+      "Bash(cp -r \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\assets\\\\faces\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\landing/\")",
+      "Bash(cp -r \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\assets\\\\logo\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\landing/\")",
+      "Bash(cp -r \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\assets\\\\videos\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\landing/\")",
+      "Bash(cp -r \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\Clippers HQ-Finale\\\\Clippers HQ-Finale\\\\assets\\\\hero\" \"C:\\\\Users\\\\Game Centar\\\\OneDrive\\\\Desktop\\\\clippers-hq\\\\public\\\\landing/\")"
     ]
   }
 }

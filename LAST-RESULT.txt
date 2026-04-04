@@ -1,73 +1,68 @@
-SEO/FAVICON + HOMEPAGE REDESIGN — Summary
-============================================
+LANDING SITE INTEGRATION — Summary
+=====================================
 
-PART 1: SEO & FAVICON
------------------------
+ASSETS COPIED:
+- /public/landing/brands/ (10 brand logos: AG1, Gymshark, Prime, etc.)
+- /public/landing/faces/ (10 creator photos: Adin Ross, xQc, IShowSpeed, etc.)
+- /public/landing/logo/logo.png
+- /public/landing/videos/video-left.mp4, video-right.mp4
+- /public/landing/hero/ (empty — source hero images were missing)
 
-Root layout (src/app/layout.tsx):
-- metadataBase: https://clipershq.com
-- title: "Clippers HQ — Content Clipping Agency for Creators & Brands" (with template for subpages)
-- description: Professional content clipping agency description
-- keywords: content clipping agency, clip management, gaming clips, etc.
-- Open Graph: type=website, siteName, title, description, url
-- Twitter: summary_large_image card
-- Canonical: https://clipershq.com
-- JSON-LD Organization schema in other.script:ld+json
-- <link rel="icon" href="/favicon.ico" sizes="any"> in <head>
+HOMEPAGE (src/app/page.tsx — clipper.html converted):
+Route: /
+- Auth redirect logic preserved at top (logged in → dashboard/admin)
+- Fixed navbar: logo + nav links (How It Works, Perks, For Brands) + Join Now button
+- Hero: "Become a Clipper" badge, gradient title, subtitle, dual CTA (Get Started + Discord)
+- Phone mockups: two tilted video players with autoplay/muted/loop
+- Stats bar: 10B+ Views, 60K+ Clippers, 340% Lift
+- Faces carousel: infinite scrolling rows (creators left, brands right) via CSS keyframes
+- Perks grid: 6 glass cards (Competitive Pay, Flexible Schedule, Top Brands, etc.)
+- How It Works: 4 numbered steps (Sign Up → Add Accounts → Join Campaigns → Get Paid)
+- Requirements: 6 checklist items with checkmarks
+- Bottom CTA: Sign Up + Discord buttons
+- Footer: logo, copyright, links (For Brands, Discord, Terms, Privacy)
 
-Favicon: src/app/favicon.ico exists (Next.js App Router auto-serves it)
+BRANDS PAGE (src/app/brands/page.tsx — index.html converted):
+Route: /brands
+- Own metadata: "For Brands — Clippers HQ"
+- Fixed navbar: logo + nav links (Process, Clients, Become a Clipper) + Book a Call button
+- Hero: "For Brands & Agencies" badge, gradient title about scaling content, Calendly CTA
+- Stats bar: same 3 numbers
+- Brand logos grid: 8 logos in responsive 4x2 / 8x1 grid
+- Process: 3 steps (Book a Call, Launch Distribution, Track & Scale)
+- Who We Work With: 5 client categories (Artists, Creators, Products, DTC, Apps)
+- Bottom CTA: Book a Free Call (Calendly link)
+- Footer: same style as homepage
 
-New files:
-- src/app/robots.ts: allows all crawlers, sitemap at clipershq.com/sitemap.xml
-- src/app/sitemap.ts: homepage + /login with lastModified, changeFrequency, priority
-- src/app/login/layout.tsx: sets login page title to "Sign In — Clippers HQ"
+CROSS-LINKING:
+- Homepage navbar → "For Brands" → /brands
+- Brands navbar → "Become a Clipper" → /
+- Both navbars → /login for auth
+- Calendly links: https://calendly.com/clipershq/30min
+- Discord links: https://discord.gg/CM8xdenGYf
 
-PART 2: HOMEPAGE REDESIGN
----------------------------
+PERFORMANCE DECISIONS:
+- No smooth-scroll.js (removed — uses native browser scrolling)
+- No intro.js / loader.js (removed — no loading screen)
+- No heavy parallax JS (removed — lightweight CSS-only effects)
+- Videos: autoPlay muted loop playsInline (native lazy behavior)
+- Images: loading="lazy" on face/brand carousel images
+- Carousel: pure CSS @keyframes (scrollLeft/scrollRight), no JS
+- Background: CSS gradients + dot grid only, no images needed
+- No meteor particle system (removed — too heavy)
 
-File: src/app/page.tsx — complete visual rewrite
+WHAT WAS NOT CONVERTED (intentionally removed):
+- 3D parallax hero layers (hero images missing + too heavy)
+- Smooth scroll polyfill (789 lines of JS — unnecessary)
+- Mouse-following glow/cursor effects (perf overhead)
+- Meteor background particles (perf overhead)
+- Service card 3D perspective transforms (complex JS)
+- Character-by-character headline animation (complex JS)
+- Calendly embed widget (link to Calendly directly instead)
+- FAQ accordion (requirements section replaced it)
+- Video player overlay (direct autoplay instead)
 
-Background layers (all CSS, no JS, no images):
-1. Gradient mesh: 3 large radial gradients (cyan #0ea5e9, violet #8b5cf6, dark blue #1e3a5f)
-   with slow drift animations (20s/25s/18s cycles), low opacity (0.06-0.08), 120px blur
-2. Dot grid: radial-gradient dots at 40px spacing, 4% opacity
-3. Floating shapes: 5 translucent geometric elements (circles, rounded squares)
-   with independent float animations (10s-18s cycles), 2-4% opacity borders
+EXISTING ROUTES UNTOUCHED:
+- /login, /dashboard, /admin, all (app)/ pages, all api/ routes — unchanged
 
-Nav:
-- Logo triangle (accent blue) + "CLIPPERS HQ" title
-- "Sign In" button with glass style (white/6% bg, white/8% border)
-
-Hero:
-- Logo with 40px blur glow behind it
-- "CLIPPERS HQ" — 5xl-7xl responsive, gradient text (white → zinc-400)
-- Subtitle in zinc-400, tagline "Simple, fast, powerful." in zinc-500
-- "Get Started" button: gradient bg (cyan → accent blue) + glow shadow underneath
-  that intensifies on hover. Hover: opacity shifts create pulse effect.
-- All elements use staggered fadeUp animations (0.1s delay between each)
-
-Stats bar:
-- 3 columns: "1,000+ Clips Tracked" | "50+ Active Campaigns" | "24/7 Automated Tracking"
-- Gradient text (white → zinc-400), bordered section top/bottom
-- Staggered fade-in on load
-
-Features (4 cards):
-- Campaign Management, Real-Time Tracking, Instant Payouts, Built for Scale
-- Glass cards: white/2% bg, white/6% border, backdrop-blur-sm
-- Hover: bg brightens to 4%, border to 10%
-- Emoji icons (📋📊💰🚀), small text, staggered animations
-
-Footer:
-- "CLIPPERS HQ © 2026" + Terms | Privacy | Contact links
-- Top border separator, max-width constrained
-
-Animations (all @keyframes in inline <style>):
-- drift1/2/3: gradient mesh movement
-- float1/2/3: geometric shape floating
-- fadeUp: element entrance animation (opacity + translateY)
-All smooth 60fps CSS transforms, no JavaScript.
-
-Responsive: mobile-first, scales to desktop with sm/lg breakpoints.
-No location references. No external assets.
-
-BUILD: ✓ (prisma generate + next build, 35/35 pages — +2 from robots/sitemap)
+BUILD: ✓ (prisma generate + next build, 36/36 pages — +1 /brands)
