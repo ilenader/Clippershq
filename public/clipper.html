@@ -516,8 +516,8 @@
         <span></span><span></span><span></span>
       </button>
       <ul class="nav-links nav-pill" id="navLinks">
+        <li><a href="/">Home</a></li>
         <li><a href="/login" style="color:var(--white)">Start Clipping</a></li>
-        <li><a href="/brands.html" style="color:var(--white)">For Brands</a></li>
         <li><a href="/brands.html" class="nav-cta">Launch a Campaign</a></li>
       </ul>
     </div>
@@ -737,6 +737,31 @@
 
   <script src="/landing/js/script.js"></script>
 
+
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var campaignLinks = document.querySelectorAll('a[href="/brands.html"]');
+    campaignLinks.forEach(function(link) {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        var loader = document.getElementById('loader');
+        if (loader) {
+          // Reset loader animations
+          ['.ldr-svg','.ldr-fill','.ldr-outline','.ldr-glow','.ldr-brand','.ldr-progress-wrap','.ldr-progress-bar'].forEach(function(sel){
+            var el = loader.querySelector(sel); if(!el) return;
+            el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+          });
+          loader.style.cssText = 'display:flex!important;opacity:1!important;visibility:visible!important;position:fixed;inset:0;z-index:2147483647;';
+          setTimeout(function() {
+            window.top.location.href = '/brands.html';
+          }, 1800);
+        } else {
+          window.top.location.href = '/brands.html';
+        }
+      });
+    });
+  });
+  </script>
 
 </body>
 </html>
