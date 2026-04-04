@@ -3,6 +3,7 @@
 <head>
   <!-- Instant background colour — no flash of white, no opacity block -->
   <style id="__pre-paint">html,body{background:#080c10!important}</style>
+  <base target="_top">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Clippers HQ — Content Clipping Agency</title>
@@ -181,7 +182,7 @@
     <div class="hero-3d">
 
       <!-- Layer 1: Background cloud photo -->
-      <img class="hero-bg" src="/landing/hero/hero-bg.jpg" alt="" aria-hidden="true" loading="eager" fetchpriority="high" decoding="sync">
+      <img class="hero-bg" style="display:none" src="/landing/hero/hero-bg.jpg" alt="" aria-hidden="true" loading="eager" fetchpriority="high" decoding="sync">
 
       <!-- Layer 2: Text content -->
       <div class="hero-content">
@@ -190,7 +191,7 @@
       </div>
 
       <!-- Layer 3: Foreground cut-out clouds (overlaps text for 3D depth) -->
-      <img class="hero-fg" src="/landing/hero/hero-fg.png" alt="" aria-hidden="true" loading="eager" fetchpriority="high" decoding="sync">
+      <img class="hero-fg" style="display:none" src="/landing/hero/hero-fg.png" alt="" aria-hidden="true" loading="eager" fetchpriority="high" decoding="sync">
 
     </div>
 
@@ -274,7 +275,7 @@
         <!-- ROW 1: metric left, step right -->
         <div class="process-row">
           <div class="process-metric reveal">
-            <span class="process-metric-num">10 Billion+</span>
+            <span class="process-metric-num">100 Million+</span>
             <span class="process-metric-label">Views</span>
             <span class="process-metric-sub">Campaign reach delivered</span>
             <p class="process-metric-desc">Start with 3 to 5 distinct hooks and test them simultaneously.</p>
@@ -300,7 +301,7 @@
             <div class="process-dot"><span>2</span></div>
           </div>
           <div class="process-metric reveal">
-            <span class="process-metric-num">60,000+</span>
+            <span class="process-metric-num">6,000+</span>
             <span class="process-metric-label">Clippers</span>
             <span class="process-metric-sub">Active creator network</span>
             <p class="process-metric-desc">Stagger posting windows to maintain momentum and broaden reach.</p>
@@ -310,7 +311,7 @@
         <!-- ROW 3: metric left, step right -->
         <div class="process-row">
           <div class="process-metric reveal">
-            <span class="process-metric-num">340%</span>
+            <span class="process-metric-num">210%</span>
             <span class="process-metric-label">Lift</span>
             <span class="process-metric-sub">Engagement spikes</span>
             <p class="process-metric-desc">Scale only the edits with strong hold rate and repost velocity.</p>
@@ -342,7 +343,7 @@
       <p class="book-desc reveal">Book a free 30-minute strategy call. We'll analyze your current presence, map out a custom distribution plan, and show you exactly what's possible.</p>
       <a href="https://calendly.com/clipershq/30min" target="_blank" class="btn-primary btn-large reveal" id="ctaBtn"><span class="btn-label">Book a Strategy Call &rarr;</span></a>
       <!-- Inline Calendly booking widget -->
-      <div class="calendly-inline-widget reveal" data-url="https://calendly.com/clipershq/30min?hide_landing_page_details=1&hide_gdpr_banner=1&background_color=111720&text_color=e8edf2&primary_color=0095f6" style="min-width:320px;height:1050px;"></div>
+      <div class="calendly-inline-widget reveal" data-url="https://calendly.com/clipershq/30min?hide_landing_page_details=1&hide_gdpr_banner=1&hide_event_type_details=1&background_color=0a0d12&text_color=e8edf2&primary_color=0095f6" style="min-width:320px;height:1050px;"></div>
       <p class="book-note reveal">No commitment. No pitch decks. Just clarity.</p>
     </div>
   </section>

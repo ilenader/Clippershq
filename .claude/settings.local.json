@@ -96,7 +96,20 @@
       "Bash(sed -i 's|<a href=\"/brands.html#book-call\" class=\"nav-cta\">Book a Call</a>|<a href=\"/brands.html\" class=\"nav-cta\">Launch a Campaign</a>|g' clipper.html)",
       "Bash(sed -i 's|<a href=\"/\" style=\"color:var\\(--white\\)\">Become a Clipper</a>|<a href=\"/brands.html\" style=\"color:var\\(--white\\)\">For Brands</a>|g' clipper.html)",
       "Bash(sed -i 's|href=\"/clipper.html\"|href=\"/\"|g' brands.html)",
-      "Bash(sed -i 's|<a href=\"/brands.html\" class=\"logo\">|<a href=\"/\" class=\"logo\">|g' brands.html)"
+      "Bash(sed -i 's|<a href=\"/brands.html\" class=\"logo\">|<a href=\"/\" class=\"logo\">|g' brands.html)",
+      "Bash(sed -i 's|<meta charset=\"UTF-8\" />|<base target=\"_top\">\\\\n  <meta charset=\"UTF-8\" />|' clipper.html)",
+      "Bash(sed -i 's|<meta charset=\"UTF-8\" />|<base target=\"_top\">\\\\n  <meta charset=\"UTF-8\" />|' brands.html)",
+      "Bash(sed -i 's|10 Billion+|100 Million+|g' clipper.html)",
+      "Bash(sed -i 's|60,000+|6,000+|g' clipper.html)",
+      "Bash(sed -i 's|340%|210%|g' clipper.html)",
+      "Bash(sed -i 's|10 Billion+|100 Million+|g' brands.html)",
+      "Bash(sed -i 's|60,000+|6,000+|g' brands.html)",
+      "Bash(sed -i 's|background_color=111720|background_color=0a0d12|g' brands.html)",
+      "Bash(sed -i 's|hide_gdpr_banner=1|hide_gdpr_banner=1\\\\&hide_event_type_details=1|g' brands.html)",
+      "Bash(sed -i '/hero-bg\\\\.jpg.*preload/d' brands.html)",
+      "Bash(sed -i '/hero-fg\\\\.png.*preload/d' brands.html)",
+      "Bash(sed -i 's|<img class=\"hero-bg\"|<img class=\"hero-bg\" style=\"display:none\"|' brands.html)",
+      "Bash(sed -i 's|<img class=\"hero-fg\"|<img class=\"hero-fg\" style=\"display:none\"|' brands.html)"
     ]
   }
 }
