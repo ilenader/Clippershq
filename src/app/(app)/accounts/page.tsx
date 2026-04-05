@@ -177,17 +177,17 @@ export default function AccountsPage() {
             const stats = account.status === "APPROVED" ? getAccountStats(account.id) : null;
             const hc = stats ? healthColors[stats.health] : null;
             return (
-              <Card key={account.id} className="p-5">
+              <Card key={account.id} className="p-3.5">
                 {/* Header: username + platform + status */}
-                <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start justify-between mb-2.5">
                   <div>
-                    <p className="text-lg font-semibold text-[var(--text-primary)]">{account.username}</p>
-                    <Badge variant={(statusBadge[account.status] || "pending") as any} className="mt-1">
+                    <p className="text-base font-semibold text-[var(--text-primary)]">{account.username}</p>
+                    <Badge variant={(statusBadge[account.status] || "pending") as any} className="mt-0.5">
                       {account.platform} · {statusDisplay[account.status] || account.status}
                     </Badge>
                   </div>
-                  {stats && hc && (
-                    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold ${hc.bg} ${hc.text} ${hc.border}`}>
+                  {stats && hc && stats.health === "GOOD" && (
+                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${hc.bg} ${hc.text} ${hc.border}`}>
                       {stats.health}
                     </span>
                   )}
@@ -203,22 +203,22 @@ export default function AccountsPage() {
 
                 {/* Stats grid for APPROVED accounts */}
                 {stats && stats.clipCount > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-[var(--border-subtle)]">
+                  <div className="grid grid-cols-4 gap-2 pt-2.5 border-t border-[var(--border-subtle)]">
                     <div>
-                      <p className="text-lg font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalViews.toLocaleString()}</p>
-                      <p className="text-sm text-[var(--text-muted)]">Views</p>
+                      <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalViews.toLocaleString()}</p>
+                      <p className="text-xs text-[var(--text-muted)]">Views</p>
                     </div>
                     <div>
-                      <p className="text-lg font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalLikes.toLocaleString()}</p>
-                      <p className="text-sm text-[var(--text-muted)]">Likes</p>
+                      <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalLikes.toLocaleString()}</p>
+                      <p className="text-xs text-[var(--text-muted)]">Likes</p>
                     </div>
                     <div>
-                      <p className="text-lg font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalComments.toLocaleString()}</p>
-                      <p className="text-sm text-[var(--text-muted)]">Comments</p>
+                      <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalComments.toLocaleString()}</p>
+                      <p className="text-xs text-[var(--text-muted)]">Comments</p>
                     </div>
                     <div>
-                      <p className="text-lg font-semibold text-[var(--text-primary)] tabular-nums">{stats.clipCount}</p>
-                      <p className="text-sm text-[var(--text-muted)]">Clips</p>
+                      <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.clipCount}</p>
+                      <p className="text-xs text-[var(--text-muted)]">Clips</p>
                     </div>
                   </div>
                 )}

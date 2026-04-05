@@ -64,13 +64,17 @@ export async function getMyEarnings() {
   const paidOut = payouts
     .filter((p: any) => p.status === "PAID")
     .reduce((sum: number, p: any) => sum + p.amount, 0);
+  const lockedInPayouts = payouts
+    .filter((p: any) => ["REQUESTED", "UNDER_REVIEW", "APPROVED"].includes(p.status))
+    .reduce((sum: number, p: any) => sum + p.amount, 0);
 
   return {
     totalEarned,
     approvedEarnings,
     pendingEarnings,
     paidOut,
-    available: approvedEarnings - paidOut,
+    lockedInPayouts,
+    available: approvedEarnings - paidOut - lockedInPayouts,
   };
 }
 

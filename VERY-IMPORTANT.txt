@@ -277,3 +277,93 @@ COMPLETE MANUAL STEPS LIST
 
 BUILD: PASS (38/38 pages)
 ===============================================================
+
+
+===============================================================
+PROMPT 3 UPDATE — Fixes, YouTube Tracking, Referral Audit
+Date: 2026-04-05
+===============================================================
+
+FIXES APPLIED
+==============
+
+1. SUSPICIOUS BADGE REMOVED FROM CLIPPER VIEW
+   - File: src/app/(app)/accounts/page.tsx
+   - Clippers now only see "GOOD" badge, never "SUSPICIOUS" or "NORMAL"
+   - SUSPICIOUS/NORMAL are internal health metrics, not clipper-facing
+   - Admin/owner views unchanged
+
+2. ACCOUNT CARDS MADE COMPACT
+   - Reduced card padding (p-5 → p-3.5), header margin, stats gap
+   - Stats text shrunk (text-lg → text-sm, labels text-sm → text-xs)
+   - Cards roughly 60-70% of previous size, still clean and readable
+
+3. REJECTED PAYOUT BALANCE BUG FIXED
+   - File: src/actions/payouts.ts → getMyEarnings()
+   - BUG: available = approvedEarnings - paidOut (missing locked payouts!)
+   - FIX: available = approvedEarnings - paidOut - lockedInPayouts
+   - lockedInPayouts = REQUESTED + UNDER_REVIEW + APPROVED
+   - REJECTED payouts correctly excluded (money returns to balance)
+   - Note: src/lib/balance.ts was already correct, only actions/payouts.ts had the bug
+
+4. EMAIL LOGO — WHITE PYRAMID
+   - File: src/lib/email.ts
+   - Changed CLIPPERS HQ text from #2596be (blue) to #ffffff (white)
+   - Dark header background preserved for contrast
+
+5. YOUTUBE TRACKING — NOW IMPLEMENTED
+   - Created: src/lib/youtube.ts (YouTube Data API v3 integration)
+   - Supports: youtube.com/watch?v=, youtu.be/, youtube.com/shorts/
+   - Updated: src/lib/apify.ts
+     - detectPlatform() now returns "youtube" for YouTube URLs
+     - fetchClipStats() routes YouTube clips to youtube.ts instead of Apify
+   - Clip submission already detected YouTube URLs (src/app/api/clips/route.ts line 14)
+   - Tracking system (src/lib/tracking.ts) uses fetchClipStats() → works automatically
+   - Fraud detection + earnings recalculation apply same as TikTok/Instagram
+   - REQUIRES: YOUTUBE_API_KEY env var (Google Cloud → YouTube Data API v3)
+
+6. REFERRAL SYSTEM BUG FIXED
+   - File: src/lib/referrals.ts → attachReferral()
+   - BUG: Banned users' referral codes could still be used
+   - FIX: Now checks inviter status, blocks if BANNED
+
+7. SIDEBAR DISCORD LINK — Already done (previous session)
+   - "Join our Discord" → https://discord.gg/7TpufG6ak6, target="_blank"
+
+8. DISCORD AUTO-ROLE — Code verified correct
+   - Guild join → 2s delay → role assignment → try/catch
+   - All logging in place, fire-and-forget, non-blocking
+
+REFERRAL SYSTEM AUDIT
+======================
+
+Flow: /login?ref=CODE → cookie (24h) → signup → attachReferral() → link user
+
+PROTECTED:
+  ✓ Self-referral blocked (inviter.id === newUserId check)
+  ✓ Invalid codes handled silently (user still signs up)
+  ✓ Banned referrer now blocked (NEW FIX)
+  ✓ Fee correctly applied: 4% for referred, 9% for normal
+  ✓ Referrer earns 5% of referred users' earnings (real-time)
+  ✓ Duplicate referral prevented (only set on createUser event)
+  ✓ Referral code unique constraint in DB schema
+
+ISSUE FOUND & FIXED:
+  - Banned users could still earn referral income → now blocked
+
+MINOR REMAINING ISSUES:
+  - sendReferralSignup() email function exists but is never called
+    (referrer doesn't get notified when someone uses their code)
+  - Referral codes never expire (acceptable for now)
+
+REMAINING ITEMS
+================
+
+NEW ENV VARS NEEDED:
+  - YOUTUBE_API_KEY — for YouTube clip tracking
+  - DISCORD_GUILD_ID — for auto-join (already documented)
+  - DISCORD_BOT_TOKEN — for auto-join + role (already documented)
+  - DISCORD_ALERT_ROLE_ID — for campaign alert role assignment
+
+BUILD: PASS
+===============================================================

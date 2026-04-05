@@ -44,10 +44,11 @@ export interface ClipStats {
 /**
  * Detect platform from URL
  */
-export function detectPlatform(url: string): "tiktok" | "instagram" | null {
+export function detectPlatform(url: string): "tiktok" | "instagram" | "youtube" | null {
   const lower = url.toLowerCase();
   if (lower.includes("tiktok.com")) return "tiktok";
   if (lower.includes("instagram.com") || lower.includes("instagr.am")) return "instagram";
+  if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "youtube";
   return null;
 }
 
@@ -193,6 +194,20 @@ export async function fetchClipStats(clipUrl: string): Promise<ClipStats> {
 
   if (platform === "instagram") {
     return fetchInstagramStats(clipUrl);
+  }
+
+  if (platform === "youtube") {
+    const { getYouTubeVideoStats } = await import("@/lib/youtube");
+    const ytStats = await getYouTubeVideoStats(clipUrl);
+    if (!ytStats) throw new Error(`Failed to fetch YouTube stats for: ${clipUrl}`);
+    return {
+      views: ytStats.views,
+      likes: ytStats.likes,
+      comments: ytStats.comments,
+      shares: 0,
+      createdAt: null,
+      platform: "youtube",
+    };
   }
 
   throw new Error(`Unsupported platform for URL: ${clipUrl}`);

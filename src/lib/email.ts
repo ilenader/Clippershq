@@ -47,7 +47,7 @@ function wrap(content: string): string {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; background: #09090b; border-radius: 16px; overflow: hidden;">
       <div style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c1c20;">
-        <h2 style="color: #2596be; font-size: 22px; margin: 0; letter-spacing: 1px;">CLIPPERS HQ</h2>
+        <h2 style="color: #ffffff; font-size: 22px; margin: 0; letter-spacing: 1px;">CLIPPERS HQ</h2>
       </div>
       <div style="padding: 24px; color: #e4e4e7;">
         ${content}
