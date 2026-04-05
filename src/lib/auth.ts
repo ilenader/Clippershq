@@ -36,32 +36,55 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       // Auto-join the user to the Clippers HQ Discord server
       if (process.env.DISCORD_GUILD_ID && process.env.DISCORD_BOT_TOKEN && account?.access_token && profile?.id) {
+        const discordId = String(profile.id);
+        const guildId = process.env.DISCORD_GUILD_ID;
+        const botToken = process.env.DISCORD_BOT_TOKEN;
+        const alertRoleId = process.env.DISCORD_ALERT_ROLE_ID;
+
         try {
-          await fetch(`https://discord.com/api/v10/guilds/${process.env.DISCORD_GUILD_ID}/members/${profile.id}`, {
+          // Step 1: Add user to guild
+          const joinRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`, {
             method: 'PUT',
             headers: {
-              'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+              'Authorization': `Bot ${botToken}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
               access_token: account.access_token,
             }),
           });
-          // Set DISCORD_ALERT_ROLE_ID in Vercel env vars
-          if (process.env.DISCORD_ALERT_ROLE_ID) {
-            try {
-              await fetch(`https://discord.com/api/v10/guilds/${process.env.DISCORD_GUILD_ID}/members/${profile.id}/roles/${process.env.DISCORD_ALERT_ROLE_ID}`, {
-                method: 'PUT',
-                headers: {
-                  'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`,
-                },
-              });
-            } catch {
-              // Non-blocking: role assignment failure is fine
+          console.log(`[DISCORD] Guild join for ${discordId}: ${joinRes.status}`);
+
+          // Step 2: Assign alert role (only if guild join succeeded)
+          if (joinRes.status === 201 || joinRes.status === 204) {
+            if (!alertRoleId) {
+              console.warn('[DISCORD] DISCORD_ALERT_ROLE_ID is not set — skipping role assignment');
+            } else {
+              // Wait 2s for Discord to finish processing the member join
+              await new Promise(r => setTimeout(r, 2000));
+
+              try {
+                console.log(`[DISCORD] Assigning role ${alertRoleId} to ${discordId} in guild ${guildId}`);
+                const roleRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${discordId}/roles/${alertRoleId}`, {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bot ${botToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                });
+                console.log(`[DISCORD] Role assignment for ${discordId}: ${roleRes.status}`);
+                if (!roleRes.ok) {
+                  const body = await roleRes.text();
+                  // Bot needs "Manage Roles" permission and its role must be HIGHER than the assigned role in Discord hierarchy
+                  console.error(`[DISCORD] Role assignment failed: ${roleRes.status} — ${body}`);
+                }
+              } catch (roleErr) {
+                console.error('[DISCORD] Role assignment error:', roleErr);
+              }
             }
           }
-        } catch {
-          // Non-blocking: if auto-join fails, login still works
+        } catch (err) {
+          console.error('[DISCORD] Guild join error:', err);
         }
       }
 
