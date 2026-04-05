@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getUserCampaignIds } from "@/lib/campaign-access";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
+import { broadcastCampaignAlert } from "@/lib/discord-bot";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -147,6 +148,12 @@ export async function POST(req: NextRequest) {
     createData.maxClipsPerUserPerDay = Math.max(1, Math.min(6, isNaN(maxClips) ? 3 : maxClips));
 
     const campaign = await db.campaign.create({ data: createData });
+
+    // Send campaign alerts to all active clippers (fire-and-forget)
+    if (campaign.status === 'ACTIVE') {
+      broadcastCampaignAlert(campaign.name, campaign.description || 'A new campaign is live! Start clipping now.').catch(() => {});
+    }
+
     return NextResponse.json(campaign, { status: 201 });
   } catch (err: any) {
     console.error("DB campaign create failed:", err?.message, err);

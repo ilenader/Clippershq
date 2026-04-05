@@ -47,6 +47,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               access_token: account.access_token,
             }),
           });
+          // Set DISCORD_ALERT_ROLE_ID in Vercel env vars
+          if (process.env.DISCORD_ALERT_ROLE_ID) {
+            try {
+              await fetch(`https://discord.com/api/v10/guilds/${process.env.DISCORD_GUILD_ID}/members/${profile.id}/roles/${process.env.DISCORD_ALERT_ROLE_ID}`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+                },
+              });
+            } catch {
+              // Non-blocking: role assignment failure is fine
+            }
+          }
         } catch {
           // Non-blocking: if auto-join fails, login still works
         }

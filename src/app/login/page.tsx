@@ -89,7 +89,7 @@ function LoginContent() {
         </div>
 
         <p className="mt-6 text-center text-xs" style={{ color: "#3a4a5a" }}>
-          By signing in, you agree to our <a href="/terms.html" style={{color:"#5a6a7a",textDecoration:"underline"}}>terms of service</a> and <a href="/privacy.html" style={{color:"#5a6a7a",textDecoration:"underline"}}>privacy policy</a>.
+          By signing in, you agree to our <a href="/terms.html" style={{color:"#5a6a7a",textDecoration:"underline"}}>Terms of Service</a> and <a href="/privacy.html" style={{color:"#5a6a7a",textDecoration:"underline"}}>Privacy Policy</a>, including receiving campaign alerts via email and Discord.
         </p>
       </div>
 

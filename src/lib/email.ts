@@ -152,6 +152,19 @@ export async function sendCampaignApproved(email: string, campaignName: string):
 export async function sendCampaignRejected(email: string, campaignName: string): Promise<boolean> {
   return sendEmail({ to: email, subject: `Campaign not approved`, html: wrap(`<p style="font-size: 15px;">Your campaign <strong>${campaignName}</strong> was not approved.</p>`) });
 }
+export async function sendCampaignAlertEmail(email: string, campaignName: string, description: string): Promise<boolean> {
+  return sendEmail({
+    to: email,
+    subject: `New Campaign: ${campaignName}`,
+    html: wrap(`
+      <p style="font-size: 16px; margin: 0 0 12px;">🎬 New Campaign Alert!</p>
+      <p style="font-size: 18px; color: #fff; font-weight: bold; margin: 0 0 12px;">${campaignName}</p>
+      <p style="font-size: 15px; color: #a1a1aa; margin: 0 0 20px;">${description}</p>
+      <a href="https://clipershq.com/login" style="display: inline-block; background: #0095f6; color: #fff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Start Clipping Now</a>
+    `),
+  });
+}
+
 export async function sendReferralSignup(email: string, referredName: string): Promise<boolean> {
   return sendEmail({ to: email, subject: "New referral!", html: wrap(`<p style="font-size: 15px;"><strong>${referredName}</strong> signed up with your link. You earn 5% of their earnings forever.</p>`) });
 }
