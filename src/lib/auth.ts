@@ -14,13 +14,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       clientSecret: process.env.AUTH_DISCORD_SECRET!,
       authorization: {
         params: {
-          scope: "identify email",
+          scope: "identify email guilds guilds.join",
         },
       },
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       // Block banned users from signing in
       if (db && account?.providerAccountId) {
         try {
@@ -33,6 +33,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
         } catch {}
       }
+
+      // Auto-join the user to the Clippers HQ Discord server
+      if (process.env.DISCORD_GUILD_ID && process.env.DISCORD_BOT_TOKEN && account?.access_token && profile?.id) {
+        try {
+          await fetch(`https://discord.com/api/v10/guilds/${process.env.DISCORD_GUILD_ID}/members/${profile.id}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              access_token: account.access_token,
+            }),
+          });
+        } catch {
+          // Non-blocking: if auto-join fails, login still works
+        }
+      }
+
       return true;
     },
     async session({ session, user }) {
