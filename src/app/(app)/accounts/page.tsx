@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { UserCircle, Plus, Copy, CheckCircle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { validateAccountLink } from "@/lib/account-validation";
 
 const platformOptions = [
   { value: "TikTok", label: "TikTok" },
@@ -59,6 +60,7 @@ export default function AccountsPage() {
   const [clips, setClips] = useState<any[]>([]);
   const [checking, setChecking] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const load = () => {
     Promise.all([
@@ -98,6 +100,15 @@ export default function AccountsPage() {
       toast.error("Please fill in all required fields.");
       return;
     }
+    // Client-side platform/URL validation
+    if (form.platform && form.profileLink) {
+      const validation = validateAccountLink(form.platform, form.profileLink);
+      if (!validation.valid) {
+        setLinkError(validation.error);
+        return;
+      }
+    }
+    setLinkError(null);
     setSubmitting(true);
     try {
       const res = await fetch("/api/accounts", {
@@ -304,9 +315,21 @@ export default function AccountsPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Select id="platform" label="Platform *" options={platformOptions} placeholder="Select platform" value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })} />
+            <Select id="platform" label="Platform *" options={platformOptions} placeholder="Select platform" value={form.platform} onChange={(e) => { setForm({ ...form, platform: e.target.value }); setLinkError(null); }} />
             <Input id="username" label="Username *" placeholder="your_username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
-            <Input id="profileLink" label="Profile link *" placeholder="https://tiktok.com/@your_username" value={form.profileLink} onChange={(e) => setForm({ ...form, profileLink: e.target.value })} />
+            <div>
+              <Input id="profileLink" label="Profile link *" placeholder="https://tiktok.com/@your_username" value={form.profileLink} onChange={(e) => {
+                const val = e.target.value;
+                setForm({ ...form, profileLink: val });
+                if (form.platform && val.length > 10) {
+                  const v = validateAccountLink(form.platform, val);
+                  setLinkError(v.valid ? null : v.error);
+                } else {
+                  setLinkError(null);
+                }
+              }} />
+              {linkError && <p className="mt-1.5 text-xs text-red-400">{linkError}</p>}
+            </div>
             <Input id="contentNiche" label="Content niche" placeholder="e.g. Comedy, Gaming, Fashion" value={form.contentNiche} onChange={(e) => setForm({ ...form, contentNiche: e.target.value })} />
             <Input id="country" label="Country" placeholder="Optional" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2.5">

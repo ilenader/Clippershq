@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export function useIsPWA(): boolean {
   const [isPWA, setIsPWA] = useState(false);
@@ -15,11 +15,32 @@ export function useIsPWA(): boolean {
   return isPWA;
 }
 
+export type MobilePlatform = "ios" | "android-chrome" | "android-firefox" | "android-samsung" | "android-other" | "desktop" | "unknown";
+
+export function detectPlatform(): MobilePlatform {
+  if (typeof navigator === "undefined") return "unknown";
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+  if (isIOS) return "ios";
+  const isAndroid = /Android/.test(ua);
+  if (isAndroid) {
+    if (/SamsungBrowser/.test(ua)) return "android-samsung";
+    if (/Firefox/.test(ua)) return "android-firefox";
+    if (/Chrome/.test(ua) && !/Edge/.test(ua)) return "android-chrome";
+    return "android-other";
+  }
+  if (/Mobi/.test(ua)) return "unknown";
+  return "desktop";
+}
+
 export function useInstallPrompt() {
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [nativePrompt, setNativePrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [platform, setPlatform] = useState<MobilePlatform>("unknown");
 
   useEffect(() => {
+    setPlatform(detectPlatform());
+
     // Check if already in standalone (installed)
     if (window.matchMedia("(display-mode: standalone)").matches ||
         (window.navigator as any).standalone === true) {
@@ -30,13 +51,14 @@ export function useInstallPrompt() {
     const handler = (e: Event) => {
       console.log("[PWA] beforeinstallprompt fired");
       e.preventDefault();
-      setInstallPrompt(e);
+      setNativePrompt(e);
     };
     window.addEventListener("beforeinstallprompt", handler);
 
     const installedHandler = () => {
+      console.log("[PWA] appinstalled fired");
       setIsInstalled(true);
-      setInstallPrompt(null);
+      setNativePrompt(null);
       localStorage.setItem("pwa_installed", "true");
     };
     window.addEventListener("appinstalled", installedHandler);
@@ -52,17 +74,23 @@ export function useInstallPrompt() {
     };
   }, []);
 
-  const triggerInstall = async () => {
-    if (!installPrompt) return false;
-    installPrompt.prompt();
-    const result = await installPrompt.userChoice;
+  const triggerNativeInstall = useCallback(async (): Promise<boolean> => {
+    if (!nativePrompt) return false;
+    nativePrompt.prompt();
+    const result = await nativePrompt.userChoice;
     if (result.outcome === "accepted") {
       setIsInstalled(true);
       localStorage.setItem("pwa_installed", "true");
       return true;
     }
     return false;
-  };
+  }, [nativePrompt]);
 
-  return { installPrompt, isInstalled, triggerInstall };
+  return {
+    nativePrompt,
+    hasNativePrompt: !!nativePrompt,
+    isInstalled,
+    platform,
+    triggerNativeInstall,
+  };
 }

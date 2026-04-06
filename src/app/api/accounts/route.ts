@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
+import { validateAccountLink } from "@/lib/account-validation";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,12 @@ export async function POST(req: NextRequest) {
 
   if (!data.platform || !data.username || !data.profileLink) {
     return NextResponse.json({ error: "Platform, username, and profile link are required" }, { status: 400 });
+  }
+
+  // Validate platform matches the profile link
+  const validation = validateAccountLink(data.platform, data.profileLink);
+  if (!validation.valid) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
   const verificationCode = generateVerificationCode();

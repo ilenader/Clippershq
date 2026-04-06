@@ -25,7 +25,9 @@ import {
   Phone,
   Smartphone,
 } from "lucide-react";
+import { useState } from "react";
 import { useInstallPrompt } from "@/hooks/use-pwa";
+import { PWAInstallInstructions } from "@/components/pwa-install-popup";
 
 interface NavItem {
   label: string;
@@ -103,7 +105,8 @@ interface SidebarProps {
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const { theme } = useTheme();
-  const { isInstalled, triggerInstall } = useInstallPrompt();
+  const { isInstalled, hasNativePrompt, triggerNativeInstall } = useInstallPrompt();
+  const [showInstallModal, setShowInstallModal] = useState(false);
   const isAdmin = role === "ADMIN" || role === "OWNER";
 
   let sections = isAdmin ? [...adminNav] : clipperNav;
@@ -182,10 +185,15 @@ export function Sidebar({ role }: SidebarProps) {
         {!isInstalled && (
           <button
             onClick={async () => {
-              const success = await triggerInstall();
-              if (success) {
-                fetch("/api/user/pwa-status", { method: "POST" }).catch(() => {});
+              if (hasNativePrompt) {
+                const success = await triggerNativeInstall();
+                if (success) {
+                  fetch("/api/user/pwa-status", { method: "POST" }).catch(() => {});
+                  return;
+                }
               }
+              // No native prompt or user declined — show instructions modal
+              setShowInstallModal(true);
             }}
             className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all cursor-pointer"
           >
@@ -194,6 +202,7 @@ export function Sidebar({ role }: SidebarProps) {
             <span className="ml-auto rounded-md bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">+2%</span>
           </button>
         )}
+        <PWAInstallInstructions open={showInstallModal} onClose={() => setShowInstallModal(false)} />
       </div>
     </aside>
   );
