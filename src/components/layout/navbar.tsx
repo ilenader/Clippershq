@@ -140,8 +140,8 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--border-color)] bg-[var(--bg-glass)] px-4 lg:px-6 backdrop-blur-xl backdrop-saturate-150 transition-theme">
-      <div>
+    <header className="lg:sticky lg:top-0 z-30 flex items-center justify-between lg:h-14 lg:border-b lg:border-[var(--border-color)] lg:bg-[var(--bg-glass)] lg:px-6 lg:backdrop-blur-xl lg:backdrop-saturate-150 transition-theme">
+      <div className="hidden lg:block">
         {isDevMode && devRole && (
           <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/20 bg-yellow-500/5 px-2.5 py-1">
             <div className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-pulse" />
@@ -150,7 +150,7 @@ export function Navbar() {
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 lg:gap-2">
         {/* Notification bell */}
         <div className="relative" ref={notifRef}>
           <button onClick={() => { setNotifOpen(!notifOpen); if (!notifOpen) fetchNotifList(); }}

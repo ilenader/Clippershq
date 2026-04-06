@@ -12,7 +12,10 @@ RULES:
 - Be friendly but professional
 - Never reveal internal platform details (fee percentages, fraud detection methods, tracking intervals)
 - Never mention team location
-- If you don't know the answer or the user seems frustrated, say: "I'd recommend speaking with our support team directly. You can request to talk to an agent and someone from the team will get back to you."
+- If you don't know the answer, respond with: "I'm not sure about that one. Would you like me to connect you with our support team? Just say 'connect me' and I'll get someone to help you."
+- If the user says "connect me", "talk to agent", "human", "support team", "real person", or similar phrases requesting human help, respond with exactly: "TRANSFER_TO_AGENT: I'm connecting you with our support team now. Someone will be with you shortly!"
+- If you find yourself giving a similar type of answer twice in a row (repetitive), suggest: "It seems like I might not be giving you what you need. Would you like me to connect you with our support team? Just say 'connect me'."
+- Every 5th message in the conversation, add a subtle note at the end: "\n\nRemember, if you need more help, I can connect you with our team."
 
 PLATFORM KNOWLEDGE:
 - Clippers submit clips (TikTok, Instagram Reels, YouTube Shorts) to campaigns
@@ -23,6 +26,8 @@ PLATFORM KNOWLEDGE:
 - Payouts: request when you've earned enough. Payouts are reviewed and processed.
 - Accounts: link your TikTok/Instagram/YouTube accounts before submitting clips
 - Referrals: share your referral link. Referred users get lower fees, you earn a percentage of their earnings.`;
+
+export const WELCOME_MESSAGE = "Hey! I'm the Clippers HQ assistant. I can help with questions about campaigns, clips, earnings, payouts, and more. If you need to talk to a real person, just let me know and I'll connect you with our support team.";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -119,8 +124,22 @@ export async function generateChatbotResponse(
  * Returns true if the last 3 AI responses all indicate inability to help.
  */
 export function shouldTransferToAgent(recentAIMessages: string[]): boolean {
+  // Check if the AI explicitly triggered transfer
+  if (recentAIMessages.length > 0) {
+    const lastMsg = recentAIMessages[recentAIMessages.length - 1];
+    if (lastMsg.includes("TRANSFER_TO_AGENT:")) return true;
+  }
   if (recentAIMessages.length < 3) return false;
   const last3 = recentAIMessages.slice(-3);
-  const transferPhrases = ["support team", "speak with", "talk to an agent", "can only help with", "connect with"];
+  const transferPhrases = ["support team", "speak with", "talk to an agent", "can only help with", "connect with", "connect me"];
   return last3.every((msg) => transferPhrases.some((phrase) => msg.toLowerCase().includes(phrase)));
+}
+
+/**
+ * Check if a user message is requesting human support.
+ */
+export function isHumanSupportRequest(message: string): boolean {
+  const lower = message.toLowerCase().trim();
+  const triggers = ["connect me", "talk to agent", "talk to a human", "human", "real person", "support team", "talk to support", "agent please", "transfer me"];
+  return triggers.some((t) => lower.includes(t));
 }

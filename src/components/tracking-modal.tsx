@@ -112,12 +112,12 @@ export function TrackingModal({ clip, open, onClose }: TrackingModalProps) {
         ) : snapshots.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)] text-center py-4">No snapshots yet.</p>
         ) : (
-          <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden">
-            <div className="grid grid-cols-[1fr_64px_56px_56px_56px] gap-2 px-4 py-2 border-b border-[var(--border-color)] text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+          <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden overflow-x-auto">
+            <div className="grid grid-cols-[1fr_64px_56px_56px_56px] gap-1 sm:gap-2 px-2 sm:px-4 py-2 border-b border-[var(--border-color)] text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)] min-w-[400px]">
               <span>Time</span>
               <span className="text-right">Views</span>
               <span className="text-right">Likes</span>
-              <span className="text-right">Comments</span>
+              <span className="text-right">Cmts</span>
               <span className="text-right">Shares</span>
             </div>
             {snapshots.map((snap, i) => {
@@ -125,22 +125,22 @@ export function TrackingModal({ clip, open, onClose }: TrackingModalProps) {
               const growth = snap.views - prevViews;
               const isFirst = i === 0;
               return (
-                <div key={snap.id} className="grid grid-cols-[1fr_64px_56px_56px_56px] gap-2 items-center px-4 py-2 border-b border-[var(--border-subtle)] last:border-b-0">
-                  <span className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                    <Clock className="h-3 w-3 text-[var(--text-muted)]" />
+                <div key={snap.id} className="grid grid-cols-[1fr_64px_56px_56px_56px] gap-1 sm:gap-2 items-center px-2 sm:px-4 py-1.5 sm:py-2 border-b border-[var(--border-subtle)] last:border-b-0 min-w-[400px]">
+                  <span className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-[var(--text-secondary)]">
+                    <Clock className="h-3 w-3 text-[var(--text-muted)] flex-shrink-0" />
                     {formatDateTime(snap.checkedAt)}
-                    {isFirst && <Badge variant="active" className="text-[9px] px-1.5 py-0">submit</Badge>}
-                    {snap.isManual && <Badge variant="pending" className="text-[9px] px-1.5 py-0">manual</Badge>}
+                    {isFirst && <Badge variant="active" className="text-[9px] px-1 sm:px-1.5 py-0">submit</Badge>}
+                    {snap.isManual && <Badge variant="pending" className="text-[9px] px-1 sm:px-1.5 py-0">manual</Badge>}
                   </span>
-                  <span className="text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">
+                  <span className="text-xs sm:text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">
                     {formatNumber(snap.views)}
                     {!isFirst && growth > 0 && (
                       <span className="text-[10px] text-emerald-400 ml-0.5">+{formatNumber(growth)}</span>
                     )}
                   </span>
-                  <span className="text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">{formatNumber(snap.likes)}</span>
-                  <span className="text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">{formatNumber(snap.comments)}</span>
-                  <span className="text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">{formatNumber(snap.shares)}</span>
+                  <span className="text-xs sm:text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">{formatNumber(snap.likes)}</span>
+                  <span className="text-xs sm:text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">{formatNumber(snap.comments)}</span>
+                  <span className="text-xs sm:text-sm font-medium text-[var(--text-primary)] text-right tabular-nums">{formatNumber(snap.shares)}</span>
                 </div>
               );
             })}

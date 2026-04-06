@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MessageCircle, X, ArrowLeft, Send, Plus, Search, Megaphone } from "lucide-react";
+import { MessageCircle, X, ArrowLeft, Send, Plus, Search, Megaphone, UserRound } from "lucide-react";
+import { WELCOME_MESSAGE } from "@/lib/chatbot";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -188,6 +189,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   const [messageInput, setMessageInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [needsHumanSupport, setNeedsHumanSupport] = useState(false);
 
   // Global — unread tracking with ref to prevent duplicate pings
   const [unreadCount, setUnreadCount] = useState(0);
@@ -709,8 +711,19 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                 <div className="flex flex-col h-full px-1">
                   {isClipper ? (
                     <div className="flex-1 flex flex-col justify-center">
+                      {/* Welcome message */}
+                      <div className="flex justify-start mb-4">
+                        <div className="flex items-end gap-2 max-w-[85%]">
+                          <div className="flex-shrink-0 w-8">
+                            <div className="rounded-full bg-accent/20 flex items-center justify-center text-accent font-semibold" style={{ width: 28, height: 28, fontSize: 11 }}>AI</div>
+                          </div>
+                          <div className="rounded-2xl px-4 py-3 text-[14.5px] leading-relaxed bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-bl-md">
+                            <p className="whitespace-pre-wrap break-words">{WELCOME_MESSAGE}</p>
+                          </div>
+                        </div>
+                      </div>
                       <p className="text-sm text-[var(--text-muted)] mb-4 text-center">
-                        Need help? Pick a question below or type your own.
+                        Pick a question below or type your own.
                       </p>
                       {/* Quick suggestions as a vertical card list — no horizontal scrolling */}
                       <div className="space-y-2">
@@ -761,6 +774,19 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                                 {formatTimestamp(msg.createdAt)}
                               </p>
                             </div>
+                            {/* "Talk to a human" link below AI messages for clippers */}
+                            {isClipper && !isMine && idx === messages.length - 1 && (
+                              <button
+                                onClick={() => {
+                                  setNeedsHumanSupport(true);
+                                  handleSend("connect me");
+                                }}
+                                className="flex items-center gap-1 mt-1 ml-0.5 text-[11px] text-accent hover:underline cursor-pointer"
+                              >
+                                <UserRound className="h-3 w-3" />
+                                Talk to a human instead
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

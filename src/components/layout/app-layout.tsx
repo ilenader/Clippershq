@@ -99,18 +99,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex flex-1 flex-col lg:ml-60 min-w-0 overflow-x-hidden">
-        {/* Mobile header with hamburger */}
-        <div className="lg:hidden flex items-center gap-3 h-14 px-4 border-b border-[var(--border-color)] bg-[var(--bg-glass)] backdrop-blur-xl">
-          <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-[var(--text-primary)] hover:bg-[var(--bg-input)] cursor-pointer">
-            <Menu className="h-5 w-5" />
-          </button>
-          <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">CLIPPERS HQ</span>
+        {/* Mobile header: hamburger + logo + bell/theme/avatar all on ONE line */}
+        <div className="lg:hidden flex items-center justify-between h-14 px-3 border-b border-[var(--border-color)] bg-[var(--bg-glass)] backdrop-blur-xl">
+          <div className="flex items-center gap-2 flex-shrink-0 whitespace-nowrap">
+            <button onClick={() => setMobileOpen(true)} className="rounded-lg p-1.5 text-[var(--text-primary)] hover:bg-[var(--bg-input)] cursor-pointer">
+              <Menu className="h-5 w-5" />
+            </button>
+            <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">CLIPPERS HQ</span>
+          </div>
+          <div className="flex items-center flex-shrink-0">
+            <Navbar />
+          </div>
         </div>
         <div className="hidden lg:block">
-          <Navbar />
-        </div>
-        {/* Mobile navbar (bell, theme, user) */}
-        <div className="lg:hidden">
           <Navbar />
         </div>
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6">{children}</main>

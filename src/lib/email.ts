@@ -45,15 +45,17 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
 
 function wrap(content: string): string {
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; background: #09090b; border-radius: 16px; overflow: hidden;">
-      <div style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c1c20;">
-        <h2 style="color: #ffffff; font-size: 22px; margin: 0; letter-spacing: 1px;">CLIPPERS HQ</h2>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; background: #0a0d12; border-radius: 16px; overflow: hidden; border: 1px solid #1c2333;">
+      <div style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c2333; background: #111720;">
+        <h2 style="color: #ffffff; font-size: 22px; margin: 0; letter-spacing: 1px; text-shadow: 0 0 20px rgba(0,149,246,0.1);">
+          <svg width="24" height="24" viewBox="0 0 100 94" style="display:inline-block;vertical-align:middle;margin-right:8px;"><polygon points="50,4 97,90 3,90" fill="#ffffff"/></svg>CLIPPERS HQ
+        </h2>
       </div>
-      <div style="padding: 24px; color: #e4e4e7;">
+      <div style="padding: 24px; color: #e8edf2; background: #111720;">
         ${content}
       </div>
-      <div style="padding: 16px 24px; border-top: 1px solid #1c1c20; text-align: center;">
-        <p style="color: #52525b; font-size: 12px; margin: 0;">&copy; 2026 Clippers HQ &mdash; clipershq.com</p>
+      <div style="padding: 16px 24px; border-top: 1px solid #1c2333; text-align: center; background: #0a0d12;">
+        <p style="color: #6b7280; font-size: 12px; margin: 0;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280; text-decoration: none;">clipershq.com</a></p>
       </div>
     </div>
   `;
@@ -160,7 +162,7 @@ export async function sendCampaignAlertEmail(email: string, campaignName: string
       <p style="font-size: 16px; margin: 0 0 12px;">🎬 New Campaign Alert!</p>
       <p style="font-size: 18px; color: #fff; font-weight: bold; margin: 0 0 12px;">${campaignName}</p>
       <p style="font-size: 15px; color: #a1a1aa; margin: 0 0 20px;">${description}</p>
-      <a href="https://clipershq.com/login" style="display: inline-block; background: #0095f6; color: #fff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Start Clipping Now</a>
+      <a href="https://clipershq.com/login" style="display: inline-block; background: #0095f6; color: #fff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; box-shadow: 0 0 20px rgba(0,149,246,0.2);">Start Clipping Now</a>
     `),
   });
 }
