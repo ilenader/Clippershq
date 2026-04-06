@@ -77,33 +77,76 @@ function Step({ num, title, subtitle, icon }: { num: number; title: string; subt
 
 // ─── Platform instructions ─────────────────────────────────
 
+function DownArrow() {
+  return (
+    <div className="flex justify-center pt-2">
+      <div className="animate-bounce">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-accent">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <polyline points="19 12 12 19 5 12" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function UpRightArrow() {
+  return (
+    <div className="flex justify-end pt-2 pr-4">
+      <div className="animate-bounce">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-accent">
+          <line x1="17" y1="7" x2="7" y2="17" />
+          <polyline points="8 7 17 7 17 16" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 function InstructionsForPlatform({ platform }: { platform: MobilePlatform }) {
-  if (platform === "ios") {
+  // iPhone + Safari
+  if (platform === "ios-safari") {
     return (
       <div className="space-y-4">
-        <Step num={1} title="Tap the <strong>Share</strong> button" subtitle="At the bottom of your browser" icon={<ShareIcon className="h-5 w-5 text-accent" />} />
-        <Step num={2} title='Tap <strong>"Add to Home Screen"</strong>' subtitle="Scroll down in the share menu if needed" icon={<PlusBoxIcon className="h-5 w-5 text-accent" />} />
-        <div className="flex justify-center pt-2">
-          <div className="animate-bounce">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-accent">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <polyline points="19 12 12 19 5 12" />
-            </svg>
-          </div>
-        </div>
+        <Step num={1} title="Tap the <strong>Share</strong> button" subtitle="At the BOTTOM of your screen" icon={<ShareIcon className="h-5 w-5 text-accent" />} />
+        <Step num={2} title='Scroll down and tap <strong>"Add to Home Screen"</strong>' subtitle="It may be below the fold in the share menu" icon={<PlusBoxIcon className="h-5 w-5 text-accent" />} />
+        <DownArrow />
       </div>
     );
   }
 
+  // iPhone + Chrome
+  if (platform === "ios-chrome") {
+    return (
+      <div className="space-y-4">
+        <Step num={1} title="Tap the <strong>Share</strong> button" subtitle="At the TOP RIGHT of your screen" icon={<ShareIcon className="h-5 w-5 text-accent" />} />
+        <Step num={2} title='Tap <strong>"More..."</strong> then scroll to <strong>"Add to Home Screen"</strong>' subtitle="You may need to scroll down in the menu" icon={<PlusBoxIcon className="h-5 w-5 text-accent" />} />
+        <UpRightArrow />
+      </div>
+    );
+  }
+
+  // iPhone + Firefox
+  if (platform === "ios-firefox") {
+    return (
+      <div className="space-y-4">
+        <Step num={1} title='Tap the <strong>three dots</strong> menu' subtitle="At the bottom right of Firefox" icon={<MenuDotsIcon className="h-5 w-5 text-accent" />} />
+        <Step num={2} title='Tap <strong>"Share"</strong> then <strong>"Add to Home Screen"</strong>' subtitle="The Add to Home Screen option is in the share menu" icon={<PlusBoxIcon className="h-5 w-5 text-accent" />} />
+      </div>
+    );
+  }
+
+  // Android + Chrome
   if (platform === "android-chrome") {
     return (
       <div className="space-y-4">
         <Step num={1} title='Tap <strong>&#8942;</strong> (three dots) at the top right' subtitle="Chrome menu button" icon={<MenuDotsIcon className="h-5 w-5 text-accent" />} />
-        <Step num={2} title='Tap <strong>"Install App"</strong> or <strong>"Add to Home Screen"</strong>' subtitle="It may say either depending on your Chrome version" icon={<PlusBoxIcon className="h-5 w-5 text-accent" />} />
+        <Step num={2} title='Tap <strong>"Add to Home Screen"</strong> or <strong>"Install App"</strong>' subtitle="It may say either depending on your Chrome version" icon={<PlusBoxIcon className="h-5 w-5 text-accent" />} />
       </div>
     );
   }
 
+  // Android + Firefox
   if (platform === "android-firefox") {
     return (
       <div className="space-y-4">
@@ -113,6 +156,7 @@ function InstructionsForPlatform({ platform }: { platform: MobilePlatform }) {
     );
   }
 
+  // Android + Samsung Internet
   if (platform === "android-samsung") {
     return (
       <div className="space-y-4">
@@ -159,7 +203,7 @@ export function PWAInstallPopup() {
 
   // On iOS/Firefox, show instructions right away since native prompt never works
   useEffect(() => {
-    if (show && (platform === "ios" || platform === "android-firefox")) {
+    if (show && (platform === "ios-safari" || platform === "ios-chrome" || platform === "ios-firefox" || platform === "android-firefox")) {
       setShowInstructions(true);
     }
   }, [show, platform]);
@@ -189,7 +233,7 @@ export function PWAInstallPopup() {
   if (!show) return null;
 
   const isBonusPhase = daysSince >= 4;
-  const isBottomSheet = platform === "ios";
+  const isBottomSheet = platform === "ios-safari" || platform === "ios-chrome" || platform === "ios-firefox";
 
   // iOS: bottom-sheet style
   if (isBottomSheet) {

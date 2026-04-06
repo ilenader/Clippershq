@@ -5,11 +5,14 @@
  * Tiered schedule:
  *   Phase 1 (0-4h after submission):   every 60 min
  *   Phase 2 (4-24h after submission):  every 120 min
- *   Phase 3 (24h+, views >= 500):      every 120 min
- *   Phase 3 (24h+, views < 500):       escalate 240 → 480 → 1440 → 4320 min
+ *   Phase 3 (24h+): growth-based:
+ *     >= 5% growth since last check → 2h (can move BACK up)
+ *     1-5% growth → 4h
+ *     < 1% growth → escalate: 4h → 8h → 24h → 72h
+ *     0% growth   → escalate: 4h → 8h → 24h → 72h
  *
- * Tracking NEVER deactivates based on flat checks — only on REJECTED status.
- * 4320 min (72 hours) is the absolute floor.
+ * Tracking NEVER stops — 72h is the absolute floor, checked forever.
+ * Only deactivates on REJECTED status.
  */
 
 import { db } from "@/lib/db";
@@ -17,15 +20,17 @@ import { fetchClipStats } from "@/lib/apify";
 import { recalculateClipEarnings } from "@/lib/earnings-calc";
 import { computeFraudLevel } from "@/lib/fraud";
 
-/** Escalation ladder for views < 500 after 24h */
+/** Slow ladder in minutes: 2h → 4h → 8h → 24h → 72h */
 const SLOW_LADDER = [120, 240, 480, 1440, 4320];
 
 /**
  * Determine the next check interval based on the tiered schedule.
+ * Phase 3 uses percentage growth to decide whether to speed up or slow down.
  */
 function getNextInterval(
   currentIntervalMin: number,
   currentViews: number,
+  previousViews: number,
   clipCreatedAt: Date | null,
 ): number {
   const hoursSinceSubmission = clipCreatedAt
@@ -38,16 +43,24 @@ function getNextInterval(
   // Phase 2: hours 4-24 → always 120 min
   if (hoursSinceSubmission <= 24) return 120;
 
-  // Phase 3: after 24h, performance-based
-  if (currentViews >= 500) return 120;
+  // Phase 3: after 24h — growth-based
+  const growthPercent = previousViews > 0
+    ? ((currentViews - previousViews) / previousViews) * 100
+    : (currentViews > 0 ? 100 : 0); // first snapshot with views = treat as high growth
 
-  // Views < 500 → escalate down the ladder
+  // >= 5% growth → fast: 2h (can move BACK up from any slower tier)
+  if (growthPercent >= 5) return 120;
+
+  // 1-5% growth → moderate: 4h
+  if (growthPercent >= 1) return 240;
+
+  // < 1% growth (including 0%) → escalate on slow ladder
   const currentIdx = SLOW_LADDER.indexOf(currentIntervalMin);
   if (currentIdx === -1) {
-    // Not on the ladder yet (e.g. was 60 or 120 from earlier phase) → start at first rung
-    return SLOW_LADDER[0]; // 240
+    // Not on the ladder yet → start at 4h (second rung, since 2h is SLOW_LADDER[0])
+    return 240;
   }
-  // Move to next rung (or stay at floor)
+  // Move to next rung (or stay at floor = 72h)
   return SLOW_LADDER[Math.min(currentIdx + 1, SLOW_LADDER.length - 1)];
 }
 
@@ -255,7 +268,7 @@ export async function runDueTrackingJobs(): Promise<{ processed: number; errors:
         }
 
         // ── Calculate next interval using tiered schedule ──
-        const newInterval = getNextInterval(job.checkIntervalMin, stats.views, clip.createdAt);
+        const newInterval = getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt);
         const nextCheck = roundToNextSlot(newInterval);
 
         await db.trackingJob.update({

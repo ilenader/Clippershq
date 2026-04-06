@@ -15,13 +15,20 @@ export function useIsPWA(): boolean {
   return isPWA;
 }
 
-export type MobilePlatform = "ios" | "android-chrome" | "android-firefox" | "android-samsung" | "android-other" | "desktop" | "unknown";
+export type MobilePlatform =
+  | "ios-safari" | "ios-chrome" | "ios-firefox"
+  | "android-chrome" | "android-firefox" | "android-samsung" | "android-other"
+  | "desktop" | "unknown";
 
 export function detectPlatform(): MobilePlatform {
   if (typeof navigator === "undefined") return "unknown";
   const ua = navigator.userAgent;
   const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
-  if (isIOS) return "ios";
+  if (isIOS) {
+    if (/CriOS/.test(ua)) return "ios-chrome";
+    if (/FxiOS/.test(ua)) return "ios-firefox";
+    return "ios-safari"; // Safari or any other iOS browser using WebKit
+  }
   const isAndroid = /Android/.test(ua);
   if (isAndroid) {
     if (/SamsungBrowser/.test(ua)) return "android-samsung";

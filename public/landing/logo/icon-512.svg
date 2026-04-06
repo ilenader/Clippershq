@@ -2,12 +2,12 @@
   <rect width="512" height="512" rx="0" fill="#0a0d12"/>
   <defs>
     <filter id="glow">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feGaussianBlur stdDeviation="6" result="blur"/>
       <feMerge>
         <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
   </defs>
-  <polygon points="256,128 384,384 128,384" fill="#ffffff" filter="url(#glow)" opacity="0.95"/>
+  <polygon points="256,166 348,346 164,346" fill="#ffffff" filter="url(#glow)" opacity="0.95"/>
 </svg>
