@@ -78,6 +78,7 @@ export async function GET() {
         id: c.id,
         campaignId: c.campaignId,
         campaignName: c.campaign?.name || null,
+        needsHumanSupport: c.needsHumanSupport || false,
         updatedAt: c.updatedAt,
         participants: c.participants.map((p: any) => ({
           userId: p.userId,

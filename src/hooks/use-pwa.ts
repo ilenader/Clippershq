@@ -28,6 +28,7 @@ export function useInstallPrompt() {
     }
 
     const handler = (e: Event) => {
+      console.log("[PWA] beforeinstallprompt fired");
       e.preventDefault();
       setInstallPrompt(e);
     };

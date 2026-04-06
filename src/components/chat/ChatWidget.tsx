@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MessageCircle, X, ArrowLeft, Send, Plus, Search, Megaphone, UserRound } from "lucide-react";
+import { MessageCircle, X, ArrowLeft, Send, Plus, Search, Megaphone, UserRound, AlertTriangle, ChevronDown, Bot } from "lucide-react";
 import { WELCOME_MESSAGE } from "@/lib/chatbot";
 
 // ─── Types ──────────────────────────────────────────────────
@@ -18,6 +18,7 @@ interface ConversationSummary {
   id: string;
   campaignId: string | null;
   campaignName: string | null;
+  needsHumanSupport: boolean;
   updatedAt: string;
   participants: Participant[];
   lastMessage: { id: string; content: string; senderId: string; createdAt: string } | null;
@@ -59,6 +60,7 @@ interface ThreadInfo {
   avatarSrc: string | null;
   avatarName: string;
   otherRole: string | null;
+  needsHumanSupport?: boolean;
 }
 
 // ─── Quick Suggestions (10 prompts, displayed as a grid) ────
@@ -196,6 +198,14 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   const lastKnownUnreadRef = useRef(0);
   const soundPlayedForCountRef = useRef(-1);
   const sseRef = useRef<EventSource | null>(null);
+
+  // Chat filter for admin/owner
+  type ChatFilter = "all" | "needs-agent" | "direct" | string; // string = campaignId
+  const [chatFilter, setChatFilter] = useState<ChatFilter>("all");
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  // Track if user has sent a message in current thread (hides suggestions)
+  const [hasSentInThread, setHasSentInThread] = useState(false);
 
   // New conversation (admin/owner)
   const [messageableUsers, setMessageableUsers] = useState<MessageableUser[]>([]);
@@ -379,6 +389,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
       sender: { id: myId, name: null, username: "You", image: null, role },
     };
     setMessages((prev) => [...prev, optimisticMsg]);
+    setHasSentInThread(true);
     setSending(true);
 
     try {
@@ -391,10 +402,14 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
         // Replace optimistic with real data (includes auto-reply if any)
         await fetchMessages(convoId);
         refreshList();
+        // If admin/owner replied, clear the needsHumanSupport banner
+        if (!isClipper && threadInfo?.needsHumanSupport) {
+          setThreadInfo((prev) => prev ? { ...prev, needsHumanSupport: false } : prev);
+        }
       }
     } catch {}
     setSending(false);
-  }, [myId, role, fetchMessages, refreshList]);
+  }, [myId, role, isClipper, threadInfo, fetchMessages, refreshList]);
 
   const sendFromInput = useCallback(async () => {
     const text = messageInput.trim();
@@ -408,6 +423,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
     setThreadInfo(info);
     activeConvoIdRef.current = info.convoId;
     setMessages([]);
+    setHasSentInThread(false);
     setView("thread");
     setLoadingMessages(true);
     await fetchMessages(info.convoId);
@@ -468,6 +484,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
       avatarSrc: displayUser?.image || null,
       avatarName: displayUser ? getDisplayName(displayUser) : "?",
       otherRole: displayUser?.role || null,
+      needsHumanSupport: convo.needsHumanSupport,
     };
     await openThreadWithInfo(info);
   }, [myId, openThreadWithInfo]);
@@ -619,53 +636,121 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                 )
               )}
 
-              {/* Admin/Owner: conversation list */}
-              {!isClipper && (
-                conversations.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-                    <MessageCircle className="h-12 w-12 text-[var(--text-muted)] mb-3 opacity-40" />
-                    <p className="text-sm text-[var(--text-muted)]">No conversations yet</p>
-                    <button onClick={openNewConversation} className="mt-3 text-sm text-accent hover:underline cursor-pointer">
-                      Start a conversation
-                    </button>
-                  </div>
-                ) : (
-                  conversations.map((convo) => {
-                    const other = convo.participants.find((p) => p.userId !== myId)
-                      || convo.participants.find((p) => p.role === "CLIPPER")
-                      || convo.participants[0];
-                    if (!other) return null;
-                    return (
-                      <button key={convo.id} onClick={() => openConversation(convo)}
-                        className={`flex w-full items-center gap-4 px-5 py-[18px] text-left transition-colors cursor-pointer hover:bg-[var(--bg-card-hover)] border-b border-[var(--border-color)] last:border-b-0 ${convo.hasUnread ? "bg-accent/5" : ""}`}>
-                        <div className="relative flex-shrink-0">
-                          <Avatar src={other.image} name={getDisplayName(other)} size={48} />
-                          {convo.hasUnread && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent border-2 border-[var(--bg-card)]" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`text-[15px] font-medium truncate ${convo.hasUnread ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>
-                              {getDisplayName(other)}
-                            </span>
-                            {convo.lastMessage && (
-                              <span className="text-xs text-[var(--text-muted)] flex-shrink-0">{formatTime(convo.lastMessage.createdAt)}</span>
-                            )}
+              {/* Admin/Owner: conversation list with filter */}
+              {!isClipper && (() => {
+                // Build unique campaign names for filter
+                const campaignNames = new Map<string, string>();
+                conversations.forEach((c) => {
+                  if (c.campaignId && c.campaignName) campaignNames.set(c.campaignId, c.campaignName);
+                });
+                const needsAgentCount = conversations.filter((c) => c.needsHumanSupport).length;
+
+                // Filter conversations
+                let filtered = conversations;
+                if (chatFilter === "needs-agent") filtered = conversations.filter((c) => c.needsHumanSupport);
+                else if (chatFilter === "direct") filtered = conversations.filter((c) => !c.campaignId);
+                else if (chatFilter !== "all") filtered = conversations.filter((c) => c.campaignId === chatFilter);
+
+                // Sort: needsHumanSupport first, then by updatedAt
+                filtered = [...filtered].sort((a, b) => {
+                  if (a.needsHumanSupport && !b.needsHumanSupport) return -1;
+                  if (!a.needsHumanSupport && b.needsHumanSupport) return 1;
+                  return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+                });
+
+                return (
+                  <>
+                    {/* Filter bar */}
+                    {conversations.length > 0 && (
+                      <div className="relative px-4 py-2.5 border-b border-[var(--border-subtle)]">
+                        <button onClick={() => setFilterOpen(!filterOpen)}
+                          className="flex items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer w-full">
+                          <span className="flex-1 text-left truncate">
+                            {chatFilter === "all" ? "All Conversations" : chatFilter === "needs-agent" ? `Needs Agent (${needsAgentCount})` : chatFilter === "direct" ? "Direct Messages" : `Campaign: ${campaignNames.get(chatFilter) || "Unknown"}`}
+                          </span>
+                          <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" />
+                        </button>
+                        {filterOpen && (
+                          <div className="absolute left-4 right-4 top-full mt-1 z-20 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-elevated)] overflow-hidden">
+                            {[
+                              { key: "all", label: "All Conversations" },
+                              { key: "needs-agent", label: `Needs Agent${needsAgentCount > 0 ? ` (${needsAgentCount})` : ""}` },
+                              { key: "direct", label: "Direct Messages" },
+                              ...Array.from(campaignNames).map(([id, name]) => ({ key: id, label: `Campaign: ${name}` })),
+                            ].map((opt) => (
+                              <button key={opt.key} onClick={() => { setChatFilter(opt.key); setFilterOpen(false); }}
+                                className={`w-full px-4 py-2.5 text-left text-xs transition-colors cursor-pointer hover:bg-[var(--bg-card-hover)] ${chatFilter === opt.key ? "text-accent font-medium" : "text-[var(--text-secondary)]"}`}>
+                                {opt.label}
+                              </button>
+                            ))}
                           </div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`text-xs ${roleBadgeColor(other.role)}`}>{other.role}</span>
-                            {convo.campaignName && <span className="text-xs text-[var(--text-muted)]">· {convo.campaignName}</span>}
-                            {convo.lastMessage && (
-                              <span className={`text-xs truncate ${convo.hasUnread ? "text-[var(--text-secondary)] font-medium" : "text-[var(--text-muted)]"}`}>
-                                · {convo.lastMessage.senderId === myId ? "You: " : ""}{convo.lastMessage.content}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })
-                )
-              )}
+                        )}
+                      </div>
+                    )}
+
+                    {filtered.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full px-6 text-center">
+                        <MessageCircle className="h-12 w-12 text-[var(--text-muted)] mb-3 opacity-40" />
+                        <p className="text-sm text-[var(--text-muted)]">{conversations.length === 0 ? "No conversations yet" : "No matching conversations"}</p>
+                        {conversations.length === 0 && (
+                          <button onClick={openNewConversation} className="mt-3 text-sm text-accent hover:underline cursor-pointer">
+                            Start a conversation
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      filtered.map((convo) => {
+                        const other = convo.participants.find((p) => p.userId !== myId)
+                          || convo.participants.find((p) => p.role === "CLIPPER")
+                          || convo.participants[0];
+                        if (!other) return null;
+                        const isAgent = convo.needsHumanSupport;
+                        return (
+                          <button key={convo.id} onClick={() => openConversation(convo)}
+                            className={`flex w-full items-center gap-4 px-5 py-[18px] text-left transition-colors cursor-pointer hover:bg-[var(--bg-card-hover)] border-b border-[var(--border-color)] last:border-b-0 ${isAgent ? "bg-red-500/5 border-l-2 border-l-red-400" : convo.hasUnread ? "bg-accent/5" : ""}`}>
+                            <div className="relative flex-shrink-0">
+                              <Avatar src={other.image} name={getDisplayName(other)} size={48} />
+                              {isAgent ? (
+                                <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-[var(--bg-card)] flex items-center justify-center">
+                                  <span className="text-[6px] text-white font-bold">!</span>
+                                </span>
+                              ) : convo.hasUnread ? (
+                                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent border-2 border-[var(--bg-card)]" />
+                              ) : null}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className={`text-[15px] font-medium truncate ${convo.hasUnread || isAgent ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>
+                                    {getDisplayName(other)}
+                                  </span>
+                                  {isAgent && (
+                                    <span className="inline-flex items-center gap-0.5 rounded-md bg-red-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-400 flex-shrink-0">
+                                      <AlertTriangle className="h-2.5 w-2.5" /> Agent
+                                    </span>
+                                  )}
+                                </div>
+                                {convo.lastMessage && (
+                                  <span className="text-xs text-[var(--text-muted)] flex-shrink-0">{formatTime(convo.lastMessage.createdAt)}</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className={`text-xs ${roleBadgeColor(other.role)}`}>{other.role}</span>
+                                {convo.campaignName && <span className="text-xs text-[var(--text-muted)]">· {convo.campaignName}</span>}
+                                {convo.lastMessage && (
+                                  <span className={`text-xs truncate ${convo.hasUnread ? "text-[var(--text-secondary)] font-medium" : "text-[var(--text-muted)]"}`}>
+                                    · {convo.lastMessage.senderId === myId ? "You: " : ""}{convo.lastMessage.content}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </>
         )}
@@ -700,6 +785,14 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                 <X className="h-4 w-4" />
               </button>
             </div>
+
+            {/* Needs agent banner — admin/owner view */}
+            {!isClipper && threadInfo?.needsHumanSupport && (
+              <div className="flex items-center gap-2.5 px-5 py-2.5 border-b border-red-500/20 bg-red-500/5">
+                <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                <p className="text-xs text-red-400 font-medium">This user requested to speak with an agent</p>
+              </div>
+            )}
 
             {/* Messages area */}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2">
@@ -749,16 +842,27 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                     const showAvatar = !isMine && (idx === 0 || messages[idx - 1].senderId !== msg.senderId);
                     const showRole = !isMine && showAvatar && (msg.sender.role === "ADMIN" || msg.sender.role === "OWNER");
                     const isOptimistic = msg.id.startsWith("opt-");
+                    // For admin/owner: detect if this message was sent by the AI (a non-clipper who isn't "me")
+                    const isAIMessage = !isClipper && !isMine && (msg.sender.role === "ADMIN" || msg.sender.role === "OWNER");
                     return (
                       <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                         <div className={`flex items-end gap-2 max-w-[85%] ${isMine ? "flex-row-reverse" : ""}`}>
                           {!isMine && (
                             <div className="flex-shrink-0 w-8">
-                              {showAvatar && <Avatar src={msg.sender.image} name={getDisplayName(msg.sender)} size={28} />}
+                              {showAvatar && (isAIMessage
+                                ? <div className="rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28 }}><Bot className="h-3.5 w-3.5 text-purple-400" /></div>
+                                : <Avatar src={msg.sender.image} name={getDisplayName(msg.sender)} size={28} />
+                              )}
                             </div>
                           )}
                           <div>
-                            {showRole && (
+                            {/* Label: AI tag for admin/owner, role badge otherwise */}
+                            {isAIMessage && showAvatar && (
+                              <div className="mb-1 ml-0.5 flex items-center gap-1.5">
+                                <span className="inline-block rounded-md bg-purple-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-400">AI Auto-reply</span>
+                              </div>
+                            )}
+                            {showRole && !isAIMessage && (
                               <div className="mb-1 ml-0.5 flex items-center gap-1.5">
                                 <span className="text-[11px] font-medium text-[var(--text-muted)]">{getDisplayName(msg.sender)}</span>
                                 <RoleBadge role={msg.sender.role} />
@@ -797,8 +901,8 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
               )}
             </div>
 
-            {/* Quick suggestion chips — visible for clipper for first ~10 messages */}
-            {isClipper && canSend && messages.length > 0 && messages.length < 10 && (
+            {/* Quick suggestion chips — only before first message in conversation */}
+            {isClipper && canSend && messages.length === 0 && !hasSentInThread && (
               <div className="border-t border-[var(--border-subtle)] px-4 py-2.5 flex flex-wrap gap-2">
                 {QUICK_SUGGESTIONS.slice(0, 4).map((s) => (
                   <button key={s} onClick={() => handleSend(s)}
