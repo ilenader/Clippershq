@@ -99,6 +99,17 @@ export function Navbar() {
     };
   }, [fetchNotifList]);
 
+  // PWA app badge — shows notification count on the home screen icon
+  useEffect(() => {
+    if ("setAppBadge" in navigator) {
+      if (notifCount > 0) {
+        (navigator as any).setAppBadge(notifCount).catch(() => {});
+      } else {
+        (navigator as any).clearAppBadge().catch(() => {});
+      }
+    }
+  }, [notifCount]);
+
   const markAllRead = async () => {
     try {
       await fetch("/api/notifications", {

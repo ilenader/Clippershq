@@ -111,7 +111,7 @@ export async function runDueTrackingJobs(): Promise<{ processed: number; errors:
             campaignId: true,
             createdAt: true,
             campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true } },
-            user: { select: { level: true, currentStreak: true, referredById: true } },
+            user: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true } },
           },
         },
       },

@@ -15,6 +15,7 @@ import {
   DEFAULT_PLATFORM_FEE,
   DEFAULT_REFERRED_FEE,
   DEFAULT_FEE_TIERS,
+  PWA_BONUS_PERCENT,
   computeLevel,
 } from "@/lib/earnings-calc";
 
@@ -263,7 +264,7 @@ export async function getGamificationState(userId: string): Promise<Gamification
     select: {
       totalEarnings: true, totalViews: true, level: true,
       bonusPercentage: true, currentStreak: true, longestStreak: true,
-      referredById: true,
+      referredById: true, isPWAUser: true,
     },
   });
   if (!user) return null;
@@ -331,7 +332,7 @@ export async function getGamificationState(userId: string): Promise<Gamification
     level,
     totalEarnings,
     totalViews: user.totalViews,
-    bonusPercent: (config.levelBonuses[level] || 0) + (currentReward?.bonusPercent || 0),
+    bonusPercent: (config.levelBonuses[level] || 0) + (currentReward?.bonusPercent || 0) + (user.isPWAUser ? PWA_BONUS_PERCENT : 0),
     currentStreak,
     longestStreak,
     nextLevelAt,

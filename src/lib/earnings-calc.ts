@@ -55,6 +55,8 @@ export interface EarningsInput {
   campaignMaxPayoutPerClip: number | null;
 }
 
+export const PWA_BONUS_PERCENT = 2; // +2% for PWA users
+
 export interface ClipperEarningsInput {
   views: number;
   clipperCpm: number | null;
@@ -69,6 +71,7 @@ export interface ClipperEarningsInput {
   maxBonusCap?: number;
   manualBonusOverride?: number | null;
   isReferred?: boolean;
+  isPWAUser?: boolean;
 }
 
 export interface EarningsBreakdown {
@@ -107,6 +110,7 @@ export function calculateClipperEarnings(input: ClipperEarningsInput): EarningsB
     maxBonusCap = MAX_BONUS_CAP,
     manualBonusOverride = null,
     isReferred = false,
+    isPWAUser = false,
   } = input;
 
   const baseFee = isReferred ? DEFAULT_REFERRED_FEE : platformFeePercent;
@@ -131,12 +135,15 @@ export function calculateClipperEarnings(input: ClipperEarningsInput): EarningsB
     if (clipperStreak >= tier.days) { streakBonus = tier.bonusPercent; break; }
   }
 
+  // PWA bonus (additive, stacks with level + streak)
+  const pwaBonus = isPWAUser ? PWA_BONUS_PERCENT : 0;
+
   // Apply bonus cap
   let totalBonusPercent: number;
   if (manualBonusOverride != null) {
     totalBonusPercent = Math.min(manualBonusOverride, MANUAL_OVERRIDE_CEILING);
   } else {
-    totalBonusPercent = Math.min(levelBonus + streakBonus, maxBonusCap);
+    totalBonusPercent = Math.min(levelBonus + streakBonus + pwaBonus, maxBonusCap);
   }
 
   const effectiveFee = isReferred ? Math.max(baseFee, DEFAULT_REFERRED_FEE) : baseFee;
@@ -189,6 +196,7 @@ export function calculateDualEarnings(input: {
   maxBonusCap?: number;
   manualBonusOverride?: number | null;
   isReferred?: boolean;
+  isPWAUser?: boolean;
 }): EarningsBreakdown {
   // Use clipperCpm; fallback to campaignCpmRate for legacy campaigns
   const cpm = input.clipperCpm ?? input.campaignCpmRate ?? null;
@@ -205,6 +213,7 @@ export function calculateDualEarnings(input: {
     maxBonusCap: input.maxBonusCap,
     manualBonusOverride: input.manualBonusOverride,
     isReferred: input.isReferred,
+    isPWAUser: input.isPWAUser,
   });
   return result;
 }
@@ -221,7 +230,7 @@ export function recalculateClipEarnings(clip: {
     clipperCpm?: number | null;
     ownerCpm?: number | null;
   };
-  user?: { level?: number; currentStreak?: number; referredById?: string | null };
+  user?: { level?: number; currentStreak?: number; referredById?: string | null; isPWAUser?: boolean };
 }): number {
   const latestStat = clip.stats[0];
   if (!latestStat) return 0;
@@ -237,6 +246,7 @@ export function recalculateClipEarnings(clip: {
     clipperLevel: clip.user?.level ?? 0,
     clipperStreak: clip.user?.currentStreak || 0,
     isReferred: !!clip.user?.referredById,
+    isPWAUser: clip.user?.isPWAUser ?? false,
   });
   return result.clipperEarnings;
 }

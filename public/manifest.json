@@ -1,0 +1,14 @@
+{
+  "name": "Clippers HQ",
+  "short_name": "Clippers HQ",
+  "description": "The all-in-one platform for managing clips, campaigns, and payouts.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0a0d12",
+  "theme_color": "#0a0d12",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/landing/logo/logo-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/landing/logo/logo-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

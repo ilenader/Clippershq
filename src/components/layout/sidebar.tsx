@@ -23,7 +23,9 @@ import {
   HelpCircle,
   Trophy,
   Phone,
+  Smartphone,
 } from "lucide-react";
+import { useInstallPrompt } from "@/hooks/use-pwa";
 
 interface NavItem {
   label: string;
@@ -101,6 +103,7 @@ interface SidebarProps {
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const { theme } = useTheme();
+  const { isInstalled, triggerInstall } = useInstallPrompt();
   const isAdmin = role === "ADMIN" || role === "OWNER";
 
   let sections = isAdmin ? [...adminNav] : clipperNav;
@@ -166,7 +169,7 @@ export function Sidebar({ role }: SidebarProps) {
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-[var(--border-color)] px-4 py-4">
+      <div className="border-t border-[var(--border-color)] px-4 py-4 space-y-1">
         <a
           href="https://discord.gg/7TpufG6ak6"
           target="_blank"
@@ -176,6 +179,21 @@ export function Sidebar({ role }: SidebarProps) {
           <MessageCircle className="h-[18px] w-[18px] text-accent" />
           Join our Discord
         </a>
+        {!isInstalled && (
+          <button
+            onClick={async () => {
+              const success = await triggerInstall();
+              if (success) {
+                fetch("/api/user/pwa-status", { method: "POST" }).catch(() => {});
+              }
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all cursor-pointer"
+          >
+            <Smartphone className="h-[18px] w-[18px] text-accent" />
+            <span>Download App</span>
+            <span className="ml-auto rounded-md bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">+2%</span>
+          </button>
+        )}
       </div>
     </aside>
   );

@@ -84,6 +84,7 @@ model User {
   referralCode  String?    @unique
   referredById  String?
   manualBonusOverride Float?
+  isPWAUser     Boolean    @default(false)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

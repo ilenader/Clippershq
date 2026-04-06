@@ -9,6 +9,8 @@ import { Navbar } from "./navbar";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { Menu, X, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PWAInstallPopup } from "@/components/pwa-install-popup";
+import { useIsPWA } from "@/hooks/use-pwa";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -16,9 +18,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isPWA = useIsPWA();
 
   // Close mobile nav on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
+
+  // Sync PWA status with backend
+  useEffect(() => {
+    if (isPWA) {
+      localStorage.setItem("pwa_installed", "true");
+      fetch("/api/user/pwa-status", { method: "POST" }).catch(() => {});
+    }
+  }, [isPWA]);
 
   const isLoading = isDevMode ? devLoading : status === "loading";
   const effectiveSession = isDevMode && devSession ? devSession : session;
@@ -117,6 +128,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6">{children}</main>
       </div>
       <ChatWidget userId={effectiveSession.user.id} role={effectiveRole} />
+      {!isPWA && <PWAInstallPopup />}
     </div>
   );
 }

@@ -79,7 +79,7 @@ export async function POST(
         include: {
           stats: { orderBy: { checkedAt: "desc" }, take: 1 },
           campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true } },
-          user: { select: { level: true, currentStreak: true, referredById: true } },
+          user: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true } },
         },
       });
       if (clipWithData?.campaign && clipWithData.stats.length > 0) {
