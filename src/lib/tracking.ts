@@ -17,7 +17,7 @@
 
 import { db } from "@/lib/db";
 import { fetchClipStats } from "@/lib/apify";
-import { recalculateClipEarnings } from "@/lib/earnings-calc";
+import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
 import { computeFraudLevel } from "@/lib/fraud";
 
 /** Interval tiers in minutes: 2h → 4h → 8h → 16h → 24h → 72h */
@@ -139,7 +139,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
             campaignId: true,
             createdAt: true,
             isOwnerOverride: true,
-            campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true } },
+            campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true } },
             user: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true } },
           },
         },
@@ -243,11 +243,12 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
         });
 
         if (clip.status === "APPROVED" && clip.campaign && campaignStatus?.status !== "PAUSED") {
-          let newEarnings = recalculateClipEarnings({
+          const breakdown = recalculateClipEarningsBreakdown({
             stats: [{ views: stats.views }],
             campaign: clip.campaign,
             user: clip.user,
           });
+          let newEarnings = breakdown.clipperEarnings;
 
           // Budget cap: don't exceed campaign budget
           try {
@@ -275,8 +276,25 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           if (newEarnings !== clip.earnings) {
             await db.clip.update({
               where: { id: clip.id },
-              data: { earnings: newEarnings },
+              data: {
+                earnings: newEarnings,
+                baseEarnings: breakdown.baseEarnings,
+                bonusPercent: breakdown.bonusPercent,
+                bonusAmount: breakdown.bonusAmount,
+              },
             });
+
+            // Owner earnings for CPM_SPLIT campaigns
+            if ((clip.campaign as any).pricingModel === "CPM_SPLIT" && (clip.campaign as any).ownerCpm) {
+              const ownerAmt = calculateOwnerEarnings(stats.views, (clip.campaign as any).ownerCpm);
+              if (ownerAmt > 0) {
+                await db.agencyEarning.upsert({
+                  where: { clipId: clip.id },
+                  create: { campaignId: clip.campaignId, clipId: clip.id, amount: ownerAmt, views: stats.views },
+                  update: { amount: ownerAmt, views: stats.views },
+                });
+              }
+            }
             if (clip.userId) {
               const allClips = await db.clip.findMany({
                 where: { userId: clip.userId, status: "APPROVED" },

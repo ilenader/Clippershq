@@ -102,7 +102,7 @@ export async function getCampaignBudgetStatus(campaignId: string): Promise<{
 
     const campaign = await db.campaign.findUnique({
       where: { id: campaignId },
-      select: { budget: true },
+      select: { budget: true, pricingModel: true },
     });
     if (!campaign || campaign.budget == null) return null;
 
@@ -110,7 +110,17 @@ export async function getCampaignBudgetStatus(campaignId: string): Promise<{
       where: { campaignId, isDeleted: false, status: "APPROVED" },
       _sum: { earnings: true },
     });
-    const spent = round2(earningsAgg._sum.earnings ?? 0);
+    let spent = round2(earningsAgg._sum.earnings ?? 0);
+
+    // For CPM_SPLIT: budget covers both clipper and owner earnings
+    if (campaign.pricingModel === "CPM_SPLIT") {
+      const ownerAgg = await db.agencyEarning.aggregate({
+        where: { campaignId },
+        _sum: { amount: true },
+      });
+      spent = round2(spent + (ownerAgg._sum.amount ?? 0));
+    }
+
     const remaining = round2(Math.max(campaign.budget - spent, 0));
 
     return {

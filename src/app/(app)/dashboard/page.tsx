@@ -286,12 +286,16 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] flex items-center">
                 Total Bonus
-                <Tooltip text="Level + streak bonus combined. Added on top of all earnings." />
+                <Tooltip text="Level + streak + PWA bonuses combined. Applied to all earnings." />
               </p>
               <Zap className="h-4 w-4 text-emerald-400" />
             </div>
             <p className="text-3xl font-bold text-accent">+{gamification.bonusPercent}%</p>
-            <p className="text-xs text-[var(--text-muted)] mt-2">Level + streak combined</p>
+            <div className="mt-2 space-y-0.5">
+              <p className="text-xs text-[var(--text-muted)]">Level: +{gamification.levelBonus || 0}%</p>
+              <p className="text-xs text-[var(--text-muted)]">Streak: +{gamification.streakBonusPercent || 0}%</p>
+              {gamification.isPWAUser && <p className="text-xs text-[var(--text-muted)]">PWA: +{gamification.pwaBonusPercent || 0}%</p>}
+            </div>
           </Card>
         </div>
       )}

@@ -24,6 +24,10 @@ export interface GamificationState {
   totalEarnings: number;
   totalViews: number;
   bonusPercent: number;
+  levelBonus: number;
+  streakBonusPercent: number;
+  pwaBonusPercent: number;
+  isPWAUser: boolean;
   currentStreak: number;
   longestStreak: number;
   nextLevelAt: number;
@@ -31,7 +35,6 @@ export interface GamificationState {
   platformFeePercent: number;
   streakReward: { days: number; bonusPercent: number } | null;
   nextStreakReward: { days: number; bonusPercent: number } | null;
-  /** Pending streak days (submitted clips but not yet approved, within 48h grace) */
   pendingStreakDays: number;
 }
 
@@ -343,11 +346,19 @@ export async function getGamificationState(userId: string): Promise<Gamification
   const dayStatuses = await getStreakDayStatuses(userId, 3);
   const pendingStreakDays = dayStatuses.filter((s) => s === "pending").length;
 
+  const levelBonusPct = config.levelBonuses[level] || 0;
+  const streakBonusPct = currentReward?.bonusPercent || 0;
+  const pwaBonusPct = user.isPWAUser ? PWA_BONUS_PERCENT : 0;
+
   return {
     level,
     totalEarnings,
     totalViews: user.totalViews,
-    bonusPercent: (config.levelBonuses[level] || 0) + (currentReward?.bonusPercent || 0) + (user.isPWAUser ? PWA_BONUS_PERCENT : 0),
+    bonusPercent: levelBonusPct + streakBonusPct + pwaBonusPct,
+    levelBonus: levelBonusPct,
+    streakBonusPercent: streakBonusPct,
+    pwaBonusPercent: pwaBonusPct,
+    isPWAUser: user.isPWAUser,
     currentStreak,
     longestStreak,
     nextLevelAt,

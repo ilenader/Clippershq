@@ -46,7 +46,6 @@ const clipperNav: NavSection[] = [
     items: [
       { label: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
       { label: "Campaigns", href: "/campaigns", icon: <Megaphone className="h-[18px] w-[18px]" /> },
-      { label: "Favorites", href: "/favorites", icon: <Star className="h-[18px] w-[18px]" /> },
       { label: "Accounts", href: "/accounts", icon: <UserCircle className="h-[18px] w-[18px]" /> },
       { label: "Clips", href: "/clips", icon: <Film className="h-[18px] w-[18px]" /> },
       { label: "Earnings", href: "/earnings", icon: <DollarSign className="h-[18px] w-[18px]" /> },
@@ -95,6 +94,7 @@ const ownerExtraNav: NavSection = {
     { label: "Progress", href: "/progress", icon: <Trophy className="h-[18px] w-[18px]" /> },
     { label: "Archive", href: "/admin/archive", icon: <Archive className="h-[18px] w-[18px]" /> },
     { label: "Team", href: "/admin/team", icon: <Shield className="h-[18px] w-[18px]" /> },
+    { label: "Agency Earnings", href: "/admin/agency-earnings", icon: <DollarSign className="h-[18px] w-[18px]" /> },
     { label: "AI Knowledge", href: "/admin/knowledge", icon: <BookOpen className="h-[18px] w-[18px]" /> },
     { label: "Gamification", href: "/admin/settings", icon: <Settings className="h-[18px] w-[18px]" /> },
   ],

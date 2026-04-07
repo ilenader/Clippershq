@@ -31,11 +31,12 @@ export const DEFAULT_LEVEL_BONUSES: Record<number, number> = {
 };
 
 export const DEFAULT_STREAK_BONUSES = [
-  { days: 3, bonusPercent: 2 },
-  { days: 7, bonusPercent: 4 },
-  { days: 14, bonusPercent: 5 },
-  { days: 30, bonusPercent: 7 },
-  { days: 60, bonusPercent: 9 },
+  { days: 3, bonusPercent: 1 },
+  { days: 7, bonusPercent: 2 },
+  { days: 14, bonusPercent: 3 },
+  { days: 30, bonusPercent: 5 },
+  { days: 60, bonusPercent: 7 },
+  { days: 90, bonusPercent: 10 },
 ];
 
 export const DEFAULT_PLATFORM_FEE = 9;  // 9% for normal users
@@ -78,6 +79,8 @@ export interface EarningsBreakdown {
   clipperEarnings: number;
   platformFee: number;
   bonusPercent: number;
+  bonusAmount: number;
+  baseEarnings: number;
   effectiveFeePercent: number;
   grossClipperEarnings: number;
 }
@@ -117,7 +120,8 @@ export function calculateClipperEarnings(input: ClipperEarningsInput): EarningsB
 
   const empty: EarningsBreakdown = {
     clipperEarnings: 0, platformFee: 0,
-    bonusPercent: 0, effectiveFeePercent: baseFee, grossClipperEarnings: 0,
+    bonusPercent: 0, bonusAmount: 0, baseEarnings: 0,
+    effectiveFeePercent: baseFee, grossClipperEarnings: 0,
   };
 
   if (!views || views <= 0) return empty;
@@ -149,29 +153,31 @@ export function calculateClipperEarnings(input: ClipperEarningsInput): EarningsB
   const effectiveFee = isReferred ? Math.max(baseFee, DEFAULT_REFERRED_FEE) : baseFee;
 
   // Base earnings from clipper CPM
-  let grossClipper = (views / 1000) * cpm;
+  let baseEarnings = (views / 1000) * cpm;
 
   // Cap before bonus
   if (campaignMaxPayoutPerClip && campaignMaxPayoutPerClip > 0) {
-    grossClipper = Math.min(grossClipper, campaignMaxPayoutPerClip);
+    baseEarnings = Math.min(baseEarnings, campaignMaxPayoutPerClip);
   }
 
-  // Apply bonus (level + streak) — bonus comes from campaign budget
-  const bonusAmount = grossClipper * (totalBonusPercent / 100);
-  grossClipper += bonusAmount;
+  // Apply bonus (level + streak + PWA) — bonus comes from campaign budget
+  const bonusAmount = baseEarnings * (totalBonusPercent / 100);
+  let grossClipper = baseEarnings + bonusAmount;
 
   // Cap again after bonus
   if (campaignMaxPayoutPerClip && campaignMaxPayoutPerClip > 0) {
     grossClipper = Math.min(grossClipper, campaignMaxPayoutPerClip);
   }
 
-  // Platform fee
+  // Platform fee (9% on total including bonus)
   const fee = grossClipper * (effectiveFee / 100);
 
   return {
     clipperEarnings: round2(grossClipper - fee),
     platformFee: round2(fee),
     bonusPercent: totalBonusPercent,
+    bonusAmount: round2(Math.min(bonusAmount, grossClipper - baseEarnings >= 0 ? bonusAmount : 0)),
+    baseEarnings: round2(baseEarnings),
     effectiveFeePercent: effectiveFee,
     grossClipperEarnings: round2(grossClipper),
   };
@@ -235,7 +241,6 @@ export function recalculateClipEarnings(clip: {
   const latestStat = clip.stats[0];
   if (!latestStat) return 0;
 
-  // Use clipperCpm; fallback to cpmRate for legacy campaigns
   const cpm = clip.campaign.clipperCpm ?? clip.campaign.cpmRate ?? null;
 
   const result = calculateClipperEarnings({
@@ -251,6 +256,35 @@ export function recalculateClipEarnings(clip: {
   return result.clipperEarnings;
 }
 
+/** Full breakdown version of recalculateClipEarnings */
+export function recalculateClipEarningsBreakdown(clip: {
+  stats: { views: number }[];
+  campaign: {
+    minViews: number | null;
+    cpmRate: number | null;
+    maxPayoutPerClip: number | null;
+    clipperCpm?: number | null;
+    ownerCpm?: number | null;
+  };
+  user?: { level?: number; currentStreak?: number; referredById?: string | null; isPWAUser?: boolean };
+}): EarningsBreakdown {
+  const latestStat = clip.stats[0];
+  const empty: EarningsBreakdown = { clipperEarnings: 0, platformFee: 0, bonusPercent: 0, bonusAmount: 0, baseEarnings: 0, effectiveFeePercent: 9, grossClipperEarnings: 0 };
+  if (!latestStat) return empty;
+
+  const cpm = clip.campaign.clipperCpm ?? clip.campaign.cpmRate ?? null;
+  return calculateClipperEarnings({
+    views: latestStat.views,
+    clipperCpm: cpm,
+    campaignMinViews: clip.campaign.minViews,
+    campaignMaxPayoutPerClip: clip.campaign.maxPayoutPerClip,
+    clipperLevel: clip.user?.level ?? 0,
+    clipperStreak: clip.user?.currentStreak || 0,
+    isReferred: !!clip.user?.referredById,
+    isPWAUser: clip.user?.isPWAUser ?? false,
+  });
+}
+
 /** Compute which level a user should be based on total earnings */
 export function computeLevel(
   totalEarnings: number,
@@ -261,6 +295,12 @@ export function computeLevel(
     if (totalEarnings >= t.minEarnings) level = t.level;
   }
   return level;
+}
+
+/** Calculate owner earnings for CPM_SPLIT campaigns */
+export function calculateOwnerEarnings(views: number, ownerCpm: number | null): number {
+  if (!views || views <= 0 || !ownerCpm || ownerCpm <= 0) return 0;
+  return round2((views / 1000) * ownerCpm);
 }
 
 function round2(n: number): number {

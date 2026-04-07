@@ -30,7 +30,8 @@ const statusFilterOptions = [
 
 const defaultForm = {
   name: "", clientName: "", platforms: [] as string[],
-  clipperCpm: "", budget: "",
+  pricingModel: "AGENCY_FEE",
+  clipperCpm: "", ownerCpm: "", agencyFee: "", budget: "",
   payoutRule: "", minViews: "", maxPayoutPerClip: "",
   maxClipsPerUserPerDay: "3",
   requirementsList: [""] as string[],
@@ -116,7 +117,10 @@ export default function AdminCampaignsPage() {
     setForm({
       name: c.name || "", clientName: c.clientName || "",
       platforms: c.platform ? c.platform.split(",").map((p: string) => p.trim()) : [],
+      pricingModel: c.pricingModel || "AGENCY_FEE",
       clipperCpm: (c.clipperCpm ?? c.cpmRate ?? "")?.toString() || "",
+      ownerCpm: c.ownerCpm?.toString() || "",
+      agencyFee: c.agencyFee?.toString() || "",
       budget: c.budget?.toString() || "",
       payoutRule: c.payoutRule || "", minViews: c.minViews?.toString() || "",
       maxPayoutPerClip: c.maxPayoutPerClip?.toString() || "",
@@ -495,10 +499,32 @@ export default function AdminCampaignsPage() {
               <Plus className="h-3.5 w-3.5" /> Add requirement
             </button>
           </div>
+          {/* Pricing model */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Pricing Model</label>
+            <div className="flex gap-3">
+              {[{ value: "AGENCY_FEE", label: "Agency Fee" }, { value: "CPM_SPLIT", label: "CPM Split" }].map((opt) => (
+                <button key={opt.value} type="button" onClick={() => updateField("pricingModel", opt.value)}
+                  className={`flex-1 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer ${form.pricingModel === opt.value ? "border-accent bg-accent/10 text-accent" : "border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)]"}`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              {form.pricingModel === "AGENCY_FEE" ? "Budget covers clipper payouts only. Agency fee is separate." : "Budget covers both clipper and owner earnings per view."}
+            </p>
+          </div>
           {/* Campaign payout settings */}
           <div className="grid gap-4 sm:grid-cols-2">
             <Input id="clipperCpm" label="Clipper CPM ($)" type="number" step="0.01" placeholder="e.g. 1.00" value={form.clipperCpm} onChange={(e) => updateField("clipperCpm", e.target.value)} />
-            <Input id="budget" label="Campaign budget ($)" type="number" placeholder="e.g. 5000" value={form.budget} onChange={(e) => updateField("budget", e.target.value)} />
+            {form.pricingModel === "CPM_SPLIT" ? (
+              <Input id="ownerCpm" label="Owner CPM ($)" type="number" step="0.01" placeholder="e.g. 0.50" value={form.ownerCpm} onChange={(e) => updateField("ownerCpm", e.target.value)} />
+            ) : (
+              <Input id="agencyFee" label="Agency Fee ($)" type="number" step="0.01" placeholder="e.g. 500" value={form.agencyFee} onChange={(e) => updateField("agencyFee", e.target.value)} />
+            )}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input id="budget" label={form.pricingModel === "CPM_SPLIT" ? "Total Budget ($)" : "Clipper Budget ($)"} type="number" placeholder="e.g. 5000" value={form.budget} onChange={(e) => updateField("budget", e.target.value)} />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Input id="maxPayoutPerClip" label="Max payout / clip ($)" type="number" step="0.01" value={form.maxPayoutPerClip} onChange={(e) => updateField("maxPayoutPerClip", e.target.value)} />

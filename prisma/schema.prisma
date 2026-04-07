@@ -164,7 +164,8 @@ model Campaign {
   clientName      String?
   platform        String
   status          CampaignStatus @default(DRAFT)
-  monetizationType String       @default("CPM") // "CPM" or "AGENCY"
+  pricingModel    String         @default("AGENCY_FEE") // "AGENCY_FEE" or "CPM_SPLIT"
+  monetizationType String       @default("CPM") // Legacy field
   budget          Float?
   cpmRate         Float?
   clipperCpm      Float?
@@ -205,6 +206,7 @@ model Campaign {
   teamCampaigns    TeamCampaign[]
   trackingJobs     TrackingJob[]
   conversations    Conversation[]
+  agencyEarnings   AgencyEarning[]
 
   @@index([status])
   @@index([isArchived])
@@ -282,6 +284,9 @@ model Clip {
   status          ClipStatus @default(PENDING)
   rejectionReason String?
   earnings        Float      @default(0)
+  baseEarnings    Float      @default(0)
+  bonusPercent    Float      @default(0)
+  bonusAmount     Float      @default(0)
   isDeleted       Boolean    @default(false)
   reviewedById    String?
   reviewedAt      DateTime?
@@ -295,14 +300,33 @@ model Clip {
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   campaign    Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   clipAccount ClipAccount @relation(fields: [clipAccountId], references: [id], onDelete: Cascade)
-  stats       ClipStat[]
-  trackingJob TrackingJob?
+  stats          ClipStat[]
+  trackingJob    TrackingJob?
+  agencyEarning  AgencyEarning?
 
   @@unique([clipUrl, campaignId])
   @@index([userId])
   @@index([campaignId])
   @@index([status])
   @@map("clips")
+}
+
+// ─── Agency/Owner Earnings ──────────────────────────────────
+
+model AgencyEarning {
+  id         String   @id @default(cuid())
+  campaignId String
+  clipId     String   @unique
+  amount     Float
+  views      Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  clip     Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("agency_earnings")
 }
 
 // ─── Clip Stats (snapshots) ─────────────────────────────────

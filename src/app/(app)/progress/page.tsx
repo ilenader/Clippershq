@@ -17,11 +17,12 @@ const LEVEL_TABLE = [
 ];
 
 const STREAK_MILESTONES = [
-  { days: 3, bonus: 2 },
-  { days: 7, bonus: 4 },
-  { days: 14, bonus: 5 },
-  { days: 30, bonus: 7 },
-  { days: 60, bonus: 9 },
+  { days: 3, bonus: 1 },
+  { days: 7, bonus: 2 },
+  { days: 14, bonus: 3 },
+  { days: 30, bonus: 5 },
+  { days: 60, bonus: 7 },
+  { days: 90, bonus: 10 },
 ];
 
 export default function ProgressPage() {
