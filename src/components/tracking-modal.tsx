@@ -42,10 +42,20 @@ function formatDateTime(dateStr: string): string {
 
 function intervalLabel(min: number): string {
   if (min <= 60) return "Every 1h";
-  if (min <= 180) return "Every 3h";
-  if (min <= 720) return "Every 12h";
+  if (min <= 120) return "Every 2h";
+  if (min <= 240) return "Every 4h";
+  if (min <= 480) return "Every 8h";
   if (min <= 1440) return "Every 24h";
-  return "Every 48h";
+  return "Every 72h";
+}
+
+function computeActualInterval(nextCheckAt: string, lastCheckedAt: string | null): string | null {
+  if (!lastCheckedAt) return null;
+  const diff = new Date(nextCheckAt).getTime() - new Date(lastCheckedAt).getTime();
+  if (diff <= 0) return null;
+  const hours = Math.round(diff / 3_600_000);
+  if (hours <= 1) return "Every 1h";
+  return `Every ${hours}h`;
 }
 
 export function TrackingModal({ clip, open, onClose }: TrackingModalProps) {
@@ -89,7 +99,7 @@ export function TrackingModal({ clip, open, onClose }: TrackingModalProps) {
             <div className="text-xs">
               <p className="text-accent font-medium">
                 {jobInfo.isActive ? "Tracking active" : "Tracking paused"}
-                <span className="text-[var(--text-muted)] ml-2">· {intervalLabel(jobInfo.checkIntervalMin)}</span>
+                <span className="text-[var(--text-muted)] ml-2">· {computeActualInterval(jobInfo.nextCheckAt, jobInfo.lastCheckedAt) || intervalLabel(jobInfo.checkIntervalMin)}</span>
               </p>
               <p className="text-[var(--text-muted)]">
                 Next check: {formatDateTime(jobInfo.nextCheckAt)}

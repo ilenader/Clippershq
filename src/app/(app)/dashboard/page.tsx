@@ -39,7 +39,7 @@ function Tooltip({ text }: { text: string }) {
         <Info className="h-[14px] w-[14px]" />
       </button>
       {show && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg bg-[#1a1a1d] border border-[var(--border-color)] px-3 py-2 text-xs text-white shadow-lg z-50 pointer-events-none">
+        <span className="absolute bottom-full mb-2 w-48 sm:w-56 rounded-lg bg-[#1a1a1d] border border-[var(--border-color)] px-3 py-2 text-xs text-white shadow-lg z-50 pointer-events-none right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2">
           {text}
         </span>
       )}

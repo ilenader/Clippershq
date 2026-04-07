@@ -19,23 +19,40 @@ async function checkBioForCode(profileLink: string, code: string): Promise<{ fou
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
 
+    console.log(`[VERIFY] Checking profile: ${profileLink} for code: ${code}`);
+
     const res = await fetch(profileLink, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
       },
     });
     clearTimeout(timeout);
 
     if (!res.ok) {
-      return { found: false, error: "Could not access profile page. Try again or ask admin to verify manually." };
+      console.log(`[VERIFY] Profile fetch failed: HTTP ${res.status}`);
+      return { found: false, error: "Could not access profile page. Make sure your profile is public and try again." };
     }
 
     const html = await res.text();
-    const found = html.includes(code);
+    console.log(`[VERIFY] Profile HTML length: ${html.length} chars`);
+
+    if (html.length < 200) {
+      console.log(`[VERIFY] Response too short — may be blocked or empty`);
+      return { found: false, error: "Could not read your profile. Make sure your profile is public and try again in a few minutes." };
+    }
+
+    // Case-insensitive search with trimming
+    const codeUpper = code.trim().toUpperCase();
+    const htmlUpper = html.toUpperCase();
+    const found = htmlUpper.includes(codeUpper);
+
+    console.log(`[VERIFY] Code "${codeUpper}" found: ${found}`);
     return { found };
   } catch (err: any) {
+    console.error(`[VERIFY] Error:`, err?.message);
     if (err?.name === "AbortError") {
       return { found: false, error: "Profile check timed out. Try again or ask admin to verify manually." };
     }

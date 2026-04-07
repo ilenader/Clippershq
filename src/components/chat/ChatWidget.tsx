@@ -913,6 +913,24 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
               </div>
             )}
 
+            {/* Return to AI button — owner/admin only, after they've responded */}
+            {!isClipper && threadInfo && !threadInfo.needsHumanSupport && messages.length > 0 && (
+              <div className="border-t border-[var(--border-subtle)] px-5 py-2 flex justify-center">
+                <button
+                  onClick={() => {
+                    // needsHumanSupport is already false (owner responded) — this is a visual confirmation
+                    // The backend already cleared needsHumanSupport when owner sent a message
+                    // Next clipper message will be handled by AI
+                    setThreadInfo((prev) => prev ? { ...prev, needsHumanSupport: false } : prev);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-accent hover:bg-accent/5 transition-colors cursor-pointer"
+                >
+                  <Bot className="h-3.5 w-3.5" />
+                  Resume AI support
+                </button>
+              </div>
+            )}
+
             {/* Input */}
             <div className="border-t border-[var(--border-color)] px-5 py-3.5">
               <div className="flex items-end gap-2.5">

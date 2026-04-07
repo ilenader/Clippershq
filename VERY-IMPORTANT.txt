@@ -367,3 +367,74 @@ NEW ENV VARS NEEDED:
 
 BUILD: PASS
 ===============================================================
+
+
+===============================================================
+UPDATE — Critical Fixes Batch
+Date: 2026-04-07
+===============================================================
+
+FIXES APPLIED
+==============
+
+1. MOBILE INPUT ZOOM FIX
+   - globals.css: Added font-size: 16px !important for mobile inputs
+   - layout.tsx: Added viewport meta with maximum-scale=1, user-scalable=no
+   - Prevents iOS Safari zoom on input focus
+
+2. CHAT — "RETURN TO AI" BUTTON FOR OWNER
+   - ChatWidget.tsx: Added "Resume AI support" button (Bot icon)
+   - Shows below input area for owner/admin when needsHumanSupport is false
+   - Flow: clipper asks for human → owner responds (clears flag) → owner clicks "Resume AI" → next clipper message handled by AI
+
+3. EMAIL TEMPLATE — DARK THEME (RE-APPLIED)
+   - email.ts wrap(): Logo SVG on its own line above text, 32px size
+   - Header: #111720 background, CLIPPERS HQ in white with blue glow
+   - Body: #111720 background, #e8edf2 text
+   - Footer: #0a0d12 background, #6b7280 muted text
+   - All email functions use wrap() — verified no hardcoded light colors
+
+4. INSTAGRAM ACCOUNT VERIFICATION FIX
+   - verify/route.ts: Case-insensitive matching (toUpperCase on both)
+   - Added detailed console.log for debugging (profile URL, HTML length, code match)
+   - Better User-Agent header to avoid blocks
+   - Short response detection (< 200 chars = blocked/empty profile)
+   - Clear error messages for public profile requirement
+
+5. NOTIFICATION DROPDOWN Z-INDEX FIX
+   - navbar.tsx: Changed notification dropdown from z-50 to z-[9999]
+   - Now appears above all other UI elements on mobile
+
+6. DASHBOARD TOOLTIP OVERFLOW FIX
+   - dashboard/page.tsx: Tooltip now right-aligned on mobile (right-0)
+   - Centered on desktop (sm:left-1/2 sm:-translate-x-1/2)
+   - Reduced width on mobile (w-48 sm:w-56)
+
+7. PWA ICON — GENERATED AS PNG WITH SHARP
+   - scripts/generate-icons.js: Generates 192x192 and 512x512 PNGs
+   - Triangle at 35% of canvas size, centered, white on #0a0d12
+   - manifest.json: Updated to /icon-192.png and /icon-512.png
+   - purpose: "any maskable" for proper OS cropping
+
+8. TRACKING INTERVAL DISPLAY FIX
+   - tracking-modal.tsx: intervalLabel() updated to match real tiers (2h/4h/8h/24h/72h)
+   - Added computeActualInterval() that calculates from nextCheckAt - lastCheckedAt
+   - Display shows actual scheduled interval, not just stored field
+
+9. TRACKING INTERVAL LOGIC — VERIFIED CORRECT
+   - Phase 1 (0-4h): 60 min ✓
+   - Phase 2 (4-24h): 120 min ✓
+   - Phase 3 (24h+): growth-based ✓
+     - >= 5% growth → 2h (can move BACK UP) ✓
+     - 1-5% growth → 4h ✓
+     - < 1% → slow ladder: 4h → 8h → 24h → 72h ✓
+   - NEVER stops, 72h floor ✓
+
+10. EMAIL SENDER ICON
+    MANUAL STEP: To add a logo to the email sender, go to Resend
+    dashboard → Domains → clipershq.com → Sender Identity → upload
+    the Clippers HQ logo as the sender avatar. This makes the logo
+    show in email clients next to the sender name.
+
+BUILD: PASS
+===============================================================

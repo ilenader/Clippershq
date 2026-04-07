@@ -174,7 +174,7 @@ export function Navbar() {
             )}
           </button>
           {notifOpen && (
-            <div className="fixed sm:absolute right-2 sm:right-0 top-14 sm:top-full sm:mt-1 w-[calc(100vw-16px)] sm:w-80 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-elevated)] overflow-hidden z-50">
+            <div className="fixed sm:absolute right-2 sm:right-0 top-14 sm:top-full sm:mt-1 w-[calc(100vw-16px)] sm:w-80 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-elevated)] overflow-hidden z-[9999]">
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border-subtle)]">
                 <p className="text-sm font-semibold text-[var(--text-primary)]">Notifications</p>
                 {notifCount > 0 && (

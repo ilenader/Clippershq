@@ -119,7 +119,8 @@
       "Bash(sed -i 's|<a href=\"#\">Terms of Service</a>|<a href=\"/terms.html\">Terms of Service</a>|g' clipper.html)",
       "Bash(sed -i 's|<a href=\"#\">Cookie Policy</a>|<a href=\"/cookies.html\">Cookie Policy</a>|g' clipper.html)",
       "Bash(sed -i 's|<a href=\"#\">Privacy Policy</a>|<a href=\"/privacy.html\">Privacy Policy</a>|g' brands.html)",
-      "Bash(sed -i 's|<a href=\"#\">Terms of Service</a>|<a href=\"/terms.html\">Terms of Service</a>|g' brands.html)"
+      "Bash(sed -i 's|<a href=\"#\">Terms of Service</a>|<a href=\"/terms.html\">Terms of Service</a>|g' brands.html)",
+      "Bash(node scripts/generate-icons.js)"
     ]
   }
 }

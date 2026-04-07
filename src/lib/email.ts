@@ -47,9 +47,10 @@ function wrap(content: string): string {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; background: #0a0d12; border-radius: 16px; overflow: hidden; border: 1px solid #1c2333;">
       <div style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c2333; background: #111720;">
-        <h2 style="color: #ffffff; font-size: 22px; margin: 0; letter-spacing: 1px; text-shadow: 0 0 20px rgba(0,149,246,0.1);">
-          <svg width="24" height="24" viewBox="0 0 100 94" style="display:inline-block;vertical-align:middle;margin-right:8px;"><polygon points="50,4 97,90 3,90" fill="#ffffff"/></svg>CLIPPERS HQ
-        </h2>
+        <div style="margin-bottom: 8px;">
+          <svg width="32" height="32" viewBox="0 0 100 94" style="display:inline-block;vertical-align:middle;"><polygon points="50,4 97,90 3,90" fill="#ffffff"/></svg>
+        </div>
+        <h2 style="color: #ffffff; font-size: 20px; margin: 0; letter-spacing: 2px; text-shadow: 0 0 20px rgba(0,149,246,0.15);">CLIPPERS HQ</h2>
       </div>
       <div style="padding: 24px; color: #e8edf2; background: #111720;">
         ${content}
