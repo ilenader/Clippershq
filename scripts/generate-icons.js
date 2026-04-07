@@ -1,17 +1,26 @@
 const sharp = require('sharp');
 
 /**
- * Generate a rounded-corner icon SVG with a large centered triangle.
- * Triangle takes ~62% of the canvas. Rounded corners are ~20% radius.
+ * Generate a rounded-corner icon with a visually centered equilateral triangle.
+ *
+ * For an equilateral triangle pointing up, the centroid (visual center) is
+ * 1/3 of the height from the base. To make it LOOK centered, we position
+ * the centroid at the canvas center, which means the top vertex is higher
+ * and the base is lower than a naive center.
  */
 function iconSvg(size) {
-  const r = Math.round(size * 0.2); // corner radius
-  const triH = Math.round(size * 0.52); // triangle height
-  const triW = Math.round(size * 0.54); // triangle base width
-  const cx = size / 2;
-  const cy = size / 2 + Math.round(size * 0.03); // nudge down slightly for visual centering
-  const topY = Math.round(cy - triH / 2);
-  const botY = Math.round(cy + triH / 2);
+  const r = Math.round(size * 0.22); // corner radius (22%)
+  const triW = Math.round(size * 0.58); // base width (58% of canvas)
+  const triH = Math.round(triW * 0.866); // equilateral height = width * sqrt(3)/2
+
+  const cx = size / 2; // horizontal center
+
+  // Centroid of equilateral triangle is at 1/3 height from the base.
+  // We want the centroid at canvas center (size/2).
+  // centroid_y = topY + (2/3)*triH = size/2
+  // topY = size/2 - (2/3)*triH
+  const topY = Math.round(size / 2 - (2 / 3) * triH);
+  const botY = topY + triH;
   const leftX = Math.round(cx - triW / 2);
   const rightX = Math.round(cx + triW / 2);
 

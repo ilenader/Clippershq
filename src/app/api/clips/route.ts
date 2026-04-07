@@ -117,11 +117,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Your account must be approved before submitting clips. Check your Accounts page." }, { status: 400 });
     }
 
-    // ── RULE 0: Must have joined the campaign with this account ──
-    const membership = await db.campaignAccount.findUnique({
-      where: { clipAccountId_campaignId: { clipAccountId: data.clipAccountId, campaignId: data.campaignId } },
+    // ── RULE 0: User must have joined the campaign with ANY of their accounts ──
+    const userAccounts = await db.clipAccount.findMany({
+      where: { userId: session.user.id },
+      select: { id: true },
+    });
+    const userAccountIds = userAccounts.map((a: any) => a.id);
+    const membership = await db.campaignAccount.findFirst({
+      where: { campaignId: data.campaignId, clipAccountId: { in: userAccountIds } },
     });
     if (!membership) {
+      console.log(`[CLIPS] Join check failed: user=${session.user.id}, campaign=${data.campaignId}, account=${data.clipAccountId}, userAccountIds=${userAccountIds.join(",")}`);
       return NextResponse.json({ error: "You must join this campaign before submitting clips." }, { status: 403 });
     }
 

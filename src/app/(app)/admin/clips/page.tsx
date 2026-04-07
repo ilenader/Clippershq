@@ -151,6 +151,23 @@ export default function AdminClipsPage() {
 
   const [trackingAll, setTrackingAll] = useState(false);
   const [trackResult, setTrackResult] = useState<string | null>(null);
+  const [trackCooldown, setTrackCooldown] = useState(0);
+
+  // Cooldown timer
+  useEffect(() => {
+    if (trackCooldown <= 0) return;
+    const t = setInterval(() => setTrackCooldown((c) => Math.max(0, c - 1)), 1000);
+    return () => clearInterval(t);
+  }, [trackCooldown]);
+
+  // Restore cooldown from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("track_all_until");
+    if (saved) {
+      const remaining = Math.ceil((parseInt(saved, 10) - Date.now()) / 1000);
+      if (remaining > 0) setTrackCooldown(remaining);
+    }
+  }, []);
 
   const handleTrackAll = async () => {
     setTrackingAll(true);
@@ -162,6 +179,10 @@ export default function AdminClipsPage() {
       const viewChanges = (data.details || []).filter((d: string) => /→/.test(d) && !/→\s*\S+\s*views/.test(d) || /\d+→\d+/.test(d)).length;
       setTrackResult(`Checked ${data.checked} clips. ${viewChanges > 0 ? `${viewChanges} had view changes.` : "No view changes."} (${data.elapsedMs}ms)`);
       toast.success(`Tracking complete — ${data.checked} clips checked.`);
+      // Start 30-min cooldown
+      const cooldownSec = 30 * 60;
+      setTrackCooldown(cooldownSec);
+      localStorage.setItem("track_all_until", (Date.now() + cooldownSec * 1000).toString());
       load();
     } catch (err: any) {
       toast.error(err.message || "Tracking failed.");
@@ -180,8 +201,8 @@ export default function AdminClipsPage() {
           <p className="text-[15px] text-[var(--text-secondary)]">Approve, reject, or flag submitted clips.</p>
         </div>
         {isOwner && (
-          <Button onClick={handleTrackAll} loading={trackingAll} variant="outline" icon={<RotateCcw className="h-4 w-4" />}>
-            Check All Now
+          <Button onClick={handleTrackAll} loading={trackingAll} disabled={trackCooldown > 0} variant="outline" icon={<RotateCcw className="h-4 w-4" />}>
+            {trackCooldown > 0 ? `Wait ${Math.floor(trackCooldown / 60)}:${(trackCooldown % 60).toString().padStart(2, "0")}` : "Check All Now"}
           </Button>
         )}
       </div>

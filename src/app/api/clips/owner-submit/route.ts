@@ -2,12 +2,13 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
 import { detectPlatform } from "@/lib/apify";
+import { calculateClipperEarnings } from "@/lib/earnings-calc";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/clips/owner-submit
- * Owner-only endpoint to submit clips without restrictions.
- * Skips: 2-hour window, campaign membership, daily limit.
+ * Owner-only: submit clips without restrictions.
+ * Auto-approved, earnings calculated immediately, tracking job created.
  */
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const { campaignId, clipUrl, userId, clipAccountId } = data;
+  const { campaignId, clipUrl, userId, clipAccountId, note, customCpm } = data;
   if (!campaignId || !clipUrl) {
     return NextResponse.json({ error: "Campaign and clip URL are required." }, { status: 400 });
   }
@@ -38,26 +39,27 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Verify campaign exists
-    const campaign = await db.campaign.findUnique({ where: { id: campaignId }, select: { id: true, status: true } });
+    // Fetch campaign with CPM and budget info
+    const campaign = await db.campaign.findUnique({
+      where: { id: campaignId },
+      select: { id: true, status: true, clipperCpm: true, cpmRate: true, budget: true, maxPayoutPerClip: true, minViews: true },
+    });
     if (!campaign) return NextResponse.json({ error: "Campaign not found." }, { status: 404 });
 
     // Check duplicate
     const existing = await db.clip.findFirst({ where: { clipUrl, campaignId } });
     if (existing) return NextResponse.json({ error: "This clip URL already exists in this campaign." }, { status: 400 });
 
-    // Determine user and account — owner can assign to themselves or another user
+    // Determine user and account
     const targetUserId = userId || session.user.id;
 
-    // Find a clip account for the target user, or use the first available
     let targetAccountId = clipAccountId;
     if (!targetAccountId) {
       const account = await db.clipAccount.findFirst({
-        where: { userId: targetUserId, status: "APPROVED" },
+        where: { userId: targetUserId, status: "APPROVED", deletedByUser: false },
         select: { id: true },
       });
       if (!account) {
-        // Create a placeholder if no account exists (owner override)
         const placeholder = await db.clipAccount.create({
           data: {
             userId: targetUserId,
@@ -74,9 +76,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const platform = detectPlatform(clipUrl);
+    // Determine CPM: use custom if provided (capped at campaign rate), else campaign rate
+    const campaignCpm = campaign.clipperCpm ?? campaign.cpmRate ?? 0;
+    let effectiveCpm = campaignCpm;
+    if (customCpm != null && customCpm > 0) {
+      effectiveCpm = Math.min(customCpm, campaignCpm);
+    }
 
-    // Create clip + tracking job atomically (NO 2-hour check, NO membership check)
+    // Create clip as APPROVED + initial stat + tracking job
     const clip = await db.$transaction(async (tx: any) => {
       const newClip = await tx.clip.create({
         data: {
@@ -84,8 +91,10 @@ export async function POST(req: NextRequest) {
           campaignId,
           clipAccountId: targetAccountId,
           clipUrl,
-          note: data.note || "Owner override submission",
+          status: "APPROVED",
+          note: note || "Owner override submission",
           isOwnerOverride: true,
+          earnings: 0,
         },
       });
 
@@ -93,19 +102,28 @@ export async function POST(req: NextRequest) {
         data: { clipId: newClip.id, views: 0, likes: 0, comments: 0, shares: 0 },
       });
 
-      if (platform === "tiktok" || platform === "instagram") {
-        const nextHour = new Date();
-        nextHour.setMinutes(0, 0, 0);
-        nextHour.setHours(nextHour.getHours() + 1);
-        await tx.trackingJob.create({
-          data: { clipId: newClip.id, campaignId, nextCheckAt: nextHour, checkIntervalMin: 60, isActive: true },
-        });
-      }
+      // Tracking job: 24h initial for owner overrides
+      const nextCheck = new Date();
+      nextCheck.setHours(nextCheck.getHours() + 24);
+      await tx.trackingJob.create({
+        data: { clipId: newClip.id, campaignId, nextCheckAt: nextCheck, checkIntervalMin: 1440, isActive: true },
+      });
 
       return newClip;
     });
 
-    return NextResponse.json(clip, { status: 201 });
+    // Budget check info
+    let budgetInfo = null;
+    if (campaign.budget && campaign.budget > 0) {
+      const { getCampaignBudgetStatus } = await import("@/lib/balance");
+      budgetInfo = await getCampaignBudgetStatus(campaignId);
+    }
+
+    return NextResponse.json({
+      ...clip,
+      effectiveCpm,
+      budgetRemaining: budgetInfo?.remaining ?? null,
+    }, { status: 201 });
   } catch (err: any) {
     console.error("Owner clip submit error:", err?.message);
     return NextResponse.json({ error: "Something went wrong." }, { status: 500 });

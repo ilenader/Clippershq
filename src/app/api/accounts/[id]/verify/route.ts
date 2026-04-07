@@ -27,6 +27,87 @@ function detectPlatform(url: string): "tiktok" | "instagram" | "youtube" | "unkn
 
 // ─── Instagram: Browserless (headless Chrome) ──────────────
 
+/** Helper: search html for code using multiple methods */
+function searchHtmlForCode(html: string, code: string): { found: boolean; method?: string } {
+  const codeUpper = code.trim().toUpperCase();
+  const htmlUpper = html.toUpperCase();
+
+  // Full text
+  if (htmlUpper.includes(codeUpper)) return { found: true, method: "full-text" };
+
+  // Meta tags
+  const metaTags = html.match(/<meta[^>]+content="([^"]*)"/gi) || [];
+  for (const tag of metaTags) {
+    const m = tag.match(/content="([^"]*)"/i);
+    if (m?.[1]?.toUpperCase().includes(codeUpper)) return { found: true, method: `meta: ${tag.substring(0, 100)}` };
+  }
+
+  // JSON-LD
+  const jsonLd = html.match(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi) || [];
+  for (const block of jsonLd) {
+    if (block.toUpperCase().includes(codeUpper)) return { found: true, method: "json-ld" };
+  }
+
+  // Script tags with bio
+  const scripts = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
+  for (const s of scripts) {
+    if (/biography|"bio"/i.test(s) && s.toUpperCase().includes(codeUpper)) return { found: true, method: "script-bio" };
+  }
+
+  // Unicode unescape
+  const decoded = html.replace(/\\u[\dA-Fa-f]{4}/g, (m) => String.fromCharCode(parseInt(m.slice(2), 16)));
+  if (decoded.toUpperCase().includes(codeUpper)) return { found: true, method: "unicode-decoded" };
+
+  return { found: false };
+}
+
+/** Helper: dump diagnostics about the HTML */
+function logHtmlDiagnostics(html: string, code: string, profileLink: string) {
+  const len = html.length;
+  const codeUpper = code.trim().toUpperCase();
+  const htmlUpper = html.toUpperCase();
+
+  // First 1000 and last 500 chars
+  console.log(`[VERIFY] FIRST 1000: ${html.substring(0, 1000)}`);
+  console.log(`[VERIFY] LAST 500: ${html.substring(Math.max(0, len - 500))}`);
+
+  // Login wall
+  const hasLogin = /log\s*in/i.test(html.substring(0, 5000));
+  const hasSignUp = /sign\s*up/i.test(html.substring(0, 5000));
+  const hasCreateAccount = /create\s*an?\s*account/i.test(html.substring(0, 5000));
+  console.log(`[VERIFY] Login wall: login=${hasLogin} signup=${hasSignUp} createAccount=${hasCreateAccount}`);
+
+  // Username presence
+  const username = profileLink.split("/").filter(Boolean).pop() || "";
+  if (username) {
+    const idx = htmlUpper.indexOf(username.toUpperCase());
+    console.log(`[VERIFY] Username "${username}" ${idx >= 0 ? `FOUND at pos ${idx}: "${html.substring(idx, idx + 300)}"` : "NOT FOUND"}`);
+  }
+
+  // All meta content attributes
+  const metas = html.match(/<meta[^>]+content="([^"]*)"/gi) || [];
+  console.log(`[VERIFY] Meta tags (${metas.length}):`);
+  metas.forEach((tag, i) => {
+    const c = tag.match(/content="([^"]*)"/i);
+    if (c?.[1]) console.log(`[VERIFY]   meta[${i}]: ${c[1].substring(0, 100)}`);
+  });
+
+  // Biography in JSON/scripts
+  const bioMatches = html.match(/.{0,150}biography.{0,150}/gi) || [];
+  if (bioMatches.length > 0) {
+    console.log(`[VERIFY] "biography" contexts (${bioMatches.length}):`);
+    bioMatches.forEach((m, i) => console.log(`[VERIFY]   bio[${i}]: ${m}`));
+  } else {
+    console.log(`[VERIFY] "biography" NOT found anywhere in HTML`);
+  }
+
+  // Snippets at intervals
+  [0, 0.25, 0.5, 0.75].forEach((pct) => {
+    const pos = Math.floor(len * pct);
+    console.log(`[VERIFY] Snippet @${Math.round(pct * 100)}% (pos ${pos}): "${html.substring(pos, pos + 200)}"`);
+  });
+}
+
 async function checkInstagramBio(profileLink: string, code: string): Promise<{ found: boolean; error?: string; debug?: string }> {
   const apiKey = process.env.BROWSERLESS_API_KEY || process.env.BROWSERLESS_TOKEN || "";
   if (!apiKey) {
@@ -34,20 +115,24 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
     return { found: false, error: "Instagram verification is not configured. Ask an admin to verify manually.", debug: "No BROWSERLESS_API_KEY" };
   }
 
-  // Determine Browserless base URL (some accounts use different hosts)
   const baseUrl = process.env.BROWSERLESS_URL || "https://chrome.browserless.io";
-  const browserlessUrl = `${baseUrl}/content?token=${apiKey}`;
-  console.log(`[VERIFY] Browserless URL: ${baseUrl}/content?token=***`);
-  console.log(`[VERIFY] Instagram profile: ${profileLink}`);
-  console.log(`[VERIFY] Looking for code: ${code}`);
+  const username = profileLink.split("/").filter(Boolean).pop() || "";
+  console.log(`[VERIFY] ════ INSTAGRAM VERIFY START ════`);
+  console.log(`[VERIFY] Base URL: ${baseUrl}`);
+  console.log(`[VERIFY] Profile: ${profileLink}`);
+  console.log(`[VERIFY] Username: ${username}`);
+  console.log(`[VERIFY] Code: ${code}`);
 
+  // ── ATTEMPT 1: /content endpoint (full rendered HTML) ──
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 40000);
+    console.log(`[VERIFY] ── Attempt 1: /content ──`);
+    const contentUrl = `${baseUrl}/content?token=${apiKey}`;
+    const ctrl1 = new AbortController();
+    const t1 = setTimeout(() => ctrl1.abort(), 40000);
 
-    const res = await fetch(browserlessUrl, {
+    const res1 = await fetch(contentUrl, {
       method: "POST",
-      signal: controller.signal,
+      signal: ctrl1.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         url: profileLink,
@@ -55,143 +140,122 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
         gotoOptions: { waitUntil: "networkidle0", timeout: 30000 },
       }),
     });
-    clearTimeout(timeout);
+    clearTimeout(t1);
 
-    console.log(`[VERIFY] Browserless response: HTTP ${res.status} ${res.statusText}`);
-    console.log(`[VERIFY] Response headers content-type: ${res.headers.get("content-type")}`);
+    console.log(`[VERIFY] /content: HTTP ${res1.status} ${res1.statusText}, content-type: ${res1.headers.get("content-type")}`);
 
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => "(empty)");
-      console.log(`[VERIFY] Browserless ERROR body (first 500): ${errBody.substring(0, 500)}`);
-      return {
-        found: false,
-        error: "Could not load Instagram profile. Make sure your profile is public and try again.",
-        debug: `Browserless HTTP ${res.status}: ${errBody.substring(0, 100)}`,
-      };
-    }
+    if (res1.ok) {
+      const html = await res1.text();
+      console.log(`[VERIFY] /content: ${html.length} chars`);
 
-    const html = await res.text();
-    const len = html.length;
-    console.log(`[VERIFY] Browserless returned ${len} chars`);
-    console.log(`[VERIFY] First 500 chars: ${html.substring(0, 500)}`);
+      const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      console.log(`[VERIFY] /content title: "${titleMatch?.[1]?.substring(0, 200) || "(none)"}"`);
 
-    // Log page title
-    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-    console.log(`[VERIFY] Page title: "${titleMatch?.[1]?.substring(0, 200) || "(no title)"}"`);
-
-    // Check for login wall
-    const hasLogin = /log\s*in/i.test(html.substring(0, 5000));
-    const hasSignUp = /sign\s*up/i.test(html.substring(0, 5000));
-    console.log(`[VERIFY] Login wall indicators: hasLogin=${hasLogin}, hasSignUp=${hasSignUp}`);
-
-    if (len < 1000) {
-      console.log(`[VERIFY] HTML too short (${len} chars) — likely blocked or error page`);
-      return {
-        found: false,
-        error: "Could not load your Instagram profile. Make sure it's public and try again in a minute.",
-        debug: `HTML too short: ${len}`,
-      };
-    }
-
-    if (hasLogin && hasSignUp && len < 50000) {
-      console.log(`[VERIFY] Instagram login wall detected`);
-      return {
-        found: false,
-        error: "Instagram is blocking access. Make sure your profile is set to PUBLIC and try again. If it keeps failing, ask an admin to verify manually.",
-        debug: "Login wall detected",
-      };
-    }
-
-    const codeUpper = code.trim().toUpperCase();
-    const htmlUpper = html.toUpperCase();
-
-    // ── Method 1: Full text search ──
-    if (htmlUpper.includes(codeUpper)) {
-      console.log(`[VERIFY] ✓ Code found via full-text search`);
-      return { found: true };
-    }
-
-    // ── Method 2: Search all meta tag contents ──
-    const metaTags = html.match(/<meta[^>]+content="([^"]*)"/gi) || [];
-    for (const tag of metaTags) {
-      const contentMatch = tag.match(/content="([^"]*)"/i);
-      if (contentMatch?.[1]?.toUpperCase().includes(codeUpper)) {
-        console.log(`[VERIFY] ✓ Code found in meta tag: ${tag.substring(0, 150)}`);
-        return { found: true };
-      }
-    }
-
-    // ── Method 3: Search all JSON-LD blocks ──
-    const jsonLdBlocks = html.match(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi) || [];
-    for (const block of jsonLdBlocks) {
-      if (block.toUpperCase().includes(codeUpper)) {
-        console.log(`[VERIFY] ✓ Code found in JSON-LD block`);
-        return { found: true };
-      }
-    }
-
-    // ── Method 4: Search all script tags for "biography" or "bio" ──
-    const scriptBlocks = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
-    for (const script of scriptBlocks) {
-      if (/biography|"bio"/i.test(script) && script.toUpperCase().includes(codeUpper)) {
-        console.log(`[VERIFY] ✓ Code found in script tag with bio data`);
-        return { found: true };
-      }
-    }
-
-    // ── Method 5: Decoded/unescaped search ──
-    // Instagram sometimes HTML-encodes or unicode-escapes content
-    const decoded = html.replace(/\\u[\dA-Fa-f]{4}/g, (m) => String.fromCharCode(parseInt(m.slice(2), 16)));
-    if (decoded.toUpperCase().includes(codeUpper)) {
-      console.log(`[VERIFY] ✓ Code found after unicode-unescape`);
-      return { found: true };
-    }
-
-    // ── NOT FOUND — dump diagnostic snippets ──
-    console.log(`[VERIFY] ✗ Code "${codeUpper}" NOT found by any method`);
-
-    // Log snippets at 0%, 25%, 50%, 75%, near end
-    const positions = [0, Math.floor(len * 0.25), Math.floor(len * 0.5), Math.floor(len * 0.75), Math.max(0, len - 200)];
-    positions.forEach((pos, i) => {
-      console.log(`[VERIFY] Snippet ${i} (pos ${pos}): "${html.substring(pos, pos + 200)}"`);
-    });
-
-    // Log bio-area if found
-    const bioIdx = htmlUpper.indexOf("BIOGRAPHY");
-    if (bioIdx >= 0) {
-      console.log(`[VERIFY] BIOGRAPHY found at pos ${bioIdx}: "${html.substring(Math.max(0, bioIdx - 50), bioIdx + 300)}"`);
-    } else {
-      console.log(`[VERIFY] "BIOGRAPHY" keyword NOT found in HTML`);
-    }
-
-    // Log username area
-    const username = profileLink.split("/").filter(Boolean).pop() || "";
-    if (username) {
-      const usernameIdx = htmlUpper.indexOf(username.toUpperCase());
-      if (usernameIdx >= 0) {
-        console.log(`[VERIFY] Username "${username}" found at pos ${usernameIdx}: "${html.substring(usernameIdx, usernameIdx + 300)}"`);
+      if (html.length > 1000) {
+        const result = searchHtmlForCode(html, code);
+        if (result.found) {
+          console.log(`[VERIFY] ✓ Code found via /content (${result.method})`);
+          return { found: true };
+        }
+        console.log(`[VERIFY] ✗ /content: code not found. Dumping diagnostics...`);
+        logHtmlDiagnostics(html, code, profileLink);
       } else {
-        console.log(`[VERIFY] Username "${username}" NOT found in HTML`);
+        console.log(`[VERIFY] /content HTML too short (${html.length}). First 500: ${html.substring(0, 500)}`);
       }
+    } else {
+      const errBody = await res1.text().catch(() => "");
+      console.log(`[VERIFY] /content failed: ${errBody.substring(0, 500)}`);
     }
-
-    return {
-      found: false,
-      error: "Verification code not found in your Instagram bio. Make sure the code is in your bio, your profile is PUBLIC, wait 30 seconds, and try again.",
-      debug: `${len} chars rendered, code not found, title: ${titleMatch?.[1]?.substring(0, 80) || "none"}`,
-    };
   } catch (err: any) {
-    console.error(`[VERIFY] Browserless EXCEPTION: name=${err?.name} message=${err?.message}`);
-    console.error(`[VERIFY] Stack:`, err?.stack?.substring(0, 300));
-    if (err?.name === "AbortError") {
-      return { found: false, error: "Instagram profile check timed out (40s). Try again or ask admin to verify manually.", debug: "Browserless timeout" };
-    }
-    return {
-      found: false,
-      error: "Could not load Instagram profile. Make sure your profile is public and try again.",
-      debug: `Exception: ${err?.message?.substring(0, 100)}`,
-    };
+    console.log(`[VERIFY] /content exception: ${err?.name} ${err?.message}`);
   }
+
+  // ── ATTEMPT 2: /scrape endpoint (targeted element extraction) ──
+  try {
+    console.log(`[VERIFY] ── Attempt 2: /scrape ──`);
+    const scrapeUrl = `${baseUrl}/scrape?token=${apiKey}`;
+    const ctrl2 = new AbortController();
+    const t2 = setTimeout(() => ctrl2.abort(), 35000);
+
+    const res2 = await fetch(scrapeUrl, {
+      method: "POST",
+      signal: ctrl2.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: profileLink,
+        elements: [
+          { selector: "meta[property='og:description']" },
+          { selector: "header section" },
+          { selector: "span" },
+        ],
+        waitForTimeout: 5000,
+        gotoOptions: { waitUntil: "networkidle0", timeout: 30000 },
+      }),
+    });
+    clearTimeout(t2);
+
+    console.log(`[VERIFY] /scrape: HTTP ${res2.status}`);
+
+    if (res2.ok) {
+      const scrapeData = await res2.json();
+      const scrapeStr = JSON.stringify(scrapeData);
+      console.log(`[VERIFY] /scrape result (${scrapeStr.length} chars): ${scrapeStr.substring(0, 1000)}`);
+
+      if (scrapeStr.toUpperCase().includes(code.trim().toUpperCase())) {
+        console.log(`[VERIFY] ✓ Code found via /scrape`);
+        return { found: true };
+      }
+      console.log(`[VERIFY] ✗ /scrape: code not found in scraped elements`);
+    } else {
+      const errBody = await res2.text().catch(() => "");
+      console.log(`[VERIFY] /scrape failed: ${errBody.substring(0, 500)}`);
+    }
+  } catch (err: any) {
+    console.log(`[VERIFY] /scrape exception: ${err?.name} ${err?.message}`);
+  }
+
+  // ── ATTEMPT 3: /function endpoint (custom JS to extract bio) ──
+  try {
+    console.log(`[VERIFY] ── Attempt 3: /function ──`);
+    const fnUrl = `${baseUrl}/function?token=${apiKey}`;
+    const ctrl3 = new AbortController();
+    const t3 = setTimeout(() => ctrl3.abort(), 35000);
+
+    const jsCode = `module.exports=async({page})=>{await page.goto('${profileLink}',{waitUntil:'networkidle0',timeout:30000});await new Promise(r=>setTimeout(r,3000));const bio=await page.evaluate(()=>{const spans=document.querySelectorAll('header section span, header section div');let text='';spans.forEach(s=>{if(s.textContent)text+=s.textContent+' '});const ogDesc=document.querySelector('meta[property="og:description"]');if(ogDesc)text+=' OG:'+ogDesc.content;return text.substring(0,2000)});return{type:'application/json',data:JSON.stringify({bio})}};`;
+
+    const res3 = await fetch(fnUrl, {
+      method: "POST",
+      signal: ctrl3.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: jsCode }),
+    });
+    clearTimeout(t3);
+
+    console.log(`[VERIFY] /function: HTTP ${res3.status}`);
+
+    if (res3.ok) {
+      const fnText = await res3.text();
+      console.log(`[VERIFY] /function result (${fnText.length} chars): ${fnText.substring(0, 1000)}`);
+
+      if (fnText.toUpperCase().includes(code.trim().toUpperCase())) {
+        console.log(`[VERIFY] ✓ Code found via /function`);
+        return { found: true };
+      }
+      console.log(`[VERIFY] ✗ /function: code not found in bio extract`);
+    } else {
+      const errBody = await res3.text().catch(() => "");
+      console.log(`[VERIFY] /function failed: ${errBody.substring(0, 500)}`);
+    }
+  } catch (err: any) {
+    console.log(`[VERIFY] /function exception: ${err?.name} ${err?.message}`);
+  }
+
+  console.log(`[VERIFY] ════ ALL 3 METHODS FAILED ════`);
+  return {
+    found: false,
+    error: "Verification code not found in your Instagram bio. Make sure the code is in your bio, your profile is PUBLIC, wait 30 seconds, and try again. If it keeps failing, ask an admin to verify manually.",
+    debug: "All 3 Browserless methods failed",
+  };
 }
 
 // ─── TikTok / YouTube / fallback: plain fetch ─────────────
