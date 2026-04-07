@@ -521,6 +521,7 @@ model Message {
   conversationId String
   senderId       String
   content        String   @db.Text
+  isAI           Boolean  @default(false)
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -528,6 +529,19 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+// ─── Chat Knowledge Base ───────────────────────────────────
+
+model ChatKnowledge {
+  id        String   @id @default(cuid())
+  category  String
+  question  String
+  answer    String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("chat_knowledge")
 }
 
 // ─── Notifications ──────────────────────────────────────────

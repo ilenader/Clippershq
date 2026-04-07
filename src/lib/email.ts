@@ -44,22 +44,28 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
 // ─── Template wrapper ────────────────────────────────────────
 
 function wrap(content: string): string {
-  return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; background: #0a0d12; border-radius: 16px; overflow: hidden; border: 1px solid #1c2333;">
-      <div style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c2333; background: #111720;">
-        <div style="margin-bottom: 8px;">
-          <svg width="32" height="32" viewBox="0 0 100 94" style="display:inline-block;vertical-align:middle;"><polygon points="50,4 97,90 3,90" fill="#ffffff"/></svg>
-        </div>
-        <h2 style="color: #ffffff; font-size: 20px; margin: 0; letter-spacing: 2px; text-shadow: 0 0 20px rgba(0,149,246,0.15);">CLIPPERS HQ</h2>
-      </div>
-      <div style="padding: 24px; color: #e8edf2; background: #111720;">
-        ${content}
-      </div>
-      <div style="padding: 16px 24px; border-top: 1px solid #1c2333; text-align: center; background: #0a0d12;">
-        <p style="color: #6b7280; font-size: 12px; margin: 0;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280; text-decoration: none;">clipershq.com</a></p>
-      </div>
-    </div>
-  `;
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"></head>
+<body style="margin: 0; padding: 0; background-color: #0a0d12; -webkit-text-size-adjust: 100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0d12;">
+<tr><td align="center" style="padding: 24px 16px;">
+  <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width: 560px; width: 100%; background-color: #111720; border-radius: 16px; border: 1px solid #1c2333; overflow: hidden;">
+    <tr><td style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c2333; background-color: #111720;">
+      <img src="https://clipershq.com/icon-512.png" width="40" height="40" alt="" style="display: block; margin: 0 auto 8px;" />
+      <h2 style="color: #ffffff; font-size: 20px; margin: 0; letter-spacing: 2px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">CLIPPERS HQ</h2>
+    </td></tr>
+    <tr><td style="padding: 24px; color: #e8edf2; background-color: #111720; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      ${content}
+    </td></tr>
+    <tr><td style="padding: 16px 24px; border-top: 1px solid #1c2333; text-align: center; background-color: #0a0d12;">
+      <p style="color: #6b7280; font-size: 12px; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280; text-decoration: none;">clipershq.com</a></p>
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>`;
 }
 
 // ─── Email functions ─────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MessageCircle, X, ArrowLeft, Send, Plus, Search, Megaphone, UserRound, AlertTriangle, ChevronDown, Bot } from "lucide-react";
-import { WELCOME_MESSAGE } from "@/lib/chatbot";
+const WELCOME_MESSAGE = "Hey! I'm the Clippers HQ assistant. I can help with questions about campaigns, clips, earnings, payouts, and more. If you need to talk to a real person, just let me know and I'll connect you with our support team.";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -40,6 +40,7 @@ interface MessageData {
   id: string;
   content: string;
   senderId: string;
+  isAI?: boolean;
   createdAt: string;
   sender: { id: string; name: string | null; username: string; image: string | null; role: string };
 }
@@ -840,29 +841,31 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                   {messages.map((msg, idx) => {
                     const isMine = msg.senderId === myId;
                     const showAvatar = !isMine && (idx === 0 || messages[idx - 1].senderId !== msg.senderId);
-                    const showRole = !isMine && showAvatar && (msg.sender.role === "ADMIN" || msg.sender.role === "OWNER");
                     const isOptimistic = msg.id.startsWith("opt-");
-                    // For admin/owner: detect if this message was sent by the AI (a non-clipper who isn't "me")
-                    const isAIMessage = !isClipper && !isMine && (msg.sender.role === "ADMIN" || msg.sender.role === "OWNER");
+                    // AI message: uses the isAI field from the database
+                    const isAIMsg = !!msg.isAI && !isMine;
+                    // Human admin/owner message (NOT AI): show their name + role badge
+                    const showRole = !isMine && showAvatar && !isAIMsg && (msg.sender.role === "ADMIN" || msg.sender.role === "OWNER");
                     return (
                       <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                         <div className={`flex items-end gap-2 max-w-[85%] ${isMine ? "flex-row-reverse" : ""}`}>
                           {!isMine && (
                             <div className="flex-shrink-0 w-8">
-                              {showAvatar && (isAIMessage
-                                ? <div className="rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28 }}><Bot className="h-3.5 w-3.5 text-purple-400" /></div>
+                              {showAvatar && (isAIMsg
+                                ? <div className="rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28 }}><Bot className="h-4 w-4 text-white" /></div>
                                 : <Avatar src={msg.sender.image} name={getDisplayName(msg.sender)} size={28} />
                               )}
                             </div>
                           )}
                           <div>
-                            {/* Label: AI tag for admin/owner, role badge otherwise */}
-                            {isAIMessage && showAvatar && (
+                            {/* Label: AI Assistant for AI messages */}
+                            {isAIMsg && showAvatar && (
                               <div className="mb-1 ml-0.5 flex items-center gap-1.5">
-                                <span className="inline-block rounded-md bg-purple-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-400">AI Auto-reply</span>
+                                <span className="text-[11px] font-medium text-blue-400">AI Assistant</span>
                               </div>
                             )}
-                            {showRole && !isAIMessage && (
+                            {/* Label: name + role badge for real human admin/owner */}
+                            {showRole && (
                               <div className="mb-1 ml-0.5 flex items-center gap-1.5">
                                 <span className="text-[11px] font-medium text-[var(--text-muted)]">{getDisplayName(msg.sender)}</span>
                                 <RoleBadge role={msg.sender.role} />

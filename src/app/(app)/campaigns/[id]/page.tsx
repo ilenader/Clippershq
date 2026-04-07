@@ -10,7 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { CampaignImage } from "@/components/ui/campaign-image";
-import { ArrowLeft, ExternalLink, UserPlus, CheckCircle, Music, LinkIcon } from "lucide-react";
+import { ArrowLeft, ExternalLink, UserPlus, CheckCircle, Music, LinkIcon, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -58,6 +58,7 @@ export default function CampaignDetailPage() {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState("");
   const [joining, setJoining] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -143,10 +144,45 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
+      {/* Paused banner */}
+      {campaign.status === "PAUSED" && (
+        <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3">
+          <span className="text-sm font-semibold text-amber-400">This campaign is paused — budget limit reached.</span>
+          <span className="text-xs text-[var(--text-muted)]">Views are still being tracked but earnings are frozen.</span>
+        </div>
+      )}
+
       {/* Joined Accounts — clipper only */}
       {isClipper && joinedAccounts.length > 0 && (
         <Card>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Your joined accounts</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Your joined accounts</h2>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-400 hover:text-red-300 hover:bg-red-500/5"
+              loading={leaving}
+              onClick={async () => {
+                if (!confirm("Are you sure you want to leave this campaign? You'll stop earning from it.")) return;
+                setLeaving(true);
+                try {
+                  for (const join of joinedAccounts) {
+                    await fetch("/api/campaign-accounts", {
+                      method: "DELETE",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ clipAccountId: join.clipAccountId, campaignId: id }),
+                    });
+                  }
+                  toast.success("Left campaign");
+                  setJoinedAccounts([]);
+                } catch { toast.error("Failed to leave campaign"); }
+                setLeaving(false);
+              }}
+              icon={<LogOut className="h-3.5 w-3.5" />}
+            >
+              Leave Campaign
+            </Button>
+          </div>
           <div className="flex flex-wrap gap-2">
             {joinedAccounts.map((join: any) => {
               const acct = approvedAccounts.find((a: any) => a.id === join.clipAccountId);

@@ -279,7 +279,7 @@ export async function POST(
 
             if (replyContent) {
               await db.message.create({
-                data: { conversationId, senderId: responderId, content: replyContent },
+                data: { conversationId, senderId: responderId, content: replyContent, isAI: true },
               });
               await db.conversation.update({
                 where: { id: conversationId },

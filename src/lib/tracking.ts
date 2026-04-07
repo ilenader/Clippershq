@@ -220,7 +220,13 @@ export async function runDueTrackingJobs(): Promise<{ processed: number; errors:
         }
 
         // Recalculate earnings if clip is approved (with budget cap)
-        if (clip.status === "APPROVED" && clip.campaign) {
+        // If campaign is PAUSED, tracking continues (stats saved above) but earnings freeze
+        const campaignStatus = await db.campaign.findUnique({
+          where: { id: clip.campaignId },
+          select: { status: true },
+        });
+
+        if (clip.status === "APPROVED" && clip.campaign && campaignStatus?.status !== "PAUSED") {
           let newEarnings = recalculateClipEarnings({
             stats: [{ views: stats.views }],
             campaign: clip.campaign,
@@ -236,6 +242,17 @@ export async function runDueTrackingJobs(): Promise<{ processed: number; errors:
               const maxAllowed = Math.max(budgetStatus.budget - otherClipsSpent, 0);
               newEarnings = Math.min(newEarnings, maxAllowed);
               newEarnings = Math.round(newEarnings * 100) / 100;
+
+              // Auto-pause: if budget is now fully spent, pause the campaign
+              const newTotalSpent = otherClipsSpent + newEarnings;
+              if (newTotalSpent >= budgetStatus.budget) {
+                await db.campaign.update({
+                  where: { id: clip.campaignId },
+                  data: { status: "PAUSED" },
+                });
+                console.log(`[BUDGET] Campaign ${clip.campaignId} paused — budget $${budgetStatus.budget} reached`);
+                details.push(`Campaign ${clip.campaignId}: AUTO-PAUSED (budget $${budgetStatus.budget} reached)`);
+              }
             }
           } catch {}
 

@@ -166,6 +166,12 @@ export default function CampaignsPage() {
             return (
               <Link key={campaign.id} href={`/campaigns/${campaign.id}`}>
                 <Card hover className={`h-full ${isPaused ? "opacity-70" : ""}`}>
+                  {/* Paused banner */}
+                  {isPaused && (
+                    <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 mb-3">
+                      <span className="text-xs font-semibold text-amber-400">Paused — Budget Reached</span>
+                    </div>
+                  )}
                   {/* Top row: image + title + badge */}
                   <div className="flex items-start gap-4">
                     <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">

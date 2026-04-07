@@ -240,6 +240,7 @@ export async function POST(req: NextRequest) {
           data: {
             conversationId: conversation.id,
             senderId: responderId,
+            isAI: true,
             content: "Welcome! 👋 I'm here to help you with this campaign. Feel free to ask me anything — how to post, what content works best, payout questions, or anything else. If you need to speak with a real person, just say 'I want to talk to a human' and someone from the team will get back to you.",
           },
         });

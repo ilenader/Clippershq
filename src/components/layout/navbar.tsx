@@ -5,6 +5,7 @@ import { useDevAuth } from "@/components/dev-auth-provider";
 import { useTheme } from "@/components/theme-provider";
 import { Sun, Moon, LogOut, ChevronDown, ArrowRightLeft, Bell } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -49,8 +50,10 @@ export function Navbar() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
+  const bellBtnRef = useRef<HTMLButtonElement>(null);
   const prevNotifCountRef = useRef(0);
   const sseRef = useRef<EventSource | null>(null);
+  const [notifPos, setNotifPos] = useState<{ top: number; right: number } | null>(null);
 
   // Fetch full notification list (for dropdown content)
   const fetchNotifList = useCallback(async () => {
@@ -122,14 +125,27 @@ export function Navbar() {
     } catch {}
   };
 
+  // Compute dropdown position when opening
+  useEffect(() => {
+    if (notifOpen && bellBtnRef.current) {
+      const rect = bellBtnRef.current.getBoundingClientRect();
+      setNotifPos({ top: rect.bottom + 4, right: Math.max(8, window.innerWidth - rect.right) });
+    }
+  }, [notifOpen]);
+
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      // For portal dropdown: check both the bell button area and the dropdown itself
+      if (notifOpen) {
+        const clickedBell = bellBtnRef.current?.contains(e.target as Node);
+        const clickedDropdown = notifRef.current?.contains(e.target as Node);
+        if (!clickedBell && !clickedDropdown) setNotifOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+  }, [notifOpen]);
 
   const handleSignOut = async () => {
     if (isDevMode) {
@@ -163,8 +179,8 @@ export function Navbar() {
 
       <div className="flex items-center gap-1 lg:gap-2">
         {/* Notification bell */}
-        <div className="relative" ref={notifRef}>
-          <button onClick={() => { setNotifOpen(!notifOpen); if (!notifOpen) fetchNotifList(); }}
+        <div className="relative">
+          <button ref={bellBtnRef} onClick={() => { setNotifOpen(!notifOpen); if (!notifOpen) fetchNotifList(); }}
             className="relative rounded-xl p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all cursor-pointer">
             <Bell className="h-4 w-4" />
             {notifCount > 0 && (
@@ -173,8 +189,11 @@ export function Navbar() {
               </span>
             )}
           </button>
-          {notifOpen && (
-            <div className="fixed sm:absolute right-2 sm:right-0 top-14 sm:top-full sm:mt-1 w-[calc(100vw-16px)] sm:w-80 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-elevated)] overflow-hidden z-[9999]">
+          {/* Portal: renders at <body> level to escape stacking contexts */}
+          {notifOpen && typeof document !== "undefined" && notifPos && createPortal(
+            <div ref={notifRef}
+              className="fixed w-[calc(100vw-16px)] sm:w-80 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-elevated)] overflow-hidden"
+              style={{ top: notifPos.top, right: notifPos.right, zIndex: 99999 }}>
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border-subtle)]">
                 <p className="text-sm font-semibold text-[var(--text-primary)]">Notifications</p>
                 {notifCount > 0 && (
@@ -198,7 +217,8 @@ export function Navbar() {
                   ))
                 )}
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
 

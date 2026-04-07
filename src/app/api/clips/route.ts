@@ -130,8 +130,11 @@ export async function POST(req: NextRequest) {
       where: { id: data.campaignId },
       select: { maxClipsPerUserPerDay: true, status: true, budget: true },
     });
-    if (!campaign || (campaign.status !== "ACTIVE" && campaign.status !== "PAUSED")) {
+    if (!campaign || campaign.status === "DRAFT" || campaign.status === "COMPLETED") {
       return NextResponse.json({ error: "This campaign is not available for submissions right now." }, { status: 400 });
+    }
+    if (campaign.status === "PAUSED") {
+      return NextResponse.json({ error: "This campaign is paused — budget limit reached. Check out other active campaigns!" }, { status: 400 });
     }
 
     // ── RULE: Budget cap — check if campaign budget is exhausted ──

@@ -144,6 +144,21 @@ export async function updateStreak(userId: string): Promise<void> {
   // If eval start is after the latest evaluable day, nothing to do
   if (evalStart > latestEvaluable) return;
 
+  // Streak protection: if ALL of clipper's campaigns are PAUSED, freeze streak
+  try {
+    const memberships = await db.campaignAccount.findMany({
+      where: { clipAccount: { userId } },
+      include: { campaign: { select: { status: true } } },
+    });
+    if (memberships.length > 0) {
+      const hasActiveCampaign = memberships.some((m: any) => m.campaign.status === "ACTIVE");
+      if (!hasActiveCampaign) {
+        // All campaigns paused — freeze streak, don't evaluate
+        return;
+      }
+    }
+  } catch {}
+
   let currentStreak = user.currentStreak;
   let lastPassedDate = user.lastActiveDate ? new Date(user.lastActiveDate) : null;
   let streakBroken = false;

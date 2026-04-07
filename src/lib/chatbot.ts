@@ -1,7 +1,30 @@
 /**
  * AI Chatbot — Uses Anthropic Claude API for intelligent auto-replies.
  * Falls back to pattern-based auto-replies if API key is not set or API fails.
+ * Knowledge base is loaded from the ChatKnowledge table and injected into the system prompt.
  */
+
+import { db } from "@/lib/db";
+
+// Cache knowledge base for 5 minutes to avoid hitting DB on every message
+let knowledgeCache: { data: string; expiry: number } | null = null;
+
+async function getKnowledgeBase(): Promise<string> {
+  const now = Date.now();
+  if (knowledgeCache && knowledgeCache.expiry > now) return knowledgeCache.data;
+
+  try {
+    if (!db) return "";
+    const entries = await db.chatKnowledge.findMany({ orderBy: { category: "asc" } });
+    if (entries.length === 0) return "";
+    const kb = entries.map((e: any) => `Q: ${e.question}\nA: ${e.answer}`).join("\n\n");
+    const result = `\n\nKNOWLEDGE BASE — Use these to answer questions accurately:\n\n${kb}`;
+    knowledgeCache = { data: result, expiry: now + 5 * 60 * 1000 };
+    return result;
+  } catch {
+    return "";
+  }
+}
 
 const SYSTEM_PROMPT = `You are the Clippers HQ support assistant. You help clippers (content creators who clip and distribute short-form content for campaigns).
 
@@ -86,6 +109,9 @@ export async function generateChatbotResponse(
 
   const userContext = `\n\nUSER CONTEXT:\n- Username: ${userData.username}\n- Level: ${userData.level}\n- Current streak: ${userData.streak} days\n- Total earnings: $${userData.earnings.toFixed(2)}`;
 
+  // Load knowledge base from DB
+  const knowledgeBase = await getKnowledgeBase();
+
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -97,7 +123,7 @@ export async function generateChatbotResponse(
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 500,
-        system: SYSTEM_PROMPT + userContext,
+        system: SYSTEM_PROMPT + knowledgeBase + userContext,
         messages: [
           ...conversationHistory.slice(-10), // Last 10 messages for context
           { role: "user", content: userMessage },

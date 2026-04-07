@@ -24,6 +24,7 @@ import {
   Trophy,
   Phone,
   Smartphone,
+  BookOpen,
 } from "lucide-react";
 import { useState } from "react";
 import { useInstallPrompt } from "@/hooks/use-pwa";
@@ -94,6 +95,7 @@ const ownerExtraNav: NavSection = {
     { label: "Progress", href: "/progress", icon: <Trophy className="h-[18px] w-[18px]" /> },
     { label: "Archive", href: "/admin/archive", icon: <Archive className="h-[18px] w-[18px]" /> },
     { label: "Team", href: "/admin/team", icon: <Shield className="h-[18px] w-[18px]" /> },
+    { label: "AI Knowledge", href: "/admin/knowledge", icon: <BookOpen className="h-[18px] w-[18px]" /> },
     { label: "Gamification", href: "/admin/settings", icon: <Settings className="h-[18px] w-[18px]" /> },
   ],
 };
