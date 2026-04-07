@@ -101,6 +101,7 @@ export default function AdminAnalyticsPage() {
   const [allAccounts, setAllAccounts] = useState<any[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(["views"]);
+  const [clipStatusFilter, setClipStatusFilter] = useState("APPROVED");
   const [timeframeDays, setTimeframeDays] = useState(15);
   const [loading, setLoading] = useState(true);
 
@@ -122,7 +123,12 @@ export default function AdminAnalyticsPage() {
   const campaignFilteredClips = selectedCampaigns.length > 0
     ? allClips.filter((c: any) => selectedCampaigns.includes(c.campaignId))
     : allClips;
-  const filteredClips = filterByTimeframe(campaignFilteredClips, timeframeDays);
+  const statusFilteredClips = clipStatusFilter === "ALL"
+    ? campaignFilteredClips
+    : clipStatusFilter === "APPROVED_REJECTED"
+    ? campaignFilteredClips.filter((c: any) => c.status === "APPROVED" || c.status === "REJECTED")
+    : campaignFilteredClips.filter((c: any) => c.status === clipStatusFilter);
+  const filteredClips = filterByTimeframe(statusFilteredClips, timeframeDays);
 
   const uniqueClippers = new Set(filteredClips.map((c: any) => c.userId).filter(Boolean));
   const totalViews = filteredClips.reduce((sum: number, c: any) => sum + (c.stats?.[0]?.views || 0), 0);
@@ -173,6 +179,16 @@ export default function AdminAnalyticsPage() {
         <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
         <MultiDropdown label="Campaign" options={campaignOptions} values={selectedCampaigns} onChange={setSelectedCampaigns} allLabel="All campaigns" />
         <MultiDropdown label="Metrics" options={metricOptions} values={selectedMetrics} onChange={setSelectedMetrics} allLabel="All metrics" />
+        <select
+          value={clipStatusFilter}
+          onChange={(e) => setClipStatusFilter(e.target.value)}
+          className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent focus:ring-1 focus:ring-accent focus:outline-none cursor-pointer"
+        >
+          <option value="APPROVED">Approved only</option>
+          <option value="REJECTED">Rejected only</option>
+          <option value="APPROVED_REJECTED">Approved + Rejected</option>
+          <option value="ALL">All clips</option>
+        </select>
       </div>
 
       {/* Stats */}

@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { CampaignImage } from "@/components/ui/campaign-image";
 import { Megaphone, Star, UserPlus, CheckCircle } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import Link from "next/link";
 
 export default function CampaignsPage() {

@@ -11,7 +11,7 @@ import { Modal } from "@/components/ui/modal";
 import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-select";
 import { formatCurrency, formatNumber, formatRelative } from "@/lib/utils";
 import { ArrowLeft, Star, Flame, Users, Zap, Film, DollarSign, ExternalLink, Shield, Percent, ShieldOff } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 export default function UserProfilePage() {
   const { id } = useParams();
@@ -20,6 +20,7 @@ export default function UserProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [timeframeDays, setTimeframeDays] = useState(15);
+  const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [showBanModal, setShowBanModal] = useState(false);
   const [banConfirmText, setBanConfirmText] = useState("");
   const [banning, setBanning] = useState(false);
@@ -54,15 +55,36 @@ export default function UserProfilePage() {
   }
 
   const roleBadge: Record<string, string> = { CLIPPER: "active", ADMIN: "pending", OWNER: "rejected" };
-  const filteredClips = filterByTimeframe(user.clips || [], timeframeDays);
+  const allClips = user.clips || [];
+  const campaignScoped = selectedCampaignId
+    ? allClips.filter((c: any) => c.campaignId === selectedCampaignId)
+    : allClips;
+  const filteredClips = filterByTimeframe(campaignScoped, timeframeDays);
   const filteredApproved = filteredClips.filter((c: any) => c.status === "APPROVED");
   const filteredPending = filteredClips.filter((c: any) => c.status === "PENDING");
   const filteredRejected = filteredClips.filter((c: any) => c.status === "REJECTED");
   const filteredEarnings = filteredApproved.reduce((s: number, c: any) => s + (c.earnings || 0), 0);
   const filteredViews = filteredClips.reduce((s: number, c: any) => s + (c.stats?.[0]?.views || 0), 0);
 
+  // Unique campaigns this user joined (for filter dropdown)
+  const userCampaigns: { id: string; name: string }[] = [];
+  const seenCampaigns = new Set<string>();
+  for (const c of allClips) {
+    if (c.campaignId && c.campaign?.name && !seenCampaigns.has(c.campaignId)) {
+      seenCampaigns.add(c.campaignId);
+      userCampaigns.push({ id: c.campaignId, name: c.campaign.name });
+    }
+  }
+  // Also include campaigns from user.campaigns if available
+  for (const c of (user.campaigns || [])) {
+    if (c.id && c.name && !seenCampaigns.has(c.id)) {
+      seenCampaigns.add(c.id);
+      userCampaigns.push({ id: c.id, name: c.name });
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <button onClick={() => router.back()}
         className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
         <ArrowLeft className="h-4 w-4" /> Back
@@ -220,7 +242,21 @@ export default function UserProfilePage() {
       {/* ── Timeframe-filtered Stats ── */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">Activity</h2>
-        <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
+        <div className="flex items-center gap-2">
+          {userCampaigns.length > 1 && (
+            <select
+              value={selectedCampaignId}
+              onChange={(e) => setSelectedCampaignId(e.target.value)}
+              className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent focus:ring-1 focus:ring-accent focus:outline-none cursor-pointer"
+            >
+              <option value="">All Campaigns</option>
+              {userCampaigns.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
+          <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
+        </div>
       </div>
 
       <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
@@ -264,9 +300,12 @@ export default function UserProfilePage() {
           <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Social Accounts</h2>
           <div className="flex flex-wrap gap-2">
             {user.clipAccounts.map((a: any) => (
-              <div key={a.id} className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] px-3 py-2">
+              <div key={a.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${a.deletedByUser ? "border-[var(--border-subtle)] opacity-60" : "border-[var(--border-color)]"}`}>
                 <span className="text-sm font-medium text-[var(--text-primary)]">{a.username}</span>
                 <Badge variant={a.status.toLowerCase() as any}>{a.platform}</Badge>
+                {a.deletedByUser && (
+                  <span className="rounded-md bg-[var(--bg-input)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">Removed by user</span>
+                )}
               </div>
             ))}
           </div>

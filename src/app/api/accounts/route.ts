@@ -74,6 +74,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
+  if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
+
+  // Check for a soft-deleted account with the same profileLink — reactivate it
+  try {
+    const existing = await db.clipAccount.findFirst({
+      where: { userId: session.user.id, profileLink: data.profileLink, deletedByUser: true },
+    });
+    if (existing) {
+      const reactivated = await db.clipAccount.update({
+        where: { id: existing.id },
+        data: {
+          deletedByUser: false,
+          deletedAt: null,
+          username: data.username,
+          platform: data.platform,
+          status: existing.status === "APPROVED" ? "APPROVED" : "PENDING",
+          verificationCode: existing.status === "APPROVED" ? existing.verificationCode : generateVerificationCode(),
+        },
+      });
+      return NextResponse.json({ ...reactivated, verificationCode: reactivated.verificationCode }, { status: 201 });
+    }
+  } catch {}
+
   const verificationCode = generateVerificationCode();
 
   const accountData: Record<string, any> = {
@@ -87,8 +110,6 @@ export async function POST(req: NextRequest) {
   if (data.followerCount) accountData.followerCount = parseInt(data.followerCount);
   if (data.contentNiche) accountData.contentNiche = data.contentNiche;
   if (data.country) accountData.country = data.country;
-
-  if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   try {
     const account = await db.clipAccount.create({

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Users, Copy, Check, ChevronDown } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { formatCurrency, formatNumber, formatRelative } from "@/lib/utils";
 
 export default function AdminReferralsPage() {

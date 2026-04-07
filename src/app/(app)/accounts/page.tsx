@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { UserCircle, Plus, Copy, CheckCircle, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { validateAccountLink } from "@/lib/account-validation";
 
 const platformOptions = [
@@ -129,12 +129,12 @@ export default function AccountsPage() {
   };
 
   const cancelAccount = async (accountId: string) => {
-    if (!confirm("Are you sure you want to cancel this submission?")) return;
+    if (!confirm("Are you sure you want to remove this account? You can re-add it later.")) return;
     setDeleting(accountId);
     try {
       const res = await fetch(`/api/accounts/${accountId}`, { method: "DELETE" });
       if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Failed to cancel"); }
-      toast.success("Account submission cancelled.");
+      toast.success("Account removed.");
       load();
     } catch (err: any) { toast.error(err.message || "Failed to cancel."); }
     setDeleting(null);
@@ -251,20 +251,25 @@ export default function AccountsPage() {
                   </div>
                 )}
 
-                {/* Remove button for non-APPROVED */}
-                {account.status !== "APPROVED" && (
-                  <div className="mt-3">
+                {/* Approved indicator + remove */}
+                {account.status === "APPROVED" && (
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-base text-accent">
+                      <CheckCircle className="h-4 w-4" />
+                      <span className="font-medium">Verified and approved</span>
+                    </div>
                     <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/5" loading={deleting === account.id} onClick={() => cancelAccount(account.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>
                       Remove
                     </Button>
                   </div>
                 )}
 
-                {/* Approved indicator */}
-                {account.status === "APPROVED" && (
-                  <div className="mt-4 flex items-center gap-1.5 text-base text-accent">
-                    <CheckCircle className="h-4 w-4" />
-                    <span className="font-medium">Verified and approved</span>
+                {/* Remove button for non-APPROVED */}
+                {account.status !== "APPROVED" && (
+                  <div className="mt-3">
+                    <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/5" loading={deleting === account.id} onClick={() => cancelAccount(account.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>
+                      Remove
+                    </Button>
                   </div>
                 )}
 
@@ -341,7 +346,7 @@ export default function AccountsPage() {
             </label>
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-              <Button type="submit" loading={submitting}>Submit account</Button>
+              <Button type="submit" loading={submitting} disabled={!!linkError}>Submit account</Button>
             </div>
           </form>
         )}

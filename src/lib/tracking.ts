@@ -5,14 +5,14 @@
  * Tiered schedule:
  *   Phase 1 (0-4h after submission):   every 60 min
  *   Phase 2 (4-24h after submission):  every 120 min
- *   Phase 3 (24h+): growth-based:
- *     >= 5% growth since last check → 2h (can move BACK up)
- *     1-5% growth → 4h
- *     < 1% growth → escalate: 4h → 8h → 24h → 72h
- *     0% growth   → escalate: 4h → 8h → 24h → 72h
+ *   Phase 3 (24h+): growth-based tier adjustments:
+ *     < 5% growth  → stay same or move up one tier (slower)
+ *     5-9% growth  → drop DOWN one tier (faster)
+ *     10-19% growth → drop DOWN two tiers (faster)
+ *     20%+ growth  → go straight to 2h (minimum)
  *
- * Tracking NEVER stops — 72h is the absolute floor, checked forever.
- * Only deactivates on REJECTED status.
+ *   Tiers: 2h → 4h → 8h → 16h → 24h → 72h
+ *   Minimum: 2h. Maximum: 72h. Tracking never stops.
  */
 
 import { db } from "@/lib/db";
@@ -20,12 +20,12 @@ import { fetchClipStats } from "@/lib/apify";
 import { recalculateClipEarnings } from "@/lib/earnings-calc";
 import { computeFraudLevel } from "@/lib/fraud";
 
-/** Slow ladder in minutes: 2h → 4h → 8h → 24h → 72h */
-const SLOW_LADDER = [120, 240, 480, 1440, 4320];
+/** Interval tiers in minutes: 2h → 4h → 8h → 16h → 24h → 72h */
+const TIERS = [120, 240, 480, 960, 1440, 4320];
 
 /**
  * Determine the next check interval based on the tiered schedule.
- * Phase 3 uses percentage growth to decide whether to speed up or slow down.
+ * Phase 3 uses percentage growth to bump down (faster) or up (slower).
  */
 function getNextInterval(
   currentIntervalMin: number,
@@ -43,25 +43,33 @@ function getNextInterval(
   // Phase 2: hours 4-24 → always 120 min
   if (hoursSinceSubmission <= 24) return 120;
 
-  // Phase 3: after 24h — growth-based
+  // Phase 3: after 24h — growth-based tier adjustments
   const growthPercent = previousViews > 0
     ? ((currentViews - previousViews) / previousViews) * 100
-    : (currentViews > 0 ? 100 : 0); // first snapshot with views = treat as high growth
+    : (currentViews > 0 ? 100 : 0);
 
-  // >= 5% growth → fast: 2h (can move BACK up from any slower tier)
-  if (growthPercent >= 5) return 120;
-
-  // 1-5% growth → moderate: 4h
-  if (growthPercent >= 1) return 240;
-
-  // < 1% growth (including 0%) → escalate on slow ladder
-  const currentIdx = SLOW_LADDER.indexOf(currentIntervalMin);
+  // Find current position on the tier ladder
+  let currentIdx = TIERS.indexOf(currentIntervalMin);
   if (currentIdx === -1) {
-    // Not on the ladder yet → start at 4h (second rung, since 2h is SLOW_LADDER[0])
-    return 240;
+    // Not on a tier — find the closest tier at or above current interval
+    currentIdx = TIERS.findIndex((t) => t >= currentIntervalMin);
+    if (currentIdx === -1) currentIdx = TIERS.length - 1; // above max → use last tier
   }
-  // Move to next rung (or stay at floor = 72h)
-  return SLOW_LADDER[Math.min(currentIdx + 1, SLOW_LADDER.length - 1)];
+
+  if (growthPercent >= 20) {
+    // 20%+ → straight to minimum (2h)
+    return TIERS[0];
+  }
+  if (growthPercent >= 10) {
+    // 10-19% → drop down two tiers
+    return TIERS[Math.max(currentIdx - 2, 0)];
+  }
+  if (growthPercent >= 5) {
+    // 5-9% → drop down one tier
+    return TIERS[Math.max(currentIdx - 1, 0)];
+  }
+  // < 5% → stay same or move up one tier (slower)
+  return TIERS[Math.min(currentIdx + 1, TIERS.length - 1)];
 }
 
 /**
@@ -123,6 +131,7 @@ export async function runDueTrackingJobs(): Promise<{ processed: number; errors:
             earnings: true,
             campaignId: true,
             createdAt: true,
+            isOwnerOverride: true,
             campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true } },
             user: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true } },
           },
@@ -137,14 +146,14 @@ export async function runDueTrackingJobs(): Promise<{ processed: number; errors:
     for (const job of dueJobs) {
       try {
         const clip = job.clip;
-        // Deactivate only on REJECTED status (or missing clip)
-        if (!clip || clip.status === "REJECTED") {
+        // Deactivate only if clip is missing
+        if (!clip) {
           await db.trackingJob.update({
             where: { id: job.id },
             data: { isActive: false },
           });
-          console.log(`[TRACKING] Deactivated job for clip ${job.clipId} (status: ${clip?.status})`);
-          details.push(`Deactivated job for clip ${job.clipId} (status: ${clip?.status})`);
+          console.log(`[TRACKING] Deactivated job for clip ${job.clipId} (missing clip)`);
+          details.push(`Deactivated job for clip ${job.clipId} (missing clip)`);
           continue;
         }
 
@@ -285,7 +294,17 @@ export async function runDueTrackingJobs(): Promise<{ processed: number; errors:
         }
 
         // ── Calculate next interval using tiered schedule ──
-        const newInterval = getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt);
+        let newInterval: number;
+        if (clip.status === "REJECTED") {
+          // Rejected clips: slow track at 48h, stats saved but no earnings
+          newInterval = 2880;
+        } else if (clip.isOwnerOverride) {
+          // Owner override clips: 24h base, 72h if growth < 5%
+          const growthPct = prevViews > 0 ? ((stats.views - prevViews) / prevViews) * 100 : (stats.views > 0 ? 100 : 0);
+          newInterval = growthPct >= 5 ? 1440 : 4320;
+        } else {
+          newInterval = getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt);
+        }
         const nextCheck = roundToNextSlot(newInterval);
 
         await db.trackingJob.update({

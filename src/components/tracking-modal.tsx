@@ -45,7 +45,9 @@ function intervalLabel(min: number): string {
   if (min <= 120) return "Every 2h";
   if (min <= 240) return "Every 4h";
   if (min <= 480) return "Every 8h";
+  if (min <= 960) return "Every 16h";
   if (min <= 1440) return "Every 24h";
+  if (min <= 2880) return "Every 48h";
   return "Every 72h";
 }
 

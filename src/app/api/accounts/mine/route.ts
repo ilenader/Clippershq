@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   if (!db) return NextResponse.json([]);
 
   try {
-    const where: any = { userId: session.user.id };
+    const where: any = { userId: session.user.id, deletedByUser: false };
     if (status) where.status = status;
     const accounts = await db.clipAccount.findMany({
       where,

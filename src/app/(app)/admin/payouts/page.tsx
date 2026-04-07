@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Wallet, Check, X, Eye, Phone } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { formatRelative, formatCurrency } from "@/lib/utils";
 
 const statusFilterOptions = [

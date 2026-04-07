@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Phone, Copy, Check, X } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { formatCurrency, formatRelative } from "@/lib/utils";
 
 const FILTERS = ["all", "today", "week", "past"] as const;

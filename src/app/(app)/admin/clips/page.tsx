@@ -14,7 +14,7 @@ import {
   Shield, AlertTriangle, Zap, Settings2, Activity,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { formatRelative, formatNumber, formatCurrency } from "@/lib/utils";
 import type { FraudLevel } from "@/lib/fraud";
 
@@ -149,14 +149,48 @@ export default function AdminClipsPage() {
     return { level, score, reasons };
   }
 
+  const [trackingAll, setTrackingAll] = useState(false);
+  const [trackResult, setTrackResult] = useState<string | null>(null);
+
+  const handleTrackAll = async () => {
+    setTrackingAll(true);
+    setTrackResult(null);
+    try {
+      const res = await fetch("/api/admin/track-all", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      const viewChanges = (data.details || []).filter((d: string) => /→/.test(d) && !/→\s*\S+\s*views/.test(d) || /\d+→\d+/.test(d)).length;
+      setTrackResult(`Checked ${data.checked} clips. ${viewChanges > 0 ? `${viewChanges} had view changes.` : "No view changes."} (${data.elapsedMs}ms)`);
+      toast.success(`Tracking complete — ${data.checked} clips checked.`);
+      load();
+    } catch (err: any) {
+      toast.error(err.message || "Tracking failed.");
+      setTrackResult(null);
+    }
+    setTrackingAll(false);
+  };
+
   const rejectionExamples = ["Wrong format", "Wrong sound", "Bad quality", "Duplicate", "Suspicious", "Wrong platform"];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Clip Review</h1>
-        <p className="text-[15px] text-[var(--text-secondary)]">Approve, reject, or flag submitted clips.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Clip Review</h1>
+          <p className="text-[15px] text-[var(--text-secondary)]">Approve, reject, or flag submitted clips.</p>
+        </div>
+        {isOwner && (
+          <Button onClick={handleTrackAll} loading={trackingAll} variant="outline" icon={<RotateCcw className="h-4 w-4" />}>
+            Check All Now
+          </Button>
+        )}
       </div>
+
+      {trackResult && (
+        <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-2.5">
+          <p className="text-sm text-accent">{trackResult}</p>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         {campaignOptions.length > 0 && (

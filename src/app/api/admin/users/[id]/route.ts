@@ -27,7 +27,7 @@ export async function GET(
     const user = await db.user.findUnique({
       where: { id },
       include: {
-        clipAccounts: { select: { id: true, username: true, platform: true, status: true } },
+        clipAccounts: { select: { id: true, username: true, platform: true, status: true, deletedByUser: true } },
         clips: {
           where: { isDeleted: false },
           include: {

@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
 import { Archive, RotateCcw, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 export default function ArchivePage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);

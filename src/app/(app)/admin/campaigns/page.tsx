@@ -14,7 +14,7 @@ import { ImageUpload } from "@/components/ui/image-upload";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
 import { CampaignImage } from "@/components/ui/campaign-image";
 import { Plus, Megaphone, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 const platformList = [
   { value: "TikTok", label: "TikTok" },

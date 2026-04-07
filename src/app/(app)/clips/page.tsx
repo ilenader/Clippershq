@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Film, Plus, ExternalLink } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { formatRelative, formatNumber, formatCurrency } from "@/lib/utils";
 
 export default function ClipsPage() {

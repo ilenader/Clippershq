@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Wallet, Plus, Info, Phone } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { formatCurrency, formatRelative } from "@/lib/utils";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 

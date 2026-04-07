@@ -11,7 +11,7 @@ import { Modal } from "@/components/ui/modal";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { CampaignImage } from "@/components/ui/campaign-image";
 import { ArrowLeft, ExternalLink, UserPlus, CheckCircle, Music, LinkIcon, LogOut } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import Link from "next/link";
 
 function isUrl(str: string): boolean {

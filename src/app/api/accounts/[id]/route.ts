@@ -4,7 +4,8 @@ import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * DELETE - allows a user to cancel/delete their own PENDING account submission
+ * DELETE - soft-deletes a user's account (sets deletedByUser = true).
+ * Data stays for owner/admin. Clipper sees it as removed.
  */
 export async function DELETE(
   req: NextRequest,
@@ -27,12 +28,12 @@ export async function DELETE(
     if (!account) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
-    if (account.status === "APPROVED") {
-      return NextResponse.json({ error: "Approved accounts cannot be removed" }, { status: 400 });
-    }
-    await db.clipAccount.delete({ where: { id } });
+    await db.clipAccount.update({
+      where: { id },
+      data: { deletedByUser: true, deletedAt: new Date() },
+    });
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to remove account" }, { status: 500 });
   }
 }

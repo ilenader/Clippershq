@@ -87,8 +87,8 @@ body {
 
 /* ─── Notification ping (3 pulses then stop) ────────────── */
 @keyframes notif-ping {
-  0%, 100% { transform: scale(1); opacity: 0.75; }
-  50% { transform: scale(2.2); opacity: 0; }
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(2.5); opacity: 0; }
 }
 .notif-ping {
   animation: notif-ping 1s cubic-bezier(0, 0, 0.2, 1) 3;

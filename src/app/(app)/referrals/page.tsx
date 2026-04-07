@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatRelative } from "@/lib/utils";
 import { Users, Copy, Check, Trophy, Share2, UserPlus, DollarSign } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 export default function ReferralsPage() {
   const { data: session } = useSession();
