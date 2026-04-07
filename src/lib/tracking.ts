@@ -102,25 +102,32 @@ function roundToNextSlot(intervalMin: number): Date {
 }
 
 /**
- * Execute all due tracking jobs. Called by the cron endpoint.
- * Returns { processed, errors, details }
+ * Execute tracking jobs. Called by the cron endpoint or manual trigger.
+ * @param options.campaignIds - If provided, only check clips from these campaigns (ignores nextCheckAt)
+ * @param options.source - "cron" or "manual" — manual checks don't change the next scheduled cron time
  */
-export async function runDueTrackingJobs(): Promise<{ processed: number; errors: number; details: string[] }> {
+export async function runDueTrackingJobs(options?: { campaignIds?: string[]; source?: "cron" | "manual" }): Promise<{ processed: number; errors: number; details: string[] }> {
   if (!db) return { processed: 0, errors: 0, details: ["DB unavailable"] };
 
-  console.log("[TRACKING] TRACKING RUNNING at", new Date().toISOString());
+  const source = options?.source || "cron";
+  const campaignIds = options?.campaignIds;
+  console.log(`[TRACKING] TRACKING RUNNING (${source}) at`, new Date().toISOString());
 
   const details: string[] = [];
   let processed = 0;
   let errors = 0;
 
   try {
-    // Find all active jobs that are due
+    // Build query: for manual checks with campaign filter, ignore nextCheckAt
+    const where: any = { isActive: true };
+    if (campaignIds && campaignIds.length > 0) {
+      where.campaignId = { in: campaignIds };
+    } else {
+      where.nextCheckAt = { lte: new Date() };
+    }
+
     const dueJobs = await db.trackingJob.findMany({
-      where: {
-        isActive: true,
-        nextCheckAt: { lte: new Date() },
-      },
+      where,
       include: {
         clip: {
           select: {
@@ -137,7 +144,7 @@ export async function runDueTrackingJobs(): Promise<{ processed: number; errors:
           },
         },
       },
-      take: 20, // Process max 20 per run to avoid timeouts
+      take: campaignIds ? 100 : 20,
     });
 
     console.log(`[TRACKING] Found ${dueJobs.length} due jobs`);
@@ -307,16 +314,24 @@ export async function runDueTrackingJobs(): Promise<{ processed: number; errors:
         }
         const nextCheck = roundToNextSlot(newInterval);
 
-        await db.trackingJob.update({
-          where: { id: job.id },
-          data: {
-            lastCheckedAt: new Date(),
-            nextCheckAt: nextCheck,
-            checkIntervalMin: newInterval,
-          },
-        });
-
-        console.log(`[TRACKING] Clip ${clip.id}: next check at ${nextCheck.toISOString()} (interval: ${newInterval}min)`);
+        if (source === "manual") {
+          // Manual checks: only update lastCheckedAt, preserve the cron schedule
+          await db.trackingJob.update({
+            where: { id: job.id },
+            data: { lastCheckedAt: new Date() },
+          });
+          console.log(`[TRACKING] Clip ${clip.id}: manual check done (cron schedule preserved)`);
+        } else {
+          await db.trackingJob.update({
+            where: { id: job.id },
+            data: {
+              lastCheckedAt: new Date(),
+              nextCheckAt: nextCheck,
+              checkIntervalMin: newInterval,
+            },
+          });
+          console.log(`[TRACKING] Clip ${clip.id}: next check at ${nextCheck.toISOString()} (interval: ${newInterval}min)`);
+        }
         details.push(`Clip ${clip.id}: ${prevViews}→${stats.views} views, next in ${newInterval}min`);
         processed++;
       } catch (err: any) {

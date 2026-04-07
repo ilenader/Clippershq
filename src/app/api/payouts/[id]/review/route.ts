@@ -34,7 +34,7 @@ export async function POST(
   const { id } = await params;
   const { action, rejectionReason } = body;
 
-  if (!["APPROVED", "REJECTED", "PAID", "UNDER_REVIEW"].includes(action)) {
+  if (!["APPROVED", "REJECTED", "PAID", "UNDER_REVIEW", "VOIDED"].includes(action)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 

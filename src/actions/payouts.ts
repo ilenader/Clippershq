@@ -93,7 +93,7 @@ export async function getAllPayouts(statusFilter?: string) {
   });
 }
 
-export async function reviewPayout(id: string, action: "APPROVED" | "REJECTED" | "PAID" | "UNDER_REVIEW", rejectionReason?: string) {
+export async function reviewPayout(id: string, action: "APPROVED" | "REJECTED" | "PAID" | "UNDER_REVIEW" | "VOIDED", rejectionReason?: string) {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
   const role = (session.user as any).role;

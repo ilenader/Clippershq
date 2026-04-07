@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Wallet, Check, X, Eye, Phone } from "lucide-react";
+import { Wallet, Check, X, Eye, Phone, Ban } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative, formatCurrency } from "@/lib/utils";
 
@@ -19,6 +19,7 @@ const statusFilterOptions = [
   { value: "APPROVED", label: "Approved" },
   { value: "PAID", label: "Paid" },
   { value: "REJECTED", label: "Rejected" },
+  { value: "VOIDED", label: "Voided" },
 ];
 
 export default function AdminPayoutsPage() {
@@ -85,9 +86,25 @@ export default function AdminPayoutsPage() {
   const getCallForPayout = (payoutId: string) =>
     calls.find((c: any) => c.payoutId === payoutId && c.status !== "CANCELLED");
 
+  const handleVoid = async (id: string) => {
+    if (!confirm("Void this payout? It will no longer count toward the clipper's balance.")) return;
+    setActing(true);
+    try {
+      const res = await fetch(`/api/payouts/${id}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "VOIDED", rejectionReason: "Voided by owner" }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Payout voided. Balance recalculated.");
+      load();
+    } catch { toast.error("Failed to void payout."); }
+    setActing(false);
+  };
+
   const statusMap: Record<string, string> = {
     REQUESTED: "pending", UNDER_REVIEW: "pending",
-    APPROVED: "approved", PAID: "active", REJECTED: "rejected",
+    APPROVED: "approved", PAID: "active", REJECTED: "rejected", VOIDED: "rejected",
   };
 
   return (
@@ -172,6 +189,9 @@ export default function AdminPayoutsPage() {
                     )}
                     {payout.status === "APPROVED" && (
                       <Button size="sm" onClick={() => handleReview(payout.id, "PAID")} loading={acting}>Mark paid</Button>
+                    )}
+                    {(payout.status === "PAID" || payout.status === "REJECTED") && (
+                      <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300" onClick={() => handleVoid(payout.id)} loading={acting} icon={<Ban className="h-3 w-3" />}>Void</Button>
                     )}
                     {/* Call scheduling */}
                     {(() => {

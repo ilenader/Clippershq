@@ -151,38 +151,52 @@ export default function AdminClipsPage() {
 
   const [trackingAll, setTrackingAll] = useState(false);
   const [trackResult, setTrackResult] = useState<string | null>(null);
-  const [trackCooldown, setTrackCooldown] = useState(0);
+  const [showTrackModal, setShowTrackModal] = useState(false);
+  const [trackSelected, setTrackSelected] = useState<Set<string>>(new Set());
 
-  // Cooldown timer
-  useEffect(() => {
-    if (trackCooldown <= 0) return;
-    const t = setInterval(() => setTrackCooldown((c) => Math.max(0, c - 1)), 1000);
-    return () => clearInterval(t);
-  }, [trackCooldown]);
+  // Count active clips per campaign for the modal
+  const activeClipsByCampaign: Record<string, number> = {};
+  for (const clip of clips) {
+    if (!clip.campaignId) continue;
+    activeClipsByCampaign[clip.campaignId] = (activeClipsByCampaign[clip.campaignId] || 0) + 1;
+  }
 
-  // Restore cooldown from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("track_all_until");
-    if (saved) {
-      const remaining = Math.ceil((parseInt(saved, 10) - Date.now()) / 1000);
-      if (remaining > 0) setTrackCooldown(remaining);
-    }
-  }, []);
+  const openTrackModal = () => {
+    // Pre-select all campaigns
+    const allIds = new Set(campaigns.map((c: any) => c.id));
+    setTrackSelected(allIds);
+    setShowTrackModal(true);
+  };
 
-  const handleTrackAll = async () => {
+  const toggleTrackCampaign = (id: string) => {
+    setTrackSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleTrackSelected = async () => {
+    if (trackSelected.size === 0) { toast.error("Select at least one campaign."); return; }
     setTrackingAll(true);
     setTrackResult(null);
     try {
-      const res = await fetch("/api/admin/track-all", { method: "POST" });
+      const res = await fetch("/api/admin/track-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaignIds: Array.from(trackSelected) }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      const viewChanges = (data.details || []).filter((d: string) => /→/.test(d) && !/→\s*\S+\s*views/.test(d) || /\d+→\d+/.test(d)).length;
-      setTrackResult(`Checked ${data.checked} clips. ${viewChanges > 0 ? `${viewChanges} had view changes.` : "No view changes."} (${data.elapsedMs}ms)`);
+      const viewChanges = (data.details || []).filter((d: string) => /→/.test(d)).length;
+      const msg = `Checked ${data.checked} clips across ${data.campaignsChecked} campaigns. ${viewChanges > 0 ? `${viewChanges} had view changes.` : "No view changes."} (${data.elapsedMs}ms)`;
+      if (data.campaignsBlocked > 0) {
+        setTrackResult(`${msg} (${data.campaignsBlocked} campaign(s) were rate-limited)`);
+      } else {
+        setTrackResult(msg);
+      }
       toast.success(`Tracking complete — ${data.checked} clips checked.`);
-      // Start 30-min cooldown
-      const cooldownSec = 30 * 60;
-      setTrackCooldown(cooldownSec);
-      localStorage.setItem("track_all_until", (Date.now() + cooldownSec * 1000).toString());
+      setShowTrackModal(false);
       load();
     } catch (err: any) {
       toast.error(err.message || "Tracking failed.");
@@ -201,8 +215,8 @@ export default function AdminClipsPage() {
           <p className="text-[15px] text-[var(--text-secondary)]">Approve, reject, or flag submitted clips.</p>
         </div>
         {isOwner && (
-          <Button onClick={handleTrackAll} loading={trackingAll} disabled={trackCooldown > 0} variant="outline" icon={<RotateCcw className="h-4 w-4" />}>
-            {trackCooldown > 0 ? `Wait ${Math.floor(trackCooldown / 60)}:${(trackCooldown % 60).toString().padStart(2, "0")}` : "Check All Now"}
+          <Button onClick={openTrackModal} variant="outline" icon={<RotateCcw className="h-4 w-4" />}>
+            Check Clips Now
           </Button>
         )}
       </div>
@@ -382,6 +396,46 @@ export default function AdminClipsPage() {
 
       {/* Tracking modal */}
       <TrackingModal clip={trackingClip} open={!!trackingClip} onClose={() => setTrackingClip(null)} />
+
+      {/* Manual tracking check modal */}
+      <Modal open={showTrackModal} onClose={() => setShowTrackModal(false)} title="Manual Tracking Check" className="max-w-md">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-[var(--text-muted)]">Select campaigns to check</p>
+            <button
+              onClick={() => {
+                if (trackSelected.size === campaigns.length) setTrackSelected(new Set());
+                else setTrackSelected(new Set(campaigns.map((c: any) => c.id)));
+              }}
+              className="text-xs text-accent hover:underline cursor-pointer"
+            >
+              {trackSelected.size === campaigns.length ? "Deselect all" : "Select all"}
+            </button>
+          </div>
+          <div className="max-h-64 overflow-y-auto space-y-1">
+            {campaigns.map((c: any) => (
+              <label key={c.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-[var(--bg-card-hover)] transition-colors cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={trackSelected.has(c.id)}
+                  onChange={() => toggleTrackCampaign(c.id)}
+                  className="h-4 w-4 rounded border-[var(--border-color)] accent-accent"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">{c.name}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{activeClipsByCampaign[c.id] || 0} clips · {c.status}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="ghost" onClick={() => setShowTrackModal(false)}>Cancel</Button>
+            <Button onClick={handleTrackSelected} loading={trackingAll} disabled={trackSelected.size === 0} icon={<RotateCcw className="h-4 w-4" />}>
+              Check {trackSelected.size} campaign{trackSelected.size !== 1 ? "s" : ""}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
