@@ -184,8 +184,11 @@ export function Navbar() {
             className="relative rounded-xl p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all cursor-pointer">
             <Bell className="h-4 w-4" />
             {notifCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-white">
-                {notifCount > 9 ? "9+" : notifCount}
+              <span className="absolute -top-0.5 -right-0.5">
+                <span className="absolute inset-0 rounded-full bg-blue-500 notif-ping" />
+                <span className="relative flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white shadow-[0_0_8px_rgba(59,130,246,0.5)]">
+                  {notifCount > 9 ? "9+" : notifCount}
+                </span>
               </span>
             )}
           </button>

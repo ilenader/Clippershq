@@ -22,10 +22,36 @@ const svg = (size) => {
 };
 
 async function main() {
-  await sharp(Buffer.from(svg(192))).png().toFile('public/icon-192.png');
+  // Generate PWA icons — flatten to remove alpha (solid black background)
+  await sharp(Buffer.from(svg(192)))
+    .flatten({ background: { r: 10, g: 13, b: 18 } }) // #0a0d12
+    .png()
+    .toFile('public/icon-192.png');
   console.log('Generated public/icon-192.png');
-  await sharp(Buffer.from(svg(512))).png().toFile('public/icon-512.png');
+
+  await sharp(Buffer.from(svg(512)))
+    .flatten({ background: { r: 10, g: 13, b: 18 } })
+    .png()
+    .toFile('public/icon-512.png');
   console.log('Generated public/icon-512.png');
+
+  // Generate favicon (32x32 PNG, browsers accept PNG favicons)
+  await sharp(Buffer.from(svg(32)))
+    .flatten({ background: { r: 10, g: 13, b: 18 } })
+    .png()
+    .toFile('public/favicon.png');
+  console.log('Generated public/favicon.png');
+
+  // Also generate a 48x48 for ICO-like usage
+  await sharp(Buffer.from(svg(48)))
+    .flatten({ background: { r: 10, g: 13, b: 18 } })
+    .png()
+    .toFile('public/favicon-48.png');
+  console.log('Generated public/favicon-48.png');
+
+  // Verify no alpha
+  const meta = await sharp('public/icon-192.png').metadata();
+  console.log('icon-192 channels:', meta.channels, 'hasAlpha:', meta.hasAlpha);
 }
 
 main().catch(console.error);
