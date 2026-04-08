@@ -295,7 +295,8 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
             // Owner earnings for CPM_SPLIT campaigns
             console.log(`[AGENCY-TRACK] Clip ${clip.id}: pricingModel=${(clip.campaign as any).pricingModel}, ownerCpm=${(clip.campaign as any).ownerCpm}`);
             if ((clip.campaign as any).pricingModel === "CPM_SPLIT" && (clip.campaign as any).ownerCpm) {
-              const ownerAmt = calculateOwnerEarnings(stats.views, (clip.campaign as any).ownerCpm);
+              const cCpm = (clip.campaign as any).clipperCpm ?? (clip.campaign as any).cpmRate;
+              const ownerAmt = calculateOwnerEarnings(stats.views, (clip.campaign as any).ownerCpm, breakdown.grossClipperEarnings, cCpm);
               console.log(`[AGENCY-TRACK] AgencyEarning: clip=${clip.id}, views=${stats.views}, ownerAmt=${ownerAmt}`);
               if (ownerAmt > 0) {
                 try {
@@ -309,13 +310,14 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
                 }
               }
             }
-            if (clip.userId) {
+            // Skip user stats/level updates for owner override clips
+            if (clip.userId && !clip.isOwnerOverride) {
               const allClips = await db.clip.findMany({
-                where: { userId: clip.userId, status: "APPROVED" },
+                where: { userId: clip.userId, status: "APPROVED", isOwnerOverride: false },
                 select: { earnings: true },
               });
               const allStatSnapshots = await db.clipStat.findMany({
-                where: { clip: { userId: clip.userId } },
+                where: { clip: { userId: clip.userId, isOwnerOverride: false } },
                 orderBy: { checkedAt: "desc" as any },
                 distinct: ["clipId" as any],
                 select: { views: true },
@@ -326,11 +328,8 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
                 where: { id: clip.userId },
                 data: { totalEarnings: Math.round(totalEarnings * 100) / 100, totalViews },
               });
-              // Skip level progression for owner override clips
-              if (!clip.isOwnerOverride) {
-                const { updateUserLevel } = await import("@/lib/gamification");
-                await updateUserLevel(clip.userId);
-              }
+              const { updateUserLevel } = await import("@/lib/gamification");
+              await updateUserLevel(clip.userId);
             }
           }
         }

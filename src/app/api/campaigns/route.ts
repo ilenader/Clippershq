@@ -142,6 +142,10 @@ export async function POST(req: NextRequest) {
     if (campaignData.bannedContent) createData.bannedContent = campaignData.bannedContent;
     if (campaignData.captionRules) createData.captionRules = campaignData.captionRules;
     if (campaignData.hashtagRules) createData.hashtagRules = campaignData.hashtagRules;
+    if (campaignData.aiKnowledge) createData.aiKnowledge = campaignData.aiKnowledge;
+    if (campaignData.pricingModel) createData.pricingModel = campaignData.pricingModel;
+    if (campaignData.ownerCpm) createData.ownerCpm = campaignData.ownerCpm;
+    if (campaignData.agencyFee) createData.agencyFee = campaignData.agencyFee;
     if (campaignData.videoLengthMin) createData.videoLengthMin = campaignData.videoLengthMin;
     if (campaignData.videoLengthMax) createData.videoLengthMax = campaignData.videoLengthMax;
     if (campaignData.reviewTiming) createData.reviewTiming = campaignData.reviewTiming;

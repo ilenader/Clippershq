@@ -40,9 +40,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json([]);
   }
 
-  // Role isolation: ADMIN does not see personal gamification state
-  if (role === "ADMIN") {
-    return NextResponse.json({});
+  // Role isolation: ADMIN and OWNER do not have personal gamification
+  if (role === "ADMIN" || role === "OWNER") {
+    return NextResponse.json({ bonusPercent: 0, levelBonus: 0, streakBonusPercent: 0, pwaBonusPercent: 0, level: 0, currentStreak: 0, longestStreak: 0 });
   }
 
   const state = await getGamificationState(session.user.id);

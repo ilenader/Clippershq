@@ -278,6 +278,10 @@ export async function POST(
             }
 
             if (replyContent) {
+              // Strip TRANSFER_TO_AGENT prefix from display
+              if (replyContent.startsWith("TRANSFER_TO_AGENT:")) {
+                replyContent = replyContent.replace("TRANSFER_TO_AGENT:", "").trim();
+              }
               await db.message.create({
                 data: { conversationId, senderId: responderId, content: replyContent, isAI: true },
               });

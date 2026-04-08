@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,7 @@ export default function ClipsPage() {
   });
   const [platformError, setPlatformError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const ts = Date.now();
       const [clipsRes, campaignsRes, accountsRes, joinsRes, gamRes] = await Promise.all([
@@ -78,9 +79,10 @@ export default function ClipsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+  useAutoRefresh(load, 30000);
 
   // Compute remaining daily submissions per campaign
   const getDailyRemaining = (campaignId: string): { remaining: number; limit: number } => {
@@ -152,13 +154,14 @@ export default function ClipsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">My Clips</h1>
-          <p className="text-[15px] text-[var(--text-secondary)]">Submit and track your clips.
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[15px] text-[var(--text-secondary)]">Submit and track your clips.</p>
             {gamification && gamification.bonusPercent > 0 && (
-              <span className="ml-2 inline-flex items-center rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-400">
+              <span className="inline-flex items-center rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-400">
                 +{gamification.bonusPercent}% bonus
               </span>
             )}
-          </p>
+          </div>
         </div>
         <Button onClick={() => setShowModal(true)} icon={<Plus className="h-4 w-4" />}>
           Submit Clip

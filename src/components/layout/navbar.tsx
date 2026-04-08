@@ -185,8 +185,8 @@ export function Navbar() {
             <Bell className="h-4 w-4" />
             {notifCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5">
-                <span className="absolute inset-0 rounded-full bg-blue-500 notif-ping" />
-                <span className="relative flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white shadow-[0_0_8px_rgba(59,130,246,0.5)]">
+                <span className="absolute inset-0 rounded-full bg-accent notif-ping" />
+                <span className="relative flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-white shadow-[0_0_8px_rgba(37,150,190,0.5)]">
                   {notifCount > 9 ? "9+" : notifCount}
                 </span>
               </span>

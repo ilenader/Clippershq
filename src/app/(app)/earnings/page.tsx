@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +63,7 @@ export default function EarningsPage() {
   useEffect(() => {
     fetchData([], true);
   }, [fetchData]);
+  useAutoRefresh(useCallback(() => fetchData(selectedCampaigns), [fetchData, selectedCampaigns]), 60000);
 
   // Re-fetch when campaign selection changes
   const handleCampaignChange = useCallback((values: string[]) => {

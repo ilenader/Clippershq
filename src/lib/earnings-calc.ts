@@ -298,9 +298,26 @@ export function computeLevel(
   return level;
 }
 
-/** Calculate owner earnings for CPM_SPLIT campaigns */
-export function calculateOwnerEarnings(views: number, ownerCpm: number | null): number {
+/**
+ * Calculate owner earnings for CPM_SPLIT campaigns.
+ * If clipper earnings are capped (maxPayoutPerClip), owner earnings are proportional:
+ *   ownerEarnings = clipperGrossEarnings × (ownerCpm / clipperCpm)
+ * This ensures both sides respect the cap proportionally.
+ */
+export function calculateOwnerEarnings(
+  views: number,
+  ownerCpm: number | null,
+  clipperGrossEarnings?: number,
+  clipperCpm?: number | null,
+): number {
   if (!views || views <= 0 || !ownerCpm || ownerCpm <= 0) return 0;
+
+  // If clipper earnings and CPM are provided, use proportional calculation
+  if (clipperGrossEarnings != null && clipperCpm && clipperCpm > 0) {
+    return round2(clipperGrossEarnings * (ownerCpm / clipperCpm));
+  }
+
+  // Fallback: raw views × ownerCpm (no cap context available)
   return round2((views / 1000) * ownerCpm);
 }
 

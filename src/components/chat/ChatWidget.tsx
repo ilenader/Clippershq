@@ -367,7 +367,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   // ── Scroll to bottom ──
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, sending]);
 
   // ── Focus input ──
   useEffect(() => {
@@ -899,6 +899,21 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                       </div>
                     );
                   })}
+                  {/* Typing indicator while waiting for AI response */}
+                  {isClipper && sending && (
+                    <div className="flex justify-start">
+                      <div className="flex items-end gap-2 max-w-[85%]">
+                        <div className="flex-shrink-0 w-8">
+                          <div className="rounded-full bg-blue-500 flex items-center justify-center" style={{ width: 28, height: 28 }}>
+                            <Bot className="h-3.5 w-3.5 text-white" />
+                          </div>
+                        </div>
+                        <div className="rounded-2xl px-4 py-3 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-bl-md">
+                          <div className="typing-dots"><span /><span /><span /></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </>
               )}

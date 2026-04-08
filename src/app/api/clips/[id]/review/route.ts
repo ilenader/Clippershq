@@ -104,7 +104,8 @@ export async function POST(
         const oCpm = (clipWithData.campaign as any).ownerCpm;
         if (pm === "CPM_SPLIT" && oCpm) {
           const views = clipWithData.stats[0].views;
-          const ownerAmt = calculateOwnerEarnings(views, oCpm);
+          const cCpm = (clipWithData.campaign as any).clipperCpm ?? (clipWithData.campaign as any).cpmRate;
+          const ownerAmt = calculateOwnerEarnings(views, oCpm, breakdown.grossClipperEarnings, cCpm);
           console.log(`[AGENCY] Creating AgencyEarning: clip=${id}, views=${views}, ownerAmt=${ownerAmt}`);
           if (ownerAmt > 0) {
             try {
