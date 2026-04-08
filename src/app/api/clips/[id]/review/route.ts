@@ -2,7 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { getUserCampaignIds } from "@/lib/campaign-access";
 import { logAudit } from "@/lib/audit";
-import { recalculateClipEarnings, recalculateClipEarningsBreakdown } from "@/lib/earnings-calc";
+import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
 import { createNotification } from "@/lib/notifications";
 import { sendClipApproved, sendClipRejected } from "@/lib/email";
 import { updateUserLevel } from "@/lib/gamification";
@@ -78,7 +78,7 @@ export async function POST(
         where: { id },
         include: {
           stats: { orderBy: { checkedAt: "desc" }, take: 1 },
-          campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true } },
+          campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, pricingModel: true, ownerCpm: true } },
           user: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true } },
         },
       });
@@ -97,6 +97,19 @@ export async function POST(
             bonusAmount: breakdown.bonusAmount,
           },
         });
+
+        // Create agency earnings for CPM_SPLIT campaigns
+        if ((clipWithData.campaign as any).pricingModel === "CPM_SPLIT" && (clipWithData.campaign as any).ownerCpm) {
+          const views = clipWithData.stats[0].views;
+          const ownerAmt = calculateOwnerEarnings(views, (clipWithData.campaign as any).ownerCpm);
+          if (ownerAmt > 0) {
+            await db.agencyEarning.upsert({
+              where: { clipId: id },
+              create: { campaignId: clip.campaignId, clipId: id, amount: ownerAmt, views },
+              update: { amount: ownerAmt, views },
+            }).catch(() => {});
+          }
+        }
       }
       // Notify clipper (in-app + email)
       createNotification(clip.userId, "CLIP_APPROVED", "Clip approved!", "Your clip has been approved and earnings have been calculated.").catch(() => {});

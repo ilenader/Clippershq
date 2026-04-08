@@ -6,9 +6,8 @@ async function generateIcon(size, outPath) {
   const triH = Math.round(triW * 0.866); // equilateral: h = w * sqrt(3)/2
 
   const cx = size / 2;
-  // Centroid at 1/3 from base. Place centroid at canvas center.
-  // centroidY = topY + 2/3 * triH = size/2  =>  topY = size/2 - 2/3 * triH
-  const topY = Math.round(size / 2 - (2 / 3) * triH - size * 0.03);
+  // Geometric center: (topY + botY) / 2 = size/2
+  const topY = Math.round(size / 2 - triH / 2);
   const botY = topY + triH;
   const leftX = Math.round(cx - triW / 2);
   const rightX = Math.round(cx + triW / 2);

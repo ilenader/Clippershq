@@ -144,7 +144,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           },
         },
       },
-      take: campaignIds ? 100 : 20,
+      take: campaignIds ? 30 : 20,
     });
 
     console.log(`[TRACKING] Found ${dueJobs.length} due jobs`);
@@ -169,19 +169,21 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
         // Fetch real stats from Apify
         const stats = await fetchClipStats(clip.clipUrl);
 
-        // Get previous snapshot for logging
+        // Get previous snapshot for growth calculation
+        // For cron checks: use last NON-manual snapshot to avoid manual checks distorting growth
         const prevStat = await db.clipStat.findFirst({
-          where: { clipId: clip.id },
+          where: { clipId: clip.id, ...(source === "cron" ? { isManual: false } : {}) },
           orderBy: { checkedAt: "desc" },
         });
         const prevViews = prevStat?.views ?? 0;
 
-        console.log(`[TRACKING] Clip ${clip.id}: ${prevViews} → ${stats.views} views`);
+        console.log(`[TRACKING] Clip ${clip.id}: ${prevViews} → ${stats.views} views (${source})`);
 
-        // Save new snapshot
+        // Save new snapshot (mark manual checks)
         await db.clipStat.create({
           data: {
             clipId: clip.id,
+            isManual: source === "manual",
             views: stats.views,
             likes: stats.likes,
             comments: stats.comments,

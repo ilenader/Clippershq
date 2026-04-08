@@ -35,6 +35,10 @@ export async function ensureReferralCode(userId: string): Promise<string | null>
 export async function attachReferral(newUserId: string, referralCode: string): Promise<boolean> {
   if (!db) return false;
   try {
+    // Only set referral on new accounts — never overwrite existing referral
+    const newUser = await db.user.findUnique({ where: { id: newUserId }, select: { referredById: true } });
+    if (newUser?.referredById) return false; // Already has a referrer
+
     const inviter = await db.user.findUnique({ where: { referralCode }, select: { id: true, status: true } });
     if (!inviter || inviter.id === newUserId || (inviter as any).status === "BANNED") return false;
 

@@ -137,13 +137,14 @@ export async function PATCH(
     }
 
     if (data.startDate) data.startDate = new Date(data.startDate);
+    else if (data.startDate === "") data.startDate = null;
     if (data.endDate) data.endDate = new Date(data.endDate);
-    if (data.budget !== undefined && data.budget !== null && data.budget !== "") data.budget = parseFloat(data.budget);
-    if (data.clipperCpm !== undefined && data.clipperCpm !== null && data.clipperCpm !== "") data.clipperCpm = parseFloat(data.clipperCpm);
-    if (data.ownerCpm !== undefined && data.ownerCpm !== null && data.ownerCpm !== "") data.ownerCpm = parseFloat(data.ownerCpm);
-    if (data.agencyFee !== undefined && data.agencyFee !== null && data.agencyFee !== "") data.agencyFee = parseFloat(data.agencyFee);
-    if (data.maxPayoutPerClip !== undefined && data.maxPayoutPerClip !== null && data.maxPayoutPerClip !== "") data.maxPayoutPerClip = parseFloat(data.maxPayoutPerClip);
-    if (data.minViews !== undefined && data.minViews !== null && data.minViews !== "") data.minViews = parseInt(data.minViews);
+    else if (data.endDate === "") data.endDate = null;
+    // Convert numeric fields: empty string → null, non-empty → parse
+    for (const f of ["budget", "clipperCpm", "ownerCpm", "agencyFee", "maxPayoutPerClip"]) {
+      if (f in data) data[f] = (data[f] !== "" && data[f] != null) ? parseFloat(data[f]) : null;
+    }
+    if ("minViews" in data) data.minViews = (data.minViews !== "" && data.minViews != null) ? parseInt(data.minViews) : null;
     if (data.maxClipsPerUserPerDay !== undefined && data.maxClipsPerUserPerDay !== null && data.maxClipsPerUserPerDay !== "") {
       const v = parseInt(data.maxClipsPerUserPerDay);
       data.maxClipsPerUserPerDay = Math.max(1, Math.min(6, isNaN(v) ? 3 : v));
@@ -154,8 +155,12 @@ export async function PATCH(
     try {
       const campaign = await db.campaign.update({ where: { id }, data });
       return NextResponse.json(campaign);
-    } catch {
-      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+    } catch (updateErr: any) {
+      console.error(`PATCH campaign ${id} DB error:`, updateErr?.message, "data:", JSON.stringify(data).substring(0, 500));
+      if (updateErr?.code === "P2025") {
+        return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+      }
+      return NextResponse.json({ error: "Failed to save campaign. Check field values." }, { status: 500 });
     }
   } catch (err: any) {
     console.error("PATCH /api/campaigns/[id] error:", err);
