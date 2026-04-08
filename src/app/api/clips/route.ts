@@ -195,38 +195,86 @@ export async function POST(req: NextRequest) {
     // Store fetched stats so we can save them with the clip (not zeros)
     let fetchedStats: { views: number; likes: number; comments: number; shares: number } | null = null;
 
+    console.log(`[FRESHNESS] Platform: ${platform}, URL: ${data.clipUrl}`);
+
     if (platform === "tiktok" || platform === "instagram") {
       // Fetch REAL post time + stats from Apify — never trust user input
       try {
         const stats = await fetchClipStats(data.clipUrl);
+        console.log(`[FRESHNESS] ${platform} createdAt: ${stats.createdAt || "null"}`);
         if (stats.createdAt) {
           const postedTime = new Date(stats.createdAt).getTime();
-          if (Date.now() - postedTime > twoHoursMs) {
+          const diffMs = Date.now() - postedTime;
+          const diffHours = Math.round(diffMs / 3600000 * 10) / 10;
+          console.log(`[FRESHNESS] Posted ${diffHours}h ago (limit: 2h)`);
+          if (diffMs > twoHoursMs) {
+            console.log(`[FRESHNESS] REJECTED — ${platform} clip posted ${diffHours}h ago`);
             return NextResponse.json({
               error: `This ${platform === "tiktok" ? "TikTok" : "Instagram"} clip was posted more than 2 hours ago and cannot be submitted.`,
             }, { status: 400 });
           }
+          console.log(`[FRESHNESS] PASSED — within 2h window`);
         } else if (platform === "instagram") {
-          // Instagram: block if we can't verify post time — no silent fallback
+          console.log(`[FRESHNESS] REJECTED — Instagram createdAt unavailable`);
           return NextResponse.json({
             error: "We could not verify when this Instagram clip was posted. Please try again.",
           }, { status: 400 });
         } else {
-          // TikTok: existing lenient behavior — allow if createdAt unavailable
-          console.warn(`[Clip Submit] TikTok createdAt unavailable for ${data.clipUrl}, allowing submission`);
+          console.warn(`[FRESHNESS] TikTok createdAt unavailable — allowing (lenient)`);
         }
         fetchedStats = { views: stats.views, likes: stats.likes, comments: stats.comments, shares: stats.shares };
       } catch (err: any) {
         if (platform === "instagram") {
-          // Instagram: block on API failure — no silent fallback
-          console.error(`[Clip Submit] Instagram verification failed for ${data.clipUrl}: ${err.message}`);
+          console.error(`[FRESHNESS] Instagram API failed: ${err.message}`);
           return NextResponse.json({
             error: "We could not verify this Instagram clip right now. Please try again.",
           }, { status: 400 });
         }
-        // TikTok: existing lenient behavior — allow if Apify fails
-        console.warn(`[Clip Submit] Apify TikTok check failed for ${data.clipUrl}: ${err.message}`);
+        console.warn(`[FRESHNESS] TikTok API failed: ${err.message} — allowing (lenient)`);
       }
+    } else if (platform === "youtube") {
+      // YouTube: use YouTube Data API to check posting time
+      try {
+        const { getYouTubeVideoDetails } = await import("@/lib/youtube");
+        const details = await getYouTubeVideoDetails(data.clipUrl);
+        console.log(`[FRESHNESS] YouTube details: publishedAt=${details?.publishedAt || "null"}, views=${details?.views || 0}`);
+        if (details) {
+          if (details.publishedAt) {
+            const postedTime = new Date(details.publishedAt).getTime();
+            const diffMs = Date.now() - postedTime;
+            const diffHours = Math.round(diffMs / 3600000 * 10) / 10;
+            console.log(`[FRESHNESS] YouTube posted ${diffHours}h ago (limit: 2h)`);
+            if (diffMs > twoHoursMs) {
+              console.log(`[FRESHNESS] REJECTED — YouTube clip posted ${diffHours}h ago`);
+              return NextResponse.json({
+                error: `This YouTube clip was posted more than 2 hours ago and cannot be submitted.`,
+              }, { status: 400 });
+            }
+            console.log(`[FRESHNESS] PASSED — within 2h window`);
+          } else {
+            console.log(`[FRESHNESS] REJECTED — YouTube publishedAt unavailable`);
+            return NextResponse.json({
+              error: "Could not verify when this YouTube clip was posted. Please try again.",
+            }, { status: 400 });
+          }
+          fetchedStats = { views: details.views, likes: details.likes, comments: details.comments, shares: 0 };
+        } else {
+          console.log(`[FRESHNESS] REJECTED — YouTube API returned null (no API key or invalid URL)`);
+          return NextResponse.json({
+            error: "Could not verify this YouTube clip. Make sure YOUTUBE_API_KEY is configured and the URL is valid.",
+          }, { status: 400 });
+        }
+      } catch (err: any) {
+        console.error(`[FRESHNESS] YouTube API error: ${err.message}`);
+        return NextResponse.json({
+          error: "Could not verify this YouTube clip right now. Please try again.",
+        }, { status: 400 });
+      }
+    } else {
+      console.log(`[FRESHNESS] Unknown platform "${platform}" — rejecting`);
+      return NextResponse.json({
+        error: "Could not detect the platform from this URL. Please use a TikTok, Instagram, or YouTube clip link.",
+      }, { status: 400 });
     }
 
     const existing = await db.clip.findFirst({
