@@ -154,45 +154,41 @@ export async function POST(
     // (earnings are NOT zeroed, trust score is NOT decreased for FLAGGED)
 
     // ── Sync user totalEarnings, totalViews, and level ──
-    try {
-      // Sum earnings from all APPROVED clips for this user
-      const earningsAgg = await db.clip.aggregate({
-        where: { userId: clip.userId, status: "APPROVED" },
-        _sum: { earnings: true },
-      });
-      const newTotalEarnings = earningsAgg._sum.earnings ?? 0;
+    // Skip entirely for OWNER/ADMIN users and owner override clips
+    const userRole_ = (clip.user as any)?.role;
+    if (userRole_ !== "OWNER" && userRole_ !== "ADMIN" && !clip.isOwnerOverride) {
+      try {
+        const earningsAgg = await db.clip.aggregate({
+          where: { userId: clip.userId, status: "APPROVED", isOwnerOverride: false },
+          _sum: { earnings: true },
+        });
+        const newTotalEarnings = earningsAgg._sum.earnings ?? 0;
 
-      // Get totalViews: sum the latest stat's views for each clip belonging to this user
-      const userClipsWithStats = await db.clip.findMany({
-        where: { userId: clip.userId, stats: { some: {} } },
-        select: {
-          stats: { orderBy: { checkedAt: "desc" }, take: 1, select: { views: true } },
-        },
-      });
-      const newTotalViews = userClipsWithStats.reduce(
-        (sum: number, c: any) => sum + (c.stats[0]?.views ?? 0),
-        0
-      );
+        const userClipsWithStats = await db.clip.findMany({
+          where: { userId: clip.userId, isOwnerOverride: false, stats: { some: {} } },
+          select: {
+            stats: { orderBy: { checkedAt: "desc" }, take: 1, select: { views: true } },
+          },
+        });
+        const newTotalViews = userClipsWithStats.reduce(
+          (sum: number, c: any) => sum + (c.stats[0]?.views ?? 0),
+          0
+        );
 
-      await db.user.update({
-        where: { id: clip.userId },
-        data: { totalEarnings: newTotalEarnings, totalViews: newTotalViews },
-      });
+        await db.user.update({
+          where: { id: clip.userId },
+          data: { totalEarnings: newTotalEarnings, totalViews: newTotalViews },
+        });
 
-      // Skip level progression for OWNER users and owner override clips
-      const clipUserRole = (clip.user as any)?.role;
-      if (clipUserRole !== "OWNER" && !clip.isOwnerOverride) {
         await updateUserLevel(clip.userId);
+      } catch (syncErr: any) {
+        console.error("User sync after clip review failed:", syncErr?.message);
       }
-    } catch (syncErr: any) {
-      console.error("User sync after clip review failed:", syncErr?.message);
     }
 
     // Update user trust score based on action (clamped to 0-100)
-    // FLAGGED does NOT affect trust score — it only means "needs review"
-    // Skip for OWNER users
-    const clipUserRole = (clip.user as any)?.role;
-    if (clipUserRole !== "OWNER") {
+    // Skip for OWNER/ADMIN users
+    if (userRole_ !== "OWNER" && userRole_ !== "ADMIN") {
       try {
         const user = await db.user.findUnique({ where: { id: clip.userId }, select: { trustScore: true } });
         if (user) {
@@ -209,7 +205,7 @@ export async function POST(
 
     // Re-evaluate streak on approval/rejection (48h grace system)
     // Skip for OWNER users and owner override clips
-    if ((action === "APPROVED" || action === "REJECTED") && clipUserRole !== "OWNER" && !clip.isOwnerOverride) {
+    if ((action === "APPROVED" || action === "REJECTED") && userRole_ !== "OWNER" && userRole_ !== "ADMIN" && !clip.isOwnerOverride) {
       try {
         const { updateStreak } = await import("@/lib/gamification");
         await updateStreak(clip.userId);
