@@ -30,31 +30,35 @@ export async function GET() {
     });
 
     const result = campaigns.map((c: any) => {
+      // Default pricingModel for campaigns created before the field existed
+      const pricing = c.pricingModel || "AGENCY_FEE";
       const totalOwnerEarnings = c.agencyEarnings.reduce((s: number, e: any) => s + (e.amount || 0), 0);
       const totalViews = c.agencyEarnings.reduce((s: number, e: any) => s + (e.views || 0), 0);
+      // For AGENCY_FEE: the fee is the campaign's agencyFee field (flat amount)
+      // For CPM_SPLIT: earnings come from AgencyEarning records (views × ownerCpm)
+      const displayEarnings = pricing === "CPM_SPLIT" ? Math.round(totalOwnerEarnings * 100) / 100 : (c.agencyFee || 0);
       return {
         id: c.id,
         name: c.name,
         platform: c.platform,
-        pricingModel: c.pricingModel,
+        pricingModel: pricing,
         ownerCpm: c.ownerCpm,
         agencyFee: c.agencyFee,
         budget: c.budget,
         status: c.status,
         totalOwnerEarnings: Math.round(totalOwnerEarnings * 100) / 100,
+        displayEarnings,
         totalViews,
         clipCount: c.agencyEarnings.length,
-        earningsByDay: c.agencyEarnings,
       };
     });
 
-    const grandTotal = result.reduce((s: number, c: any) => {
-      if (c.pricingModel === "CPM_SPLIT") return s + c.totalOwnerEarnings;
-      if (c.pricingModel === "AGENCY_FEE" && c.agencyFee) return s + c.agencyFee;
-      return s;
-    }, 0);
+    // Only include campaigns that have some agency value
+    const withEarnings = result.filter((c: any) => c.displayEarnings > 0 || c.totalOwnerEarnings > 0);
 
-    return NextResponse.json({ campaigns: result, total: Math.round(grandTotal * 100) / 100 });
+    const grandTotal = withEarnings.reduce((s: number, c: any) => s + (c.displayEarnings || 0), 0);
+
+    return NextResponse.json({ campaigns: withEarnings, allCampaigns: result, total: Math.round(grandTotal * 100) / 100 });
   } catch {
     return NextResponse.json({ campaigns: [], total: 0 });
   }

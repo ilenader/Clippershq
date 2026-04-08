@@ -15,6 +15,14 @@ import { Film, Plus, ExternalLink } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative, formatNumber, formatCurrency } from "@/lib/utils";
 
+function detectUrlPlatform(url: string): string | null {
+  const l = url.toLowerCase();
+  if (l.includes("tiktok.com")) return "TikTok";
+  if (l.includes("instagram.com") || l.includes("instagr.am")) return "Instagram";
+  if (l.includes("youtube.com") || l.includes("youtu.be")) return "YouTube";
+  return null;
+}
+
 export default function ClipsPage() {
   const { data: session } = useSession();
   const router = useRouter();
@@ -40,6 +48,7 @@ export default function ClipsPage() {
     clipUrl: "",
     note: "",
   });
+  const [platformError, setPlatformError] = useState<string | null>(null);
 
   const load = async () => {
     try {
@@ -92,21 +101,20 @@ export default function ClipsPage() {
       return;
     }
 
-    // Frontend platform match check
-    const selectedAccount = accounts.find((a: any) => a.id === form.clipAccountId);
-    if (selectedAccount) {
-      const url = form.clipUrl.toLowerCase();
-      const plat = selectedAccount.platform;
-      const platformUrls: Record<string, string[]> = {
-        TikTok: ["tiktok.com"],
-        Instagram: ["instagram.com", "instagr.am"],
-        YouTube: ["youtube.com", "youtu.be"],
-      };
-      const expected = platformUrls[plat] || [];
-      if (expected.length > 0 && !expected.some((d) => url.includes(d))) {
-        toast.error(`Platform mismatch: your account is ${plat} but the URL is not a ${plat} link.`);
+    // Frontend platform match check — against both account and campaign
+    const urlPlat = detectUrlPlatform(form.clipUrl);
+    const selectedCampaign = campaigns.find((c: any) => c.id === form.campaignId);
+    if (urlPlat && selectedCampaign?.platform) {
+      const allowed = selectedCampaign.platform.split(",").map((p: string) => p.trim().toLowerCase());
+      if (!allowed.includes(urlPlat.toLowerCase())) {
+        toast.error(`This campaign only accepts ${selectedCampaign.platform} clips. Your link is from ${urlPlat}.`);
         return;
       }
+    }
+    const selectedAccount = accounts.find((a: any) => a.id === form.clipAccountId);
+    if (selectedAccount && urlPlat && selectedAccount.platform !== urlPlat) {
+      toast.error(`Platform mismatch: your account is ${selectedAccount.platform} but the URL is from ${urlPlat}.`);
+      return;
     }
 
     setSubmitting(true);
@@ -218,9 +226,36 @@ export default function ClipsPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Select id="campaignId" label="Campaign *" options={campaigns.filter((c: any) => joinedCampaignIds.has(c.id)).map((c: any) => ({ value: c.id, label: `${c.name} (${c.platform})` }))} placeholder={joinedCampaignIds.size === 0 ? "Join a campaign first" : "Select campaign"} value={form.campaignId} onChange={(e) => setForm({ ...form, campaignId: e.target.value })} />
+            <Select id="campaignId" label="Campaign *" options={campaigns.filter((c: any) => joinedCampaignIds.has(c.id)).map((c: any) => ({ value: c.id, label: `${c.name} (${c.platform})` }))} placeholder={joinedCampaignIds.size === 0 ? "Join a campaign first" : "Select campaign"} value={form.campaignId} onChange={(e) => { setForm({ ...form, campaignId: e.target.value }); setPlatformError(null); }} />
             <Select id="clipAccountId" label="Account *" options={accounts.map((a: any) => ({ value: a.id, label: `${a.username} (${a.platform})` }))} placeholder="Select approved account" value={form.clipAccountId} onChange={(e) => setForm({ ...form, clipAccountId: e.target.value })} />
-            <Input id="clipUrl" label="Clip URL *" placeholder="https://tiktok.com/@user/video/..." value={form.clipUrl} onChange={(e) => setForm({ ...form, clipUrl: e.target.value })} />
+            <div>
+              <Input id="clipUrl" label="Clip URL *" placeholder="https://tiktok.com/@user/video/..." value={form.clipUrl} onChange={(e) => {
+                const val = e.target.value;
+                setForm({ ...form, clipUrl: val });
+                // Real-time platform check against campaign
+                if (val.length > 10 && form.campaignId) {
+                  const det = detectUrlPlatform(val);
+                  const camp = campaigns.find((c: any) => c.id === form.campaignId);
+                  if (det && camp?.platform) {
+                    const allowed = camp.platform.split(",").map((p: string) => p.trim().toLowerCase());
+                    if (!allowed.includes(det.toLowerCase())) {
+                      setPlatformError(`This campaign only accepts ${camp.platform} clips. Your link is from ${det}.`);
+                    } else {
+                      setPlatformError(null);
+                    }
+                  } else {
+                    setPlatformError(null);
+                  }
+                } else {
+                  setPlatformError(null);
+                }
+              }} />
+              {platformError && <p className="mt-1.5 text-xs text-red-400">{platformError}</p>}
+              {form.campaignId && !platformError && (() => {
+                const camp = campaigns.find((c: any) => c.id === form.campaignId);
+                return camp?.platform ? <p className="mt-1 text-xs text-[var(--text-muted)]">Accepted: {camp.platform}</p> : null;
+              })()}
+            </div>
             <Textarea id="note" label="Note (optional)" placeholder="Any additional info..." value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
             {form.campaignId && (() => {
               const { remaining, limit } = getDailyRemaining(form.campaignId);
@@ -243,7 +278,7 @@ export default function ClipsPage() {
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-              <Button type="submit" loading={submitting}>Submit Clip</Button>
+              <Button type="submit" loading={submitting} disabled={!!platformError}>Submit Clip</Button>
             </div>
           </form>
         )}

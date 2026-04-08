@@ -187,6 +187,7 @@ model Campaign {
   videoLengthMin  Int?
   videoLengthMax  Int?
   reviewTiming    String?
+  aiKnowledge     String?        @db.Text
   startDate       DateTime?
   endDate         DateTime?
   createdById     String?

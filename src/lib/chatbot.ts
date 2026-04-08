@@ -40,7 +40,8 @@ RULES:
 - If you find yourself giving a similar type of answer twice in a row (repetitive), suggest: "It seems like I might not be giving you what you need. Would you like me to connect you with our support team? Just say 'connect me'."
 - Every 5th message in the conversation, add a subtle note at the end: "\n\nRemember, if you need more help, I can connect you with our team."
 
-IMPORTANT: Only answer questions that you can answer from the KNOWLEDGE BASE provided below. If the question is not covered in the knowledge base, say: "I'm not sure about that one. Would you like me to connect you with our support team? Just say 'connect me' and I'll get someone to help you." NEVER make up information. NEVER guess. If you don't know, admit it and offer to connect them with a human.
+IMPORTANT: Only answer questions that you can answer from the KNOWLEDGE BASE or CAMPAIGN-SPECIFIC INFO provided below. If the question is not covered, say: "I'm not sure about that one. Would you like me to connect you with our support team? Just say 'connect me' and I'll get someone to help you." NEVER make up information. NEVER guess. If you don't know, admit it and offer to connect them with a human.
+If asked about a specific campaign and you have campaign-specific knowledge, use it. If you don't have campaign details, say: "I don't have specific details about that. Would you like me to connect you with our team? Just say 'connect me'." NEVER make up campaign details.
 
 PLATFORM KNOWLEDGE:
 - Clippers submit clips (TikTok, Instagram Reels, YouTube Shorts) to campaigns
@@ -100,6 +101,7 @@ export async function generateChatbotResponse(
   userMessage: string,
   conversationHistory: ChatMessage[],
   userData: UserData,
+  campaignId?: string | null,
 ): Promise<string | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null; // Fall back to auto-replies
@@ -111,8 +113,22 @@ export async function generateChatbotResponse(
 
   const userContext = `\n\nUSER CONTEXT:\n- Username: ${userData.username}\n- Level: ${userData.level}\n- Current streak: ${userData.streak} days\n- Total earnings: $${userData.earnings.toFixed(2)}`;
 
-  // Load knowledge base from DB
+  // Load global knowledge base from DB
   const knowledgeBase = await getKnowledgeBase();
+
+  // Load per-campaign AI knowledge if available
+  let campaignKnowledge = "";
+  if (campaignId) {
+    try {
+      const campaign = await db.campaign.findUnique({
+        where: { id: campaignId },
+        select: { name: true, aiKnowledge: true },
+      });
+      if (campaign?.aiKnowledge) {
+        campaignKnowledge = `\n\nCAMPAIGN-SPECIFIC INFO for "${campaign.name}":\n${campaign.aiKnowledge}\nUse this to answer campaign-specific questions accurately. If you don't know, say so and offer to connect with support.`;
+      }
+    } catch {}
+  }
 
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -125,7 +141,7 @@ export async function generateChatbotResponse(
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 500,
-        system: SYSTEM_PROMPT + knowledgeBase + userContext,
+        system: SYSTEM_PROMPT + knowledgeBase + campaignKnowledge + userContext,
         messages: [
           ...conversationHistory.slice(-10), // Last 10 messages for context
           { role: "user", content: userMessage },

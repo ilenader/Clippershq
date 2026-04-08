@@ -37,6 +37,7 @@ const defaultForm = {
   requirementsList: [""] as string[],
   examples: "", soundLink: "", assetLink: "", imageUrl: "",
   captionRules: "", hashtagRules: "",
+  aiKnowledge: "",
   startDate: "",
 };
 
@@ -128,6 +129,7 @@ export default function AdminCampaignsPage() {
       requirementsList: reqs.length > 0 ? reqs : [""],
       examples: c.examples || "", soundLink: c.soundLink || "", assetLink: c.assetLink || "",
       imageUrl: c.imageUrl || "", captionRules: c.captionRules || "", hashtagRules: c.hashtagRules || "",
+      aiKnowledge: c.aiKnowledge || "",
       startDate: c.startDate ? new Date(c.startDate).toISOString().split("T")[0] : "",
     });
     setShowModal(true);
@@ -151,6 +153,7 @@ export default function AdminCampaignsPage() {
         maxClipsPerUserPerDay: form.maxClipsPerUserPerDay, requirements,
         examples: form.examples, soundLink: form.soundLink, assetLink: form.assetLink,
         imageUrl: form.imageUrl, captionRules: form.captionRules, hashtagRules: form.hashtagRules,
+        aiKnowledge: form.aiKnowledge,
         startDate: form.startDate,
       };
 
@@ -554,6 +557,7 @@ export default function AdminCampaignsPage() {
             <Textarea id="hashtagRules" label="Hashtag rules" value={form.hashtagRules} onChange={(e) => updateField("hashtagRules", e.target.value)} />
           </div>
           <Textarea id="payoutRule" label="Payout rules" value={form.payoutRule} onChange={(e) => updateField("payoutRule", e.target.value)} />
+          <Textarea id="aiKnowledge" label="Campaign Instructions for AI Chatbot" placeholder="Paste detailed info about this campaign — where to find content, posting rules, common clipper questions. The AI chatbot will use this to answer questions." value={form.aiKnowledge} onChange={(e) => updateField("aiKnowledge", e.target.value)} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Input id="soundLink" label="Sound link (optional)" value={form.soundLink} onChange={(e) => updateField("soundLink", e.target.value)} />
             <Input id="assetLink" label="Asset link" value={form.assetLink} onChange={(e) => updateField("assetLink", e.target.value)} />

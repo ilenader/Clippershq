@@ -35,7 +35,7 @@ const CAMPAIGN_FIELDS = [
   "payoutRule", "minViews", "maxPayoutPerClip",
   "description", "requirements", "examples", "soundLink", "assetLink",
   "imageUrl", "bannedContent", "captionRules", "hashtagRules",
-  "videoLengthMin", "videoLengthMax", "reviewTiming", "startDate", "endDate",
+  "videoLengthMin", "videoLengthMax", "reviewTiming", "aiKnowledge", "startDate", "endDate",
   "maxClipsPerUserPerDay",
 ];
 
@@ -69,7 +69,7 @@ export async function PATCH(
       // Verify admin has access to this campaign (creator OR assigned via CampaignAdmin/team)
       const campaign = await db.campaign.findUnique({
         where: { id },
-        select: { createdById: true, name: true, clientName: true, platform: true, budget: true, clipperCpm: true, ownerCpm: true, agencyFee: true, pricingModel: true, minViews: true, maxPayoutPerClip: true, maxClipsPerUserPerDay: true, requirements: true, examples: true, soundLink: true, assetLink: true, imageUrl: true, captionRules: true, hashtagRules: true, payoutRule: true, startDate: true },
+        select: { createdById: true, name: true, clientName: true, platform: true, budget: true, clipperCpm: true, ownerCpm: true, agencyFee: true, pricingModel: true, minViews: true, maxPayoutPerClip: true, maxClipsPerUserPerDay: true, requirements: true, examples: true, soundLink: true, assetLink: true, imageUrl: true, captionRules: true, hashtagRules: true, aiKnowledge: true, payoutRule: true, startDate: true },
       });
       if (!campaign) {
         return NextResponse.json({ error: "Campaign not found" }, { status: 404 });

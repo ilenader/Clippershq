@@ -169,17 +169,18 @@ export function calculateClipperEarnings(input: ClipperEarningsInput): EarningsB
     grossClipper = Math.min(grossClipper, campaignMaxPayoutPerClip);
   }
 
-  // Platform fee (9% on total including bonus)
+  // Platform fee is calculated for reference but NOT subtracted from clipperEarnings.
+  // Fee is applied once at payout time, not at earnings calculation time.
   const fee = grossClipper * (effectiveFee / 100);
 
   return {
-    clipperEarnings: round2(grossClipper - fee),
-    platformFee: round2(fee),
+    clipperEarnings: round2(grossClipper),       // GROSS earnings (base + bonus, before fee)
+    platformFee: round2(fee),                     // For reference only — not subtracted
     bonusPercent: totalBonusPercent,
     bonusAmount: round2(bonusAmount),
     baseEarnings: round2(baseEarnings),
     effectiveFeePercent: effectiveFee,
-    grossClipperEarnings: round2(grossClipper),
+    grossClipperEarnings: round2(grossClipper),   // Same as clipperEarnings now
   };
 }
 

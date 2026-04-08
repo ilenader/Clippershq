@@ -88,21 +88,18 @@ export default function CampaignsPage() {
     });
   };
 
-  const openJoinModal = (e: React.MouseEvent, campaign: any) => {
+  const handleQuickJoin = async (e: React.MouseEvent, campaign: any) => {
     e.preventDefault();
     e.stopPropagation();
     if (approvedAccounts.length === 0) {
-      toast.error("You need an approved account before joining campaigns.");
+      toast.error("You need a verified account before joining. Go to My Accounts to add one.");
       return;
     }
-    setJoinTargetCampaign(campaign);
-    setSelectedAccount("");
-    setShowJoinModal(true);
-  };
-
-  const handleJoin = async () => {
-    if (!selectedAccount || !joinTargetCampaign) {
-      toast.error("Please select an account.");
+    // Find first approved account whose platform matches the campaign
+    const campaignPlatforms = (campaign.platform || "").split(",").map((p: string) => p.trim().toLowerCase());
+    const matchingAccount = approvedAccounts.find((a: any) => campaignPlatforms.includes(a.platform.toLowerCase()));
+    if (!matchingAccount) {
+      toast.error(`You need a verified ${campaign.platform} account to join this campaign.`);
       return;
     }
     setJoining(true);
@@ -110,14 +107,11 @@ export default function CampaignsPage() {
       const res = await fetch("/api/campaign-accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clipAccountId: selectedAccount, campaignId: joinTargetCampaign.id }),
+        body: JSON.stringify({ clipAccountId: matchingAccount.id, campaignId: campaign.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to join");
-      toast.success(`Joined ${joinTargetCampaign.name} successfully!`);
-      setShowJoinModal(false);
-      setJoinTargetCampaign(null);
-      setSelectedAccount("");
+      toast.success(`Joined ${campaign.name}!`);
       await loadJoins();
     } catch (err: any) {
       toast.error(err.message || "Failed to join campaign.");
@@ -156,7 +150,16 @@ export default function CampaignsPage() {
         />
       ) : (
         <div className="grid gap-5 sm:grid-cols-2">
-          {campaigns.map((campaign: any) => {
+          {[...campaigns].sort((a: any, b: any) => {
+            const aStarred = favorites.includes(a.id) ? 0 : 1;
+            const bStarred = favorites.includes(b.id) ? 0 : 1;
+            if (aStarred !== bStarred) return aStarred - bStarred;
+            // Within same group: ACTIVE first, then by name
+            const aActive = a.status === "ACTIVE" ? 0 : 1;
+            const bActive = b.status === "ACTIVE" ? 0 : 1;
+            if (aActive !== bActive) return aActive - bActive;
+            return (a.name || "").localeCompare(b.name || "");
+          }).map((campaign: any) => {
             const isPaused = campaign.status === "PAUSED";
             const spent = clipsByCampaign[campaign.id] || 0;
             const budget = campaign.budget || 0;
@@ -252,7 +255,7 @@ export default function CampaignsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={(e) => openJoinModal(e, campaign)}
+                        onClick={(e) => handleQuickJoin(e, campaign)}
                         icon={<UserPlus className="h-3.5 w-3.5" />}
                       >
                         Join Campaign
@@ -269,44 +272,7 @@ export default function CampaignsPage() {
         </div>
       )}
 
-      {/* Join Modal */}
-      <Modal open={showJoinModal} onClose={() => { setShowJoinModal(false); setJoinTargetCampaign(null); }} title="Join campaign">
-        {joinTargetCampaign && (() => {
-          const available = getAvailableAccounts(joinTargetCampaign.id);
-          return available.length === 0 ? (
-            <div className="py-6 text-center">
-              <p className="text-[15px] text-[var(--text-secondary)]">
-                {approvedAccounts.length === 0
-                  ? "You need an approved account first."
-                  : "All your approved accounts have already joined this campaign."}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-[15px] text-[var(--text-secondary)]">
-                Select an approved account to join <span className="font-medium text-[var(--text-primary)]">{joinTargetCampaign.name}</span>:
-              </p>
-              <Select
-                id="joinAccount"
-                label="Account"
-                options={available.map((a: any) => ({
-                  value: a.id,
-                  label: `${a.username} (${a.platform})`,
-                }))}
-                placeholder="Select account"
-                value={selectedAccount}
-                onChange={(e) => setSelectedAccount(e.target.value)}
-              />
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="ghost" onClick={() => { setShowJoinModal(false); setJoinTargetCampaign(null); }}>Cancel</Button>
-                <Button onClick={handleJoin} loading={joining} icon={<UserPlus className="h-4 w-4" />}>
-                  Join campaign
-                </Button>
-              </div>
-            </div>
-          );
-        })()}
-      </Modal>
+      {/* Join modal removed — auto-join on click */}
     </div>
   );
 }

@@ -252,7 +252,7 @@ export async function POST(
                 level: userData?.level || 0,
                 earnings: userData?.totalEarnings || 0,
                 streak: userData?.currentStreak || 0,
-              });
+              }, convo?.campaignId);
 
               // Check if AI suggests transfer after 3 consecutive unable-to-help responses
               if (replyContent) {

@@ -75,9 +75,16 @@ export default function CampaignDetailPage() {
       .finally(() => setLoading(false));
   }, [id, router]);
 
-  const handleJoin = async () => {
-    if (!selectedAccount) {
-      toast.error("Please select an account.");
+  const handleQuickJoin = async () => {
+    if (approvedAccounts.length === 0) {
+      toast.error("You need a verified account before joining. Go to My Accounts to add one.");
+      return;
+    }
+    // Find first approved account matching campaign platforms
+    const campaignPlatforms = campaign?.platform ? campaign.platform.split(",").map((p: string) => p.trim().toLowerCase()) : [];
+    const matchingAccount = approvedAccounts.find((a: any) => campaignPlatforms.includes(a.platform.toLowerCase()));
+    if (!matchingAccount) {
+      toast.error(`You need a verified ${campaign?.platform || ""} account to join this campaign.`);
       return;
     }
     setJoining(true);
@@ -85,13 +92,11 @@ export default function CampaignDetailPage() {
       const res = await fetch("/api/campaign-accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clipAccountId: selectedAccount, campaignId: id }),
+        body: JSON.stringify({ clipAccountId: matchingAccount.id, campaignId: id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to join");
-      toast.success("Joined campaign successfully!");
-      setShowJoinModal(false);
-      setSelectedAccount("");
+      toast.success("Joined campaign!");
       const joinsRes = await fetch(`/api/campaign-accounts?campaignId=${id}`);
       const joinsData = await joinsRes.json();
       setJoinedAccounts(Array.isArray(joinsData) ? joinsData : []);
@@ -295,7 +300,7 @@ export default function CampaignDetailPage() {
                 <span className="text-sm font-medium text-emerald-400">Joined</span>
               </div>
             ) : (
-              <Button onClick={() => setShowJoinModal(true)} icon={<UserPlus className="h-4 w-4" />}>
+              <Button onClick={handleQuickJoin} loading={joining} icon={<UserPlus className="h-4 w-4" />}>
                 Join campaign
               </Button>
             )
@@ -306,41 +311,7 @@ export default function CampaignDetailPage() {
         </div>
       )}
 
-      {/* Join Modal */}
-      <Modal open={showJoinModal} onClose={() => setShowJoinModal(false)} title="Join campaign">
-        {availableAccounts.length === 0 ? (
-          <div className="py-6 text-center">
-            <p className="text-[15px] text-[var(--text-secondary)]">
-              {approvedAccounts.length === 0
-                ? "You need an approved account first."
-                : "All your approved accounts have already joined this campaign."}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-[15px] text-[var(--text-secondary)]">
-              Select an approved account to join <span className="font-medium text-[var(--text-primary)]">{campaign.name}</span>:
-            </p>
-            <Select
-              id="joinAccount"
-              label="Account"
-              options={availableAccounts.map((a: any) => ({
-                value: a.id,
-                label: `${a.username} (${a.platform})`,
-              }))}
-              placeholder="Select account"
-              value={selectedAccount}
-              onChange={(e) => setSelectedAccount(e.target.value)}
-            />
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="ghost" onClick={() => setShowJoinModal(false)}>Cancel</Button>
-              <Button onClick={handleJoin} loading={joining} icon={<UserPlus className="h-4 w-4" />}>
-                Join campaign
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      {/* Join modal removed — auto-join on click */}
     </div>
   );
 }

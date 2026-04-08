@@ -105,6 +105,7 @@ export async function POST(req: NextRequest) {
     bannedContent: data.bannedContent || null,
     captionRules: data.captionRules || null,
     hashtagRules: data.hashtagRules || null,
+    aiKnowledge: data.aiKnowledge || null,
     videoLengthMin: data.videoLengthMin ? parseInt(data.videoLengthMin) : null,
     videoLengthMax: data.videoLengthMax ? parseInt(data.videoLengthMax) : null,
     reviewTiming: data.reviewTiming || null,

@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
     // ── RULE: Max clips per user per day per campaign ──
     const campaign = await db.campaign.findUnique({
       where: { id: data.campaignId },
-      select: { maxClipsPerUserPerDay: true, status: true, budget: true },
+      select: { maxClipsPerUserPerDay: true, status: true, budget: true, platform: true },
     });
     if (!campaign || campaign.status === "DRAFT" || campaign.status === "COMPLETED") {
       return NextResponse.json({ error: "This campaign is not available for submissions right now." }, { status: 400 });
@@ -176,6 +176,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         error: `Platform mismatch: your account is ${account.platform} but the clip URL is from ${urlPlatform}. Use a ${account.platform} clip URL.`,
       }, { status: 400 });
+    }
+
+    // ── RULE 1b: Clip platform must match campaign's allowed platforms ──
+    if (urlPlatform && campaign.platform) {
+      const allowed = campaign.platform.split(",").map((p: string) => p.trim().toLowerCase());
+      if (!allowed.includes(urlPlatform.toLowerCase())) {
+        return NextResponse.json({
+          error: `This campaign only accepts ${campaign.platform} clips. Your link is from ${urlPlatform}.`,
+        }, { status: 400 });
+      }
     }
 
     // ── RULE 2: Clip must be submitted within 2 hours of posting ──
