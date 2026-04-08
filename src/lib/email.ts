@@ -68,6 +68,17 @@ function wrap(content: string): string {
 </html>`;
 }
 
+/** Centered button for emails (uses table for email client compatibility) */
+function emailButton(text: string, href: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+<tr><td align="center" style="border-radius: 8px; background-color: #0095f6;">
+  <a href="${href}" target="_blank" style="display: inline-block; padding: 12px 28px; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    ${text}
+  </a>
+</td></tr>
+</table>`;
+}
+
 // ─── Email functions ─────────────────────────────────────────
 
 export async function sendWelcomeEmail(email: string, username: string): Promise<boolean> {
@@ -161,7 +172,8 @@ export async function sendCampaignApproved(email: string, campaignName: string):
 export async function sendCampaignRejected(email: string, campaignName: string): Promise<boolean> {
   return sendEmail({ to: email, subject: `Campaign not approved`, html: wrap(`<p style="font-size: 15px;">Your campaign <strong>${campaignName}</strong> was not approved.</p>`) });
 }
-export async function sendCampaignAlertEmail(email: string, campaignName: string, description: string): Promise<boolean> {
+export async function sendCampaignAlertEmail(email: string, campaignName: string, description: string, campaignId?: string): Promise<boolean> {
+  const link = campaignId ? `https://clipershq.com/campaigns/${campaignId}` : "https://clipershq.com/campaigns";
   return sendEmail({
     to: email,
     subject: `New Campaign: ${campaignName}`,
@@ -169,7 +181,7 @@ export async function sendCampaignAlertEmail(email: string, campaignName: string
       <p style="font-size: 16px; margin: 0 0 12px;">🎬 New Campaign Alert!</p>
       <p style="font-size: 18px; color: #fff; font-weight: bold; margin: 0 0 12px;">${campaignName}</p>
       <p style="font-size: 15px; color: #a1a1aa; margin: 0 0 20px;">${description}</p>
-      <a href="https://clipershq.com/login" style="display: inline-block; background: #0095f6; color: #fff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; box-shadow: 0 0 20px rgba(0,149,246,0.2);">Start Clipping Now</a>
+      ${emailButton("Start Clipping Now", link)}
     `),
   });
 }

@@ -17,6 +17,8 @@ import {
   DEFAULT_FEE_TIERS,
   PWA_BONUS_PERCENT,
   computeLevel,
+  calculateClipperEarnings,
+  calculateOwnerEarnings,
 } from "@/lib/earnings-calc";
 
 export interface GamificationState {
@@ -194,6 +196,7 @@ export async function updateStreak(userId: string): Promise<void> {
   }
 
   const newLongest = Math.max(currentStreak, user.longestStreak);
+  const streakChanged = currentStreak !== user.currentStreak;
 
   await db.user.update({
     where: { id: userId },
@@ -203,6 +206,15 @@ export async function updateStreak(userId: string): Promise<void> {
       lastActiveDate: lastPassedDate || user.lastActiveDate,
     },
   });
+
+  // If streak changed, recalculate unpaid earnings with new bonus
+  if (streakChanged) {
+    try {
+      await recalculateUnpaidEarnings(userId);
+    } catch (err: any) {
+      console.error(`[RECALC] Failed for user ${userId}:`, err?.message);
+    }
+  }
 }
 
 /**
@@ -270,6 +282,12 @@ export async function updateUserLevel(userId: string): Promise<void> {
       where: { id: userId },
       data: { level: newLevel, bonusPercentage: newBonus },
     });
+    // Level changed — recalculate unpaid earnings
+    try {
+      await recalculateUnpaidEarnings(userId);
+    } catch (err: any) {
+      console.error(`[RECALC] Level change failed for user ${userId}:`, err?.message);
+    }
   }
 }
 
@@ -368,4 +386,106 @@ export async function getGamificationState(userId: string): Promise<Gamification
     nextStreakReward: nextReward,
     pendingStreakDays,
   };
+}
+
+/**
+ * Recalculate all unpaid clip earnings for a user when their bonus changes.
+ * Only affects APPROVED clips not included in a PAID payout.
+ */
+export async function recalculateUnpaidEarnings(userId: string): Promise<{ clipsUpdated: number; oldTotal: number; newTotal: number }> {
+  if (!db) return { clipsUpdated: 0, oldTotal: 0, newTotal: 0 };
+
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { level: true, currentStreak: true, referredById: true, isPWAUser: true, manualBonusOverride: true },
+  });
+  if (!user) return { clipsUpdated: 0, oldTotal: 0, newTotal: 0 };
+
+  // Get IDs of clips already included in PAID payouts (their earnings are locked)
+  const paidPayouts = await db.payoutRequest.findMany({
+    where: { userId, status: "PAID" },
+    select: { campaignId: true },
+  });
+  const paidCampaignIds = new Set(paidPayouts.map((p: any) => p.campaignId).filter(Boolean));
+
+  // Get all APPROVED clips
+  const clips = await db.clip.findMany({
+    where: { userId, status: "APPROVED", isDeleted: false },
+    include: {
+      stats: { orderBy: { checkedAt: "desc" }, take: 1 },
+      campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true } },
+    },
+  });
+
+  const config = await loadConfig();
+  let clipsUpdated = 0;
+  let oldTotal = 0;
+  let newTotal = 0;
+
+  for (const clip of clips) {
+    const stat = clip.stats[0];
+    if (!stat) continue;
+
+    oldTotal += clip.earnings || 0;
+
+    // Skip clips from campaigns that have been fully paid out
+    // (Simple heuristic: skip if campaign has ANY paid payout — more precise would be per-clip tracking)
+    if (paidCampaignIds.has(clip.campaignId)) {
+      newTotal += clip.earnings || 0;
+      continue;
+    }
+
+    const cpm = clip.campaign.clipperCpm ?? clip.campaign.cpmRate ?? null;
+    const result = calculateClipperEarnings({
+      views: stat.views,
+      clipperCpm: cpm,
+      campaignMinViews: clip.campaign.minViews,
+      campaignMaxPayoutPerClip: clip.campaign.maxPayoutPerClip,
+      clipperLevel: user.level,
+      clipperStreak: user.currentStreak,
+      levelBonuses: config.levelBonuses,
+      streakBonuses: config.streakBonuses,
+      isReferred: !!user.referredById,
+      isPWAUser: user.isPWAUser,
+      manualBonusOverride: user.manualBonusOverride,
+    });
+
+    if (result.clipperEarnings !== clip.earnings || result.bonusPercent !== clip.bonusPercent) {
+      await db.clip.update({
+        where: { id: clip.id },
+        data: {
+          earnings: result.clipperEarnings,
+          baseEarnings: result.baseEarnings,
+          bonusPercent: result.bonusPercent,
+          bonusAmount: result.bonusAmount,
+        },
+      });
+
+      // Update agency earnings for CPM_SPLIT
+      if ((clip.campaign as any).pricingModel === "CPM_SPLIT" && (clip.campaign as any).ownerCpm) {
+        const ownerAmt = calculateOwnerEarnings(stat.views, (clip.campaign as any).ownerCpm);
+        if (ownerAmt > 0) {
+          await db.agencyEarning.upsert({
+            where: { clipId: clip.id },
+            create: { campaignId: clip.campaignId, clipId: clip.id, amount: ownerAmt, views: stat.views },
+            update: { amount: ownerAmt, views: stat.views },
+          });
+        }
+      }
+
+      clipsUpdated++;
+    }
+    newTotal += result.clipperEarnings;
+  }
+
+  // Update user totals
+  if (clipsUpdated > 0) {
+    await db.user.update({
+      where: { id: userId },
+      data: { totalEarnings: Math.round(newTotal * 100) / 100 },
+    });
+    console.log(`[RECALC] User ${userId}: ${clipsUpdated} clips recalculated, $${oldTotal.toFixed(2)} → $${newTotal.toFixed(2)}`);
+  }
+
+  return { clipsUpdated, oldTotal: Math.round(oldTotal * 100) / 100, newTotal: Math.round(newTotal * 100) / 100 };
 }

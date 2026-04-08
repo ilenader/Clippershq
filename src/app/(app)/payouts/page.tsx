@@ -630,8 +630,7 @@ export default function PayoutsPage() {
           {feePercent != null && (() => {
             const amt = parseFloat(form.amount) || 0;
             const fee = Math.round(amt * feePercent / 100 * 100) / 100;
-            const bonus = Math.round(amt * bonusPercent / 100 * 100) / 100;
-            const final_ = Math.round((amt - fee + bonus) * 100) / 100;
+            const final_ = Math.round((amt - fee) * 100) / 100;
             const show = amt > 0;
             return (
               <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-4 py-3 space-y-1.5 text-sm">
@@ -640,19 +639,16 @@ export default function PayoutsPage() {
                   <span className="text-[var(--text-primary)] tabular-nums">{show ? formatCurrency(amt) : "-"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Fee ({feePercent}%)</span>
+                  <span className="text-[var(--text-secondary)]">Platform fee ({feePercent}%)</span>
                   <span className="text-red-400 tabular-nums">{show ? `-${formatCurrency(fee)}` : "-"}</span>
                 </div>
-                {bonusPercent > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">Bonus return ({bonusPercent}%)</span>
-                    <span className="text-emerald-400 tabular-nums">{show ? `+${formatCurrency(bonus)}` : "-"}</span>
-                  </div>
-                )}
                 <div className="flex justify-between border-t border-[var(--border-color)] pt-1.5">
-                  <span className="text-[var(--text-primary)] font-semibold">Final payout</span>
+                  <span className="text-[var(--text-primary)] font-semibold">You&apos;ll receive</span>
                   <span className="text-accent font-bold tabular-nums">{show ? formatCurrency(final_) : "-"}</span>
                 </div>
+                {bonusPercent > 0 && (
+                  <p className="text-xs text-emerald-400 pt-1">Your earnings already include your +{bonusPercent}% bonus</p>
+                )}
               </div>
             );
           })()}

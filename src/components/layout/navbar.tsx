@@ -195,8 +195,8 @@ export function Navbar() {
           {/* Portal: renders at <body> level to escape stacking contexts */}
           {notifOpen && typeof document !== "undefined" && notifPos && createPortal(
             <div ref={notifRef}
-              className="fixed w-[calc(100vw-16px)] sm:w-80 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-elevated)] overflow-hidden"
-              style={{ top: notifPos.top, right: notifPos.right, zIndex: 99999 }}>
+              className="fixed rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-elevated)] overflow-hidden"
+              style={{ top: notifPos.top, left: 8, right: 8, maxWidth: 320, marginLeft: "auto", zIndex: 99999 }}>
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border-subtle)]">
                 <p className="text-sm font-semibold text-[var(--text-primary)]">Notifications</p>
                 {notifCount > 0 && (
@@ -210,7 +210,7 @@ export function Navbar() {
                   notifications.map((n: any) => (
                     <div key={n.id} className={`px-4 py-2.5 border-b border-[var(--border-subtle)] last:border-b-0 ${!n.isRead ? "bg-accent/5" : ""}`}>
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-[var(--text-primary)]">{n.title}</p>
+                        <p className="text-sm font-medium text-[var(--text-primary)] truncate min-w-0">{n.title}</p>
                         {n.createdAt && (
                           <span className="text-[11px] text-[var(--text-muted)] tabular-nums flex-shrink-0">{formatNotifTime(n.createdAt)}</span>
                         )}

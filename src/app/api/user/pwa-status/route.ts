@@ -27,10 +27,18 @@ export async function POST() {
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
 
-  await db.user.update({
-    where: { id: session.user.id },
-    data: { isPWAUser: true },
-  });
+  const current = await db.user.findUnique({ where: { id: session.user.id }, select: { isPWAUser: true } });
+  if (!current?.isPWAUser) {
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { isPWAUser: true },
+    });
+    // PWA bonus changed — recalculate earnings
+    try {
+      const { recalculateUnpaidEarnings } = await import("@/lib/gamification");
+      await recalculateUnpaidEarnings(session.user.id);
+    } catch {}
+  }
 
   return NextResponse.json({ ok: true, isPWAUser: true });
 }

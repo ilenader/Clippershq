@@ -29,6 +29,7 @@ export default function ClipsPage() {
   const [clips, setClips] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [gamification, setGamification] = useState<any>(null);
   const [joinedCampaignIds, setJoinedCampaignIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -43,23 +44,26 @@ export default function ClipsPage() {
   const load = async () => {
     try {
       const ts = Date.now();
-      const [clipsRes, campaignsRes, accountsRes, joinsRes] = await Promise.all([
+      const [clipsRes, campaignsRes, accountsRes, joinsRes, gamRes] = await Promise.all([
         fetch(`/api/clips/mine?_t=${ts}`, { cache: "no-store" }),
         fetch(`/api/campaigns?status=ACTIVE&_t=${ts}`, { cache: "no-store" }),
         fetch(`/api/accounts/mine?status=APPROVED&_t=${ts}`, { cache: "no-store" }),
         fetch(`/api/campaign-accounts?_t=${ts}`, { cache: "no-store" }),
+        fetch(`/api/gamification?_t=${ts}`, { cache: "no-store" }),
       ]);
-      const [clipsData, campaignsData, accountsData, joinsData] = await Promise.all([
+      const [clipsData, campaignsData, accountsData, joinsData, gamData] = await Promise.all([
         clipsRes.json(),
         campaignsRes.json(),
         accountsRes.json(),
         joinsRes.json(),
+        gamRes.json(),
       ]);
       setClips(Array.isArray(clipsData) ? clipsData : []);
       setCampaigns(Array.isArray(campaignsData) ? campaignsData : []);
       setAccounts(Array.isArray(accountsData) ? accountsData : []);
       const joinsArr = Array.isArray(joinsData) ? joinsData : [];
       setJoinedCampaignIds(new Set(joinsArr.map((j: any) => j.campaignId)));
+      if (gamData && !gamData.error) setGamification(gamData);
     } catch (err) {
       console.error("Failed to load clips page data:", err);
     } finally {
@@ -140,7 +144,13 @@ export default function ClipsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">My Clips</h1>
-          <p className="text-[15px] text-[var(--text-secondary)]">Submit and track your clips.</p>
+          <p className="text-[15px] text-[var(--text-secondary)]">Submit and track your clips.
+            {gamification && gamification.bonusPercent > 0 && (
+              <span className="ml-2 inline-flex items-center rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-400">
+                +{gamification.bonusPercent}% bonus
+              </span>
+            )}
+          </p>
         </div>
         <Button onClick={() => setShowModal(true)} icon={<Plus className="h-4 w-4" />}>
           Submit Clip
@@ -182,7 +192,12 @@ export default function ClipsPage() {
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.likes) : "0"}</span> <span className="text-[var(--text-muted)]">likes</span></span>
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.comments) : "0"}</span> <span className="text-[var(--text-muted)]">comments</span></span>
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.shares) : "0"}</span> <span className="text-[var(--text-muted)]">shares</span></span>
-                    {clip.status === "APPROVED" && clip.earnings > 0 && <span className="font-medium text-accent tabular-nums">{formatCurrency(clip.earnings)}</span>}
+                    {clip.status === "APPROVED" && clip.earnings > 0 && (
+                      <span className="font-medium text-accent tabular-nums">
+                        {formatCurrency(clip.earnings)}
+                        {clip.bonusAmount > 0 && <span className="text-emerald-400 text-xs ml-1">(+{formatCurrency(clip.bonusAmount)} bonus)</span>}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {clip.status === "REJECTED" && clip.rejectionReason && (
