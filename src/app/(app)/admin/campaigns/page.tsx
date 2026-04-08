@@ -144,7 +144,8 @@ export default function AdminCampaignsPage() {
       const requirements = form.requirementsList.filter((r) => r.trim()).join("\n");
       const payload: Record<string, any> = {
         name: form.name, clientName: form.clientName, platform: form.platforms.join(", "),
-        clipperCpm: form.clipperCpm, budget: form.budget,
+        pricingModel: form.pricingModel, clipperCpm: form.clipperCpm,
+        ownerCpm: form.ownerCpm, agencyFee: form.agencyFee, budget: form.budget,
         payoutRule: form.payoutRule,
         minViews: form.minViews, maxPayoutPerClip: form.maxPayoutPerClip,
         maxClipsPerUserPerDay: form.maxClipsPerUserPerDay, requirements,

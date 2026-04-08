@@ -2,7 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { getUserCampaignIds } from "@/lib/campaign-access";
 import { logAudit } from "@/lib/audit";
-import { recalculateClipEarnings } from "@/lib/earnings-calc";
+import { recalculateClipEarnings, recalculateClipEarningsBreakdown } from "@/lib/earnings-calc";
 import { createNotification } from "@/lib/notifications";
 import { sendClipApproved, sendClipRejected } from "@/lib/email";
 import { updateUserLevel } from "@/lib/gamification";
@@ -83,12 +83,20 @@ export async function POST(
         },
       });
       if (clipWithData?.campaign && clipWithData.stats.length > 0) {
-        const earnings = recalculateClipEarnings({
+        const breakdown = recalculateClipEarningsBreakdown({
           stats: clipWithData.stats,
           campaign: clipWithData.campaign,
           user: clipWithData.user || undefined,
         });
-        await db.clip.update({ where: { id }, data: { earnings } });
+        await db.clip.update({
+          where: { id },
+          data: {
+            earnings: breakdown.clipperEarnings,
+            baseEarnings: breakdown.baseEarnings,
+            bonusPercent: breakdown.bonusPercent,
+            bonusAmount: breakdown.bonusAmount,
+          },
+        });
       }
       // Notify clipper (in-app + email)
       createNotification(clip.userId, "CLIP_APPROVED", "Clip approved!", "Your clip has been approved and earnings have been calculated.").catch(() => {});

@@ -2,7 +2,6 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
 import { detectPlatform } from "@/lib/apify";
-import { calculateClipperEarnings } from "@/lib/earnings-calc";
 import { NextRequest, NextResponse } from "next/server";
 
 /**

@@ -176,7 +176,7 @@ export function calculateClipperEarnings(input: ClipperEarningsInput): EarningsB
     clipperEarnings: round2(grossClipper - fee),
     platformFee: round2(fee),
     bonusPercent: totalBonusPercent,
-    bonusAmount: round2(Math.min(bonusAmount, grossClipper - baseEarnings >= 0 ? bonusAmount : 0)),
+    bonusAmount: round2(bonusAmount),
     baseEarnings: round2(baseEarnings),
     effectiveFeePercent: effectiveFee,
     grossClipperEarnings: round2(grossClipper),

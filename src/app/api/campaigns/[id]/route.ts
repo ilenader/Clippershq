@@ -31,7 +31,8 @@ export async function GET(
 
 const CAMPAIGN_FIELDS = [
   "name", "clientName", "platform", "status", "budget",
-  "clipperCpm", "payoutRule", "minViews", "maxPayoutPerClip",
+  "clipperCpm", "ownerCpm", "agencyFee", "pricingModel",
+  "payoutRule", "minViews", "maxPayoutPerClip",
   "description", "requirements", "examples", "soundLink", "assetLink",
   "imageUrl", "bannedContent", "captionRules", "hashtagRules",
   "videoLengthMin", "videoLengthMax", "reviewTiming", "startDate", "endDate",
@@ -68,7 +69,7 @@ export async function PATCH(
       // Verify admin has access to this campaign (creator OR assigned via CampaignAdmin/team)
       const campaign = await db.campaign.findUnique({
         where: { id },
-        select: { createdById: true, name: true, clientName: true, platform: true, budget: true, clipperCpm: true, minViews: true, maxPayoutPerClip: true, maxClipsPerUserPerDay: true, requirements: true, examples: true, soundLink: true, assetLink: true, imageUrl: true, captionRules: true, hashtagRules: true, payoutRule: true, startDate: true },
+        select: { createdById: true, name: true, clientName: true, platform: true, budget: true, clipperCpm: true, ownerCpm: true, agencyFee: true, pricingModel: true, minViews: true, maxPayoutPerClip: true, maxClipsPerUserPerDay: true, requirements: true, examples: true, soundLink: true, assetLink: true, imageUrl: true, captionRules: true, hashtagRules: true, payoutRule: true, startDate: true },
       });
       if (!campaign) {
         return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
@@ -139,6 +140,8 @@ export async function PATCH(
     if (data.endDate) data.endDate = new Date(data.endDate);
     if (data.budget !== undefined && data.budget !== null && data.budget !== "") data.budget = parseFloat(data.budget);
     if (data.clipperCpm !== undefined && data.clipperCpm !== null && data.clipperCpm !== "") data.clipperCpm = parseFloat(data.clipperCpm);
+    if (data.ownerCpm !== undefined && data.ownerCpm !== null && data.ownerCpm !== "") data.ownerCpm = parseFloat(data.ownerCpm);
+    if (data.agencyFee !== undefined && data.agencyFee !== null && data.agencyFee !== "") data.agencyFee = parseFloat(data.agencyFee);
     if (data.maxPayoutPerClip !== undefined && data.maxPayoutPerClip !== null && data.maxPayoutPerClip !== "") data.maxPayoutPerClip = parseFloat(data.maxPayoutPerClip);
     if (data.minViews !== undefined && data.minViews !== null && data.minViews !== "") data.minViews = parseInt(data.minViews);
     if (data.maxClipsPerUserPerDay !== undefined && data.maxClipsPerUserPerDay !== null && data.maxClipsPerUserPerDay !== "") {
