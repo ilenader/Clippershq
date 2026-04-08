@@ -264,9 +264,9 @@ export default function AdminClipsPage() {
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
-                          {clip.clipAccount?.username || clip.user?.username || "Clipper"}
-                        </p>
+                        <a href={`/admin/users/${clip.userId}`} className="text-sm font-semibold text-accent hover:underline truncate cursor-pointer">
+                          {clip.user?.username || "Clipper"}
+                        </a>
                         {isOwner && trustScore !== null && (
                           <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${trustScore < 30 ? "text-red-400" : trustScore < 60 ? "text-yellow-400" : "text-emerald-400"}`}>
                             <Shield className="h-3 w-3" />{trustScore}
@@ -274,7 +274,7 @@ export default function AdminClipsPage() {
                         )}
                       </div>
                       <p className="text-xs text-[var(--text-muted)]">
-                        {clip.campaign?.name || "-"} · {formatRelative(clip.createdAt)}
+                        {clip.clipAccount?.username || "-"} · {clip.campaign?.name || "-"} · {formatRelative(clip.createdAt)}
                       </p>
                     </div>
                   </div>

@@ -21,7 +21,7 @@ import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwn
 import { computeFraudLevel } from "@/lib/fraud";
 
 /** Interval tiers in minutes: 2h → 4h → 8h → 16h → 24h → 72h */
-const TIERS = [120, 240, 480, 960, 1440, 4320];
+const TIERS = [120, 240, 480, 960, 1440, 2880];
 
 /**
  * Determine the next check interval based on the tiered schedule.
@@ -116,6 +116,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
   const details: string[] = [];
   let processed = 0;
   let errors = 0;
+  const startTime = Date.now();
 
   try {
     // Build query: for manual checks with campaign filter, ignore nextCheckAt
@@ -144,13 +145,18 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           },
         },
       },
-      take: campaignIds ? 30 : 20,
+      take: campaignIds ? 15 : 20,
     });
 
     console.log(`[TRACKING] Found ${dueJobs.length} due jobs`);
     details.push(`Found ${dueJobs.length} due jobs`);
 
     for (const job of dueJobs) {
+      // Timeout safety: stop after 50 seconds to avoid Vercel function timeout
+      if (Date.now() - startTime > 50000) {
+        details.push(`Stopped early — 50s timeout. ${processed} processed, ${dueJobs.length - processed} remaining.`);
+        break;
+      }
       try {
         const clip = job.clip;
         // Deactivate only if clip is missing
@@ -287,14 +293,20 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
             });
 
             // Owner earnings for CPM_SPLIT campaigns
+            console.log(`[AGENCY-TRACK] Clip ${clip.id}: pricingModel=${(clip.campaign as any).pricingModel}, ownerCpm=${(clip.campaign as any).ownerCpm}`);
             if ((clip.campaign as any).pricingModel === "CPM_SPLIT" && (clip.campaign as any).ownerCpm) {
               const ownerAmt = calculateOwnerEarnings(stats.views, (clip.campaign as any).ownerCpm);
+              console.log(`[AGENCY-TRACK] AgencyEarning: clip=${clip.id}, views=${stats.views}, ownerAmt=${ownerAmt}`);
               if (ownerAmt > 0) {
-                await db.agencyEarning.upsert({
-                  where: { clipId: clip.id },
-                  create: { campaignId: clip.campaignId, clipId: clip.id, amount: ownerAmt, views: stats.views },
-                  update: { amount: ownerAmt, views: stats.views },
-                });
+                try {
+                  await db.agencyEarning.upsert({
+                    where: { clipId: clip.id },
+                    create: { campaignId: clip.campaignId, clipId: clip.id, amount: ownerAmt, views: stats.views },
+                    update: { amount: ownerAmt, views: stats.views },
+                  });
+                } catch (aeErr: any) {
+                  console.error(`[AGENCY-TRACK] Failed:`, aeErr?.message);
+                }
               }
             }
             if (clip.userId) {
@@ -314,8 +326,11 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
                 where: { id: clip.userId },
                 data: { totalEarnings: Math.round(totalEarnings * 100) / 100, totalViews },
               });
-              const { updateUserLevel } = await import("@/lib/gamification");
-              await updateUserLevel(clip.userId);
+              // Skip level progression for owner override clips
+              if (!clip.isOwnerOverride) {
+                const { updateUserLevel } = await import("@/lib/gamification");
+                await updateUserLevel(clip.userId);
+              }
             }
           }
         }
@@ -328,7 +343,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
         } else if (clip.isOwnerOverride) {
           // Owner override clips: 24h base, 72h if growth < 5%
           const growthPct = prevViews > 0 ? ((stats.views - prevViews) / prevViews) * 100 : (stats.views > 0 ? 100 : 0);
-          newInterval = growthPct >= 5 ? 1440 : 4320;
+          newInterval = growthPct >= 5 ? 1440 : 2880;
         } else {
           newInterval = getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt);
         }

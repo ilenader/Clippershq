@@ -47,7 +47,7 @@ export async function POST(
     // Fetch clip with campaign info for access check
     const clip = await db.clip.findUnique({
       where: { id },
-      select: { id: true, campaignId: true, status: true, userId: true, user: { select: { email: true } } },
+      select: { id: true, campaignId: true, status: true, userId: true, isOwnerOverride: true, user: { select: { email: true, role: true } } },
     });
 
     if (!clip) return NextResponse.json({ error: "Clip not found" }, { status: 404 });
@@ -99,15 +99,24 @@ export async function POST(
         });
 
         // Create agency earnings for CPM_SPLIT campaigns
-        if ((clipWithData.campaign as any).pricingModel === "CPM_SPLIT" && (clipWithData.campaign as any).ownerCpm) {
+        console.log(`[AGENCY] Clip ${id}: pricingModel=${(clipWithData.campaign as any).pricingModel}, ownerCpm=${(clipWithData.campaign as any).ownerCpm}`);
+        const pm = (clipWithData.campaign as any).pricingModel;
+        const oCpm = (clipWithData.campaign as any).ownerCpm;
+        if (pm === "CPM_SPLIT" && oCpm) {
           const views = clipWithData.stats[0].views;
-          const ownerAmt = calculateOwnerEarnings(views, (clipWithData.campaign as any).ownerCpm);
+          const ownerAmt = calculateOwnerEarnings(views, oCpm);
+          console.log(`[AGENCY] Creating AgencyEarning: clip=${id}, views=${views}, ownerAmt=${ownerAmt}`);
           if (ownerAmt > 0) {
-            await db.agencyEarning.upsert({
-              where: { clipId: id },
-              create: { campaignId: clip.campaignId, clipId: id, amount: ownerAmt, views },
-              update: { amount: ownerAmt, views },
-            }).catch(() => {});
+            try {
+              await db.agencyEarning.upsert({
+                where: { clipId: id },
+                create: { campaignId: clip.campaignId, clipId: id, amount: ownerAmt, views },
+                update: { amount: ownerAmt, views },
+              });
+              console.log(`[AGENCY] AgencyEarning saved for clip ${id}`);
+            } catch (aeErr: any) {
+              console.error(`[AGENCY] Failed to save AgencyEarning for clip ${id}:`, aeErr?.message);
+            }
           }
         }
       }
@@ -169,29 +178,37 @@ export async function POST(
         data: { totalEarnings: newTotalEarnings, totalViews: newTotalViews },
       });
 
-      await updateUserLevel(clip.userId);
+      // Skip level progression for OWNER users and owner override clips
+      const clipUserRole = (clip.user as any)?.role;
+      if (clipUserRole !== "OWNER" && !clip.isOwnerOverride) {
+        await updateUserLevel(clip.userId);
+      }
     } catch (syncErr: any) {
       console.error("User sync after clip review failed:", syncErr?.message);
     }
 
     // Update user trust score based on action (clamped to 0-100)
     // FLAGGED does NOT affect trust score — it only means "needs review"
-    try {
-      const user = await db.user.findUnique({ where: { id: clip.userId }, select: { trustScore: true } });
-      if (user) {
-        let delta = 0;
-        if (action === "APPROVED") delta = 5;
-        else if (action === "REJECTED") delta = -10;
-        // FLAGGED: no delta — flagging is not a verdict
-        if (delta !== 0) {
-          const newScore = Math.max(0, Math.min(100, user.trustScore + delta));
-          await db.user.update({ where: { id: clip.userId }, data: { trustScore: newScore } });
+    // Skip for OWNER users
+    const clipUserRole = (clip.user as any)?.role;
+    if (clipUserRole !== "OWNER") {
+      try {
+        const user = await db.user.findUnique({ where: { id: clip.userId }, select: { trustScore: true } });
+        if (user) {
+          let delta = 0;
+          if (action === "APPROVED") delta = 5;
+          else if (action === "REJECTED") delta = -10;
+          if (delta !== 0) {
+            const newScore = Math.max(0, Math.min(100, user.trustScore + delta));
+            await db.user.update({ where: { id: clip.userId }, data: { trustScore: newScore } });
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
     // Re-evaluate streak on approval/rejection (48h grace system)
-    if (action === "APPROVED" || action === "REJECTED") {
+    // Skip for OWNER users and owner override clips
+    if ((action === "APPROVED" || action === "REJECTED") && clipUserRole !== "OWNER" && !clip.isOwnerOverride) {
       try {
         const { updateStreak } = await import("@/lib/gamification");
         await updateStreak(clip.userId);
