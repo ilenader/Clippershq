@@ -132,30 +132,7 @@ function CampaignAvatar({ src, name, size = 44 }: { src: string | null; name: st
   );
 }
 
-// ─── Notification Sound ─────────────────────────────────────
-
-let notificationAudio: HTMLAudioElement | null = null;
-
-// Preload the notification sound on first interaction so it plays instantly
-if (typeof window !== "undefined") {
-  try {
-    notificationAudio = new Audio("/sounds/whoosh-notification-ding-betacut-1-00-01.mp3");
-    notificationAudio.volume = 0.95;
-    notificationAudio.preload = "auto";
-  } catch {}
-}
-
-function playNotificationSound() {
-  try {
-    if (!notificationAudio) {
-      notificationAudio = new Audio("/sounds/whoosh-notification-ding-betacut-1-00-01.mp3");
-      notificationAudio.volume = 0.95;
-      notificationAudio.preload = "auto";
-    }
-    notificationAudio.currentTime = 0;
-    notificationAudio.play().catch(() => {});
-  } catch {}
-}
+// ─── Notification sounds disabled — all updates are silent ─────────────
 
 function RoleBadge({ role }: { role: string }) {
   if (role === "OWNER") {
@@ -197,7 +174,6 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   // Global — unread tracking
   const [unreadCount, setUnreadCount] = useState(0);
   const sseRef = useRef<EventSource | null>(null);
-  const chatMountTimeRef = useRef(Date.now());
 
   // Chat filter for admin/owner
   type ChatFilter = "all" | "needs-agent" | "direct" | string; // string = campaignId
@@ -219,14 +195,8 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   useEffect(() => { activeConvoIdRef.current = threadInfo?.convoId || ""; }, [threadInfo]);
 
   // ── Handle unread count update (shared by SSE + polling fallback) ──
-  // Sound is ONLY played when count increases AND page has been open > 3 seconds
+  // All updates are silent — no notification sounds
   const handleUnreadUpdate = useCallback((newCount: number) => {
-    let prevCount = newCount;
-    try { const v = sessionStorage.getItem("chat_unread_count"); if (v !== null) prevCount = parseInt(v, 10); } catch {}
-    const elapsed = Date.now() - chatMountTimeRef.current;
-    if (newCount > prevCount && elapsed > 3000) {
-      playNotificationSound();
-    }
     try { sessionStorage.setItem("chat_unread_count", String(newCount)); } catch {}
     setUnreadCount(newCount);
 
@@ -331,7 +301,6 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
     }
 
     // Initial unread fetch + connect SSE
-    chatMountTimeRef.current = Date.now();
     fetchUnread();
     connectSSE();
 

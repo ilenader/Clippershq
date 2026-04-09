@@ -2,7 +2,7 @@ import { runDueTrackingJobs } from "@/lib/tracking";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // Allow up to 60s for Apify calls
+export const maxDuration = 300; // 5 minutes — cron processes many clips via Apify
 
 /**
  * GET /api/cron/tracking

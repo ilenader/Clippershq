@@ -42,40 +42,58 @@ export async function POST(
       return NextResponse.json({ error: "Only archived campaigns can be permanently deleted" }, { status: 400 });
     }
 
-    // Count clips for logging
-    const clipCount = await db.clip.count({ where: { campaignId: id } });
-    const agencyCount = await db.agencyEarning.count({ where: { campaignId: id } });
+    console.log(`[DELETE] Attempting to delete campaign: ${id} (${campaign.name})`);
 
-    // Delete in correct order to respect FK constraints
-    // 1. AgencyEarnings (depend on Clips and Campaign)
-    await db.agencyEarning.deleteMany({ where: { campaignId: id } });
-    // 2. ClipStats (depend on Clips)
-    await db.clipStat.deleteMany({ where: { clip: { campaignId: id } } });
-    // 3. TrackingJobs (depend on Clips and Campaign)
-    await db.trackingJob.deleteMany({ where: { campaignId: id } });
-    // 4. PayoutRequests tied to this campaign
-    await db.payoutRequest.deleteMany({ where: { campaignId: id } });
-    // 5. PendingCampaignEdits
-    await db.pendingCampaignEdit.deleteMany({ where: { campaignId: id } });
-    // 6. CampaignAccounts (join table)
-    await db.campaignAccount.deleteMany({ where: { campaignId: id } });
-    // 7. CampaignAdmins
-    await db.campaignAdmin.deleteMany({ where: { campaignId: id } });
-    // 8. TeamCampaigns
-    await db.teamCampaign.deleteMany({ where: { campaignId: id } });
-    // 9. Notes
-    await db.note.deleteMany({ where: { campaignId: id } });
-    // 10. Notifications referencing clips from this campaign
-    const clipIds = (await db.clip.findMany({ where: { campaignId: id }, select: { id: true } })).map((c: any) => c.id);
-    if (clipIds.length > 0) {
-      await db.notification.deleteMany({ where: { metadata: { path: ["clipId"], array_contains: clipIds } } }).catch(() => {});
-    }
-    // 11. Clips (now safe — all dependents deleted)
-    await db.clip.deleteMany({ where: { campaignId: id } });
-    // 12. Campaign itself
-    await db.campaign.delete({ where: { id } });
+    await db.$transaction(async (tx: any) => {
+      // 1. Get all clip IDs for this campaign
+      const clipIds = (await tx.clip.findMany({ where: { campaignId: id }, select: { id: true } })).map((c: any) => c.id);
 
-    console.log(`[DELETE] Campaign ${campaign.name} (${id}) permanently deleted with ${clipCount} clips, ${agencyCount} agency earnings`);
+      // 2. Delete clip-dependent records
+      if (clipIds.length > 0) {
+        await tx.clipStat.deleteMany({ where: { clipId: { in: clipIds } } });
+        await tx.trackingJob.deleteMany({ where: { clipId: { in: clipIds } } });
+        await tx.agencyEarning.deleteMany({ where: { clipId: { in: clipIds } } });
+      }
+
+      // 3. Delete campaign-level agency earnings (safety — may have orphans)
+      await tx.agencyEarning.deleteMany({ where: { campaignId: id } });
+
+      // 4. Delete clips
+      await tx.clip.deleteMany({ where: { campaignId: id } });
+
+      // 5. Delete campaign join tables
+      await tx.campaignAccount.deleteMany({ where: { campaignId: id } });
+      await tx.campaignAdmin.deleteMany({ where: { campaignId: id } });
+      await tx.teamCampaign.deleteMany({ where: { campaignId: id } });
+
+      // 6. Delete campaign edits
+      await tx.pendingCampaignEdit.deleteMany({ where: { campaignId: id } });
+
+      // 7. Delete payouts tied to this campaign
+      try { await tx.payoutRequest.deleteMany({ where: { campaignId: id } }); } catch {}
+
+      // 8. Delete notes
+      try { await tx.note.deleteMany({ where: { campaignId: id } }); } catch {}
+
+      // 9. Delete conversations + participants + messages tied to this campaign
+      try {
+        const convos = await tx.conversation.findMany({ where: { campaignId: id }, select: { id: true } });
+        const convoIds = convos.map((c: any) => c.id);
+        if (convoIds.length > 0) {
+          await tx.message.deleteMany({ where: { conversationId: { in: convoIds } } });
+          await tx.conversationParticipant.deleteMany({ where: { conversationId: { in: convoIds } } });
+          await tx.conversation.deleteMany({ where: { id: { in: convoIds } } });
+        }
+      } catch {}
+
+      // 10. Delete tracking jobs tied to campaign (safety — some may not have clipId)
+      try { await tx.trackingJob.deleteMany({ where: { campaignId: id } }); } catch {}
+
+      // 11. Delete the campaign itself
+      await tx.campaign.delete({ where: { id } });
+
+      console.log(`[DELETE] Campaign ${campaign.name} (${id}) permanently deleted with ${clipIds.length} clips`);
+    });
 
     // Audit log
     await logAudit({
@@ -88,7 +106,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, message: "Campaign permanently deleted" });
   } catch (err: any) {
-    console.error("Permanent delete failed:", err?.message);
-    return NextResponse.json({ error: "Failed to delete campaign" }, { status: 500 });
+    console.error("[DELETE] Failed:", err?.message, err?.code);
+    return NextResponse.json({ error: err?.message || "Failed to delete campaign" }, { status: 500 });
   }
 }

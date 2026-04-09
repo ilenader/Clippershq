@@ -9,26 +9,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-// ─── Notification Sound (different from chat) ─────────────
-let notifSoundAudio: HTMLAudioElement | null = null;
-if (typeof window !== "undefined") {
-  try {
-    notifSoundAudio = new Audio("/sounds/chat-ping.wav");
-    notifSoundAudio.volume = 0.7;
-    notifSoundAudio.preload = "auto";
-  } catch {}
-}
-function playNotifSound() {
-  try {
-    if (!notifSoundAudio) {
-      notifSoundAudio = new Audio("/sounds/chat-ping.wav");
-      notifSoundAudio.volume = 0.7;
-      notifSoundAudio.preload = "auto";
-    }
-    notifSoundAudio.currentTime = 0;
-    notifSoundAudio.play().catch(() => {});
-  } catch {}
-}
+// ─── Notification sounds disabled — all updates are silent ─────────────
 
 function formatNotifTime(dateStr: string): string {
   try {
@@ -52,7 +33,6 @@ export function Navbar() {
   const notifRef = useRef<HTMLDivElement>(null);
   const bellBtnRef = useRef<HTMLButtonElement>(null);
   const sseRef = useRef<EventSource | null>(null);
-  const mountTimeRef = useRef(Date.now());
   const [notifPos, setNotifPos] = useState<{ top: number; right: number } | null>(null);
 
   // Fetch notification list — plays sound only for genuinely new notifications
@@ -66,22 +46,15 @@ export function Navbar() {
       const newCount = data.unreadCount || 0;
       setNotifCount(newCount);
 
-      // Sound: compare newest notification ID against sessionStorage
+      // Track latest notification ID (no sound — updates are silent)
       if (notifs.length > 0) {
-        const newestId = notifs[0].id;
-        const lastSeenId = sessionStorage.getItem("last_seen_notif_id") || "";
-        const elapsed = Date.now() - mountTimeRef.current;
-        if (newestId !== lastSeenId && lastSeenId !== "" && elapsed > 3000) {
-          playNotifSound();
-        }
-        sessionStorage.setItem("last_seen_notif_id", newestId);
+        try { sessionStorage.setItem("last_seen_notif_id", notifs[0].id); } catch {}
       }
     } catch {}
   }, []);
 
-  // SSE connection — NO sound here, only count/data updates
+  // SSE connection — silent count/data updates only
   useEffect(() => {
-    mountTimeRef.current = Date.now();
     fetchNotifList();
 
     const es = new EventSource("/api/notifications/sse");
