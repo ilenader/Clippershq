@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getUserCampaignIds } from "@/lib/campaign-access";
 import { logAudit } from "@/lib/audit";
 import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
+import { getCampaignBudgetStatus } from "@/lib/balance";
 import { createNotification } from "@/lib/notifications";
 import { sendClipApproved, sendClipRejected } from "@/lib/email";
 import { updateUserLevel } from "@/lib/gamification";
@@ -88,36 +89,97 @@ export async function POST(
           campaign: clipWithData.campaign,
           user: clipWithData.user || undefined,
         });
+
+        let finalClipperEarnings = breakdown.clipperEarnings;
+        let finalOwnerAmt = 0;
+
+        const pm = (clipWithData.campaign as any).pricingModel;
+        const oCpm = (clipWithData.campaign as any).ownerCpm;
+        const isCpmSplit = pm === "CPM_SPLIT" && oCpm;
+
+        if (isCpmSplit) {
+          const views = clipWithData.stats[0].views;
+          const cCpm = (clipWithData.campaign as any).clipperCpm ?? (clipWithData.campaign as any).cpmRate;
+          finalOwnerAmt = calculateOwnerEarnings(views, oCpm, breakdown.grossClipperEarnings, cCpm);
+        }
+
+        // ── Budget cap: check remaining budget BEFORE saving earnings ──
+        try {
+          const budgetStatus = await getCampaignBudgetStatus(clip.campaignId);
+          if (budgetStatus && budgetStatus.budget > 0) {
+            // Remaining budget excluding THIS clip's current contribution (it's being recalculated)
+            const thisClipCurrentSpend = (clipWithData.earnings || 0);
+            // getCampaignBudgetStatus.spent already includes this clip's existing earnings + any existing agency earning
+            let thisClipCurrentOwner = 0;
+            if (isCpmSplit) {
+              try {
+                const existingAe = await db.agencyEarning.findUnique({ where: { clipId: id } });
+                thisClipCurrentOwner = existingAe?.amount || 0;
+              } catch {}
+            }
+            const otherSpent = budgetStatus.spent - thisClipCurrentSpend - thisClipCurrentOwner;
+            const remaining = Math.max(budgetStatus.budget - otherSpent, 0);
+
+            const totalForThisClip = finalClipperEarnings + finalOwnerAmt;
+
+            if (remaining <= 0) {
+              // No budget left — zero out earnings and pause
+              finalClipperEarnings = 0;
+              finalOwnerAmt = 0;
+              console.log(`[BUDGET] Clip ${id}: no budget remaining ($${budgetStatus.budget} fully spent), earnings set to $0`);
+            } else if (totalForThisClip > remaining) {
+              // Scale both down proportionally to fit within remaining budget
+              const scaleFactor = remaining / totalForThisClip;
+              finalClipperEarnings = Math.round(finalClipperEarnings * scaleFactor * 100) / 100;
+              finalOwnerAmt = Math.round(finalOwnerAmt * scaleFactor * 100) / 100;
+              // Ensure we don't exceed remaining due to rounding
+              if (finalClipperEarnings + finalOwnerAmt > remaining) {
+                finalClipperEarnings = Math.round((remaining - finalOwnerAmt) * 100) / 100;
+              }
+              console.log(`[BUDGET] Clip ${id}: capped to fit budget. remaining=$${remaining}, clipper=$${finalClipperEarnings}, owner=$${finalOwnerAmt}`);
+            }
+
+            // Auto-pause if budget is now fully spent
+            const newTotalSpent = otherSpent + finalClipperEarnings + finalOwnerAmt;
+            if (newTotalSpent >= budgetStatus.budget) {
+              await db.campaign.update({
+                where: { id: clip.campaignId },
+                data: { status: "PAUSED" },
+              });
+              console.log(`[BUDGET] Campaign ${clip.campaignId} auto-paused — budget $${budgetStatus.budget} fully spent`);
+            }
+          }
+        } catch (budgetErr: any) {
+          console.error(`[BUDGET] Budget check failed for clip ${id}:`, budgetErr?.message);
+        }
+
+        // Save clipper earnings
         await db.clip.update({
           where: { id },
           data: {
-            earnings: breakdown.clipperEarnings,
+            earnings: finalClipperEarnings,
             baseEarnings: breakdown.baseEarnings,
             bonusPercent: breakdown.bonusPercent,
             bonusAmount: breakdown.bonusAmount,
           },
         });
 
-        // Create agency earnings for CPM_SPLIT campaigns
-        console.log(`[AGENCY] Clip ${id}: pricingModel=${(clipWithData.campaign as any).pricingModel}, ownerCpm=${(clipWithData.campaign as any).ownerCpm}`);
-        const pm = (clipWithData.campaign as any).pricingModel;
-        const oCpm = (clipWithData.campaign as any).ownerCpm;
-        if (pm === "CPM_SPLIT" && oCpm) {
-          const views = clipWithData.stats[0].views;
-          const cCpm = (clipWithData.campaign as any).clipperCpm ?? (clipWithData.campaign as any).cpmRate;
-          const ownerAmt = calculateOwnerEarnings(views, oCpm, breakdown.grossClipperEarnings, cCpm);
-          console.log(`[AGENCY] Creating AgencyEarning: clip=${id}, views=${views}, ownerAmt=${ownerAmt}`);
-          if (ownerAmt > 0) {
+        // Save agency earnings for CPM_SPLIT campaigns
+        if (isCpmSplit) {
+          console.log(`[AGENCY] Clip ${id}: clipper=$${finalClipperEarnings}, owner=$${finalOwnerAmt}`);
+          if (finalOwnerAmt > 0) {
             try {
               await db.agencyEarning.upsert({
                 where: { clipId: id },
-                create: { campaignId: clip.campaignId, clipId: id, amount: ownerAmt, views },
-                update: { amount: ownerAmt, views },
+                create: { campaignId: clip.campaignId, clipId: id, amount: finalOwnerAmt, views: clipWithData.stats[0].views },
+                update: { amount: finalOwnerAmt, views: clipWithData.stats[0].views },
               });
-              console.log(`[AGENCY] AgencyEarning saved for clip ${id}`);
             } catch (aeErr: any) {
               console.error(`[AGENCY] Failed to save AgencyEarning for clip ${id}:`, aeErr?.message);
             }
+          } else {
+            // Zero owner earnings — delete any existing record
+            try { await db.agencyEarning.delete({ where: { clipId: id } }); } catch {}
           }
         }
       }

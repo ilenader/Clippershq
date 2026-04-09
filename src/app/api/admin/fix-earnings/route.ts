@@ -122,6 +122,91 @@ export async function POST() {
     });
   }
 
+  // ── Budget overflow cleanup: scale down last clips to fit within budget ──
+  let budgetOverflowFixed = 0;
+  try {
+    const campaigns = await db.campaign.findMany({
+      where: { budget: { gt: 0 }, isArchived: false },
+      select: { id: true, budget: true, pricingModel: true },
+    });
+
+    for (const campaign of campaigns) {
+      // Sum clipper earnings
+      const clipperAgg = await db.clip.aggregate({
+        where: { campaignId: campaign.id, status: "APPROVED", isDeleted: false },
+        _sum: { earnings: true },
+      });
+      let totalSpent = clipperAgg._sum.earnings ?? 0;
+
+      // Add owner earnings for CPM_SPLIT
+      if (campaign.pricingModel === "CPM_SPLIT") {
+        const ownerAgg = await db.agencyEarning.aggregate({
+          where: { campaignId: campaign.id },
+          _sum: { amount: true },
+        });
+        totalSpent += ownerAgg._sum.amount ?? 0;
+      }
+
+      if (totalSpent <= campaign.budget) continue; // No overflow
+
+      const overflow = Math.round((totalSpent - campaign.budget) * 100) / 100;
+      console.log(`[FIX-BUDGET] Campaign ${campaign.id}: $${totalSpent.toFixed(2)} spent of $${campaign.budget} budget, overflow=$${overflow.toFixed(2)}`);
+
+      // Get clips ordered by approval date (newest first) — scale down newest clips first
+      const campaignClips = await db.clip.findMany({
+        where: { campaignId: campaign.id, status: "APPROVED", isDeleted: false },
+        orderBy: { reviewedAt: "desc" },
+        select: { id: true, earnings: true },
+      });
+
+      let remainingOverflow = overflow;
+      for (const c of campaignClips) {
+        if (remainingOverflow <= 0) break;
+        const clipEarnings = c.earnings || 0;
+        if (clipEarnings <= 0) continue;
+
+        // Get this clip's owner earnings
+        let clipOwnerAmt = 0;
+        if (campaign.pricingModel === "CPM_SPLIT") {
+          try {
+            const ae = await db.agencyEarning.findUnique({ where: { clipId: c.id } });
+            clipOwnerAmt = ae?.amount || 0;
+          } catch {}
+        }
+        const clipTotal = clipEarnings + clipOwnerAmt;
+
+        if (remainingOverflow >= clipTotal) {
+          // Zero out this clip entirely
+          await db.clip.update({ where: { id: c.id }, data: { earnings: 0 } });
+          if (clipOwnerAmt > 0) {
+            try { await db.agencyEarning.update({ where: { clipId: c.id }, data: { amount: 0 } }); } catch {}
+          }
+          remainingOverflow = Math.round((remainingOverflow - clipTotal) * 100) / 100;
+          budgetOverflowFixed++;
+        } else {
+          // Partially reduce this clip
+          const keepTotal = clipTotal - remainingOverflow;
+          const scaleFactor = keepTotal / clipTotal;
+          const newClipEarnings = Math.round(clipEarnings * scaleFactor * 100) / 100;
+          const newOwnerAmt = Math.round(clipOwnerAmt * scaleFactor * 100) / 100;
+          await db.clip.update({ where: { id: c.id }, data: { earnings: newClipEarnings } });
+          if (campaign.pricingModel === "CPM_SPLIT" && clipOwnerAmt > 0) {
+            try { await db.agencyEarning.update({ where: { clipId: c.id }, data: { amount: newOwnerAmt } }); } catch {}
+          }
+          remainingOverflow = 0;
+          budgetOverflowFixed++;
+        }
+      }
+      console.log(`[FIX-BUDGET] Campaign ${campaign.id}: overflow fixed, ${budgetOverflowFixed} clips adjusted`);
+
+      // Auto-pause if at budget
+      await db.campaign.update({ where: { id: campaign.id }, data: { status: "PAUSED" } });
+      console.log(`[FIX-BUDGET] Campaign ${campaign.id}: auto-paused after budget fix`);
+    }
+  } catch (budgetErr: any) {
+    console.error(`[FIX-BUDGET] Error:`, budgetErr?.message);
+  }
+
   console.log(`[FIX-EARNINGS] Done: ${updated}/${clips.length} clips updated, $${oldTotal.toFixed(2)} → $${newTotal.toFixed(2)}`);
 
   return NextResponse.json({
@@ -131,5 +216,6 @@ export async function POST() {
     newTotal: Math.round(newTotal * 100) / 100,
     usersUpdated: users.length,
     agencyEarnings: { updated: agencyUpdated, oldTotal: Math.round(agencyOldTotal * 100) / 100, newTotal: Math.round(agencyNewTotal * 100) / 100 },
+    budgetOverflowClipsFixed: budgetOverflowFixed,
   });
 }
