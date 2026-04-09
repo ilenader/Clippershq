@@ -51,7 +51,7 @@ export function Navbar() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
   const bellBtnRef = useRef<HTMLButtonElement>(null);
-  const prevNotifCountRef = useRef(0);
+  const prevNotifCountRef = useRef(-1);
   const sseRef = useRef<EventSource | null>(null);
   const [notifPos, setNotifPos] = useState<{ top: number; right: number } | null>(null);
 

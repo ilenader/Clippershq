@@ -196,7 +196,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
 
   // Global — unread tracking with ref to prevent duplicate pings
   const [unreadCount, setUnreadCount] = useState(0);
-  const lastKnownUnreadRef = useRef(0);
+  const lastKnownUnreadRef = useRef(-1);
   const soundPlayedForCountRef = useRef(-1);
   const sseRef = useRef<EventSource | null>(null);
 
@@ -221,7 +221,8 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
 
   // ── Handle unread count update (shared by SSE + polling fallback) ──
   const handleUnreadUpdate = useCallback((newCount: number) => {
-    if (newCount > lastKnownUnreadRef.current && soundPlayedForCountRef.current !== newCount) {
+    // Only play sound for genuinely new messages, not on initial load/reconnect
+    if (lastKnownUnreadRef.current >= 0 && newCount > lastKnownUnreadRef.current && soundPlayedForCountRef.current !== newCount) {
       soundPlayedForCountRef.current = newCount;
       playNotificationSound();
     }
