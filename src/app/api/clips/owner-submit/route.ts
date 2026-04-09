@@ -1,7 +1,8 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
-import { detectPlatform } from "@/lib/apify";
+import { detectPlatform, fetchClipStats } from "@/lib/apify";
+import { recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -82,7 +83,17 @@ export async function POST(req: NextRequest) {
       effectiveCpm = Math.min(customCpm, campaignCpm);
     }
 
-    // Create clip as APPROVED + initial stat + tracking job
+    // Fetch real stats from platform BEFORE creating the clip
+    let fetchedStats = { views: 0, likes: 0, comments: 0, shares: 0 };
+    try {
+      const realStats = await fetchClipStats(clipUrl);
+      fetchedStats = { views: realStats.views, likes: realStats.likes, comments: realStats.comments, shares: realStats.shares };
+      console.log(`[OWNER-SUBMIT] Fetched real stats for ${clipUrl}: ${fetchedStats.views} views`);
+    } catch (err: any) {
+      console.log(`[OWNER-SUBMIT] Could not fetch stats for ${clipUrl}: ${err?.message} — starting with 0`);
+    }
+
+    // Create clip as APPROVED + initial stat with real views + tracking job (immediate)
     const clip = await db.$transaction(async (tx: any) => {
       const newClip = await tx.clip.create({
         data: {
@@ -98,18 +109,50 @@ export async function POST(req: NextRequest) {
       });
 
       await tx.clipStat.create({
-        data: { clipId: newClip.id, views: 0, likes: 0, comments: 0, shares: 0 },
+        data: { clipId: newClip.id, views: fetchedStats.views, likes: fetchedStats.likes, comments: fetchedStats.comments, shares: fetchedStats.shares },
       });
 
-      // Tracking job: 24h initial for owner overrides
-      const nextCheck = new Date();
-      nextCheck.setHours(nextCheck.getHours() + 24);
+      // Tracking job: check immediately on next cron run, then every 2 hours
       await tx.trackingJob.create({
-        data: { clipId: newClip.id, campaignId, nextCheckAt: nextCheck, checkIntervalMin: 1440, isActive: true },
+        data: { clipId: newClip.id, campaignId, nextCheckAt: new Date(), checkIntervalMin: 120, isActive: true },
       });
 
       return newClip;
     });
+
+    // Calculate earnings from real views (if any)
+    if (fetchedStats.views > 0) {
+      try {
+        const fullCampaign = await db.campaign.findUnique({
+          where: { id: campaignId },
+          select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true, budget: true },
+        });
+        if (fullCampaign) {
+          const breakdown = recalculateClipEarningsBreakdown({
+            stats: [{ views: fetchedStats.views }],
+            campaign: fullCampaign,
+          });
+          await db.clip.update({
+            where: { id: clip.id },
+            data: { earnings: breakdown.clipperEarnings, baseEarnings: breakdown.baseEarnings, bonusPercent: breakdown.bonusPercent, bonusAmount: breakdown.bonusAmount },
+          });
+
+          // Agency earnings for CPM_SPLIT
+          if (fullCampaign.pricingModel === "CPM_SPLIT" && fullCampaign.ownerCpm) {
+            const cCpm = fullCampaign.clipperCpm ?? fullCampaign.cpmRate ?? null;
+            const ownerAmt = calculateOwnerEarnings(fetchedStats.views, fullCampaign.ownerCpm, breakdown.grossClipperEarnings, cCpm);
+            if (ownerAmt > 0) {
+              try {
+                await db.agencyEarning.create({ data: { campaignId, clipId: clip.id, amount: ownerAmt, views: fetchedStats.views } });
+              } catch {}
+            }
+          }
+          console.log(`[OWNER-SUBMIT] Earnings calculated: $${breakdown.clipperEarnings} for ${fetchedStats.views} views`);
+        }
+      } catch (earningsErr: any) {
+        console.error(`[OWNER-SUBMIT] Earnings calc failed:`, earningsErr?.message);
+      }
+    }
 
     // Budget check info
     let budgetInfo = null;
