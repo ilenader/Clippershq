@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
-import { recalculateClipEarningsBreakdown } from "@/lib/earnings-calc";
+import { recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,7 @@ export async function POST() {
     where: { status: "APPROVED", isDeleted: false },
     include: {
       stats: { orderBy: { checkedAt: "desc" }, take: 1 },
-      campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true } },
+      campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true } },
       user: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true } },
     },
   });
@@ -60,7 +60,48 @@ export async function POST() {
       updated++;
     }
 
+    // Fix agency earnings for CPM_SPLIT campaigns (proportional to capped clipper earnings)
+    if ((clip.campaign as any).pricingModel === "CPM_SPLIT" && (clip.campaign as any).ownerCpm && clip.stats[0]) {
+      const cCpm = (clip.campaign as any).clipperCpm ?? (clip.campaign as any).cpmRate ?? null;
+      const ownerAmt = calculateOwnerEarnings(clip.stats[0].views, (clip.campaign as any).ownerCpm, breakdown.clipperEarnings, cCpm);
+      if (ownerAmt > 0) {
+        try {
+          await db.agencyEarning.upsert({
+            where: { clipId: clip.id },
+            create: { campaignId: clip.campaignId, clipId: clip.id, amount: ownerAmt, views: clip.stats[0].views },
+            update: { amount: ownerAmt, views: clip.stats[0].views },
+          });
+        } catch {}
+      }
+    }
+
     newTotal += breakdown.clipperEarnings;
+  }
+
+  // Fix agency earnings summary
+  let agencyOldTotal = 0;
+  let agencyNewTotal = 0;
+  let agencyUpdated = 0;
+  try {
+    const allAgency = await db.agencyEarning.findMany({ include: { clip: { include: { stats: { orderBy: { checkedAt: "desc" }, take: 1 }, campaign: { select: { clipperCpm: true, cpmRate: true, ownerCpm: true, maxPayoutPerClip: true, minViews: true, pricingModel: true } } } } } });
+    for (const ae of allAgency) {
+      agencyOldTotal += ae.amount || 0;
+      if (ae.clip?.stats?.[0] && ae.clip?.campaign) {
+        const cCpm = ae.clip.campaign.clipperCpm ?? ae.clip.campaign.cpmRate ?? null;
+        const clipBreakdown = recalculateClipEarningsBreakdown({ stats: ae.clip.stats, campaign: ae.clip.campaign });
+        const newOwnerAmt = calculateOwnerEarnings(ae.clip.stats[0].views, ae.clip.campaign.ownerCpm, clipBreakdown.clipperEarnings, cCpm);
+        if (Math.abs(newOwnerAmt - ae.amount) > 0.01) {
+          await db.agencyEarning.update({ where: { id: ae.id }, data: { amount: newOwnerAmt } });
+          agencyUpdated++;
+        }
+        agencyNewTotal += newOwnerAmt;
+      } else {
+        agencyNewTotal += ae.amount || 0;
+      }
+    }
+    console.log(`[FIX-AGENCY] Updated ${agencyUpdated} records, old total $${agencyOldTotal.toFixed(2)}, new total $${agencyNewTotal.toFixed(2)}`);
+  } catch (aeErr: any) {
+    console.error(`[FIX-AGENCY] Error:`, aeErr?.message);
   }
 
   // Update all users' totalEarnings
@@ -89,5 +130,6 @@ export async function POST() {
     oldTotal: Math.round(oldTotal * 100) / 100,
     newTotal: Math.round(newTotal * 100) / 100,
     usersUpdated: users.length,
+    agencyEarnings: { updated: agencyUpdated, oldTotal: Math.round(agencyOldTotal * 100) / 100, newTotal: Math.round(agencyNewTotal * 100) / 100 },
   });
 }

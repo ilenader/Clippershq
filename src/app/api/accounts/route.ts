@@ -76,6 +76,22 @@ export async function POST(req: NextRequest) {
 
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
+  // Check if another user already has an APPROVED account with the same username + platform
+  try {
+    const duplicate = await db.clipAccount.findFirst({
+      where: {
+        username: data.username,
+        platform: data.platform,
+        status: "APPROVED",
+        userId: { not: session.user.id },
+        deletedByUser: false,
+      },
+    });
+    if (duplicate) {
+      return NextResponse.json({ error: "This account is already verified by another user." }, { status: 400 });
+    }
+  } catch {}
+
   // Check for a soft-deleted account with the same profileLink — reactivate it
   try {
     const existing = await db.clipAccount.findFirst({

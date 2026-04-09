@@ -31,7 +31,7 @@ export default function ProgressPage() {
   const userRole = (session?.user as any)?.role;
 
   useEffect(() => {
-    if (session && userRole && userRole === "ADMIN") {
+    if (session && userRole && (userRole === "ADMIN" || userRole === "OWNER")) {
       router.replace("/admin");
     }
   }, [session, userRole, router]);

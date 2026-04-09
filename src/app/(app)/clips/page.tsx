@@ -154,16 +154,14 @@ export default function ClipsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">My Clips</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-[15px] text-[var(--text-secondary)]">Submit and track your clips.</p>
-            {gamification && gamification.bonusPercent > 0 && (
-              <span className="inline-flex items-center rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-400">
-                +{gamification.bonusPercent}% bonus
-              </span>
-            )}
-          </div>
+          <p className="text-[15px] text-[var(--text-secondary)]">Submit and track your clips.</p>
+          {gamification && gamification.bonusPercent > 0 && (
+            <span className="inline-flex items-center rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-400 mt-1">
+              +{gamification.bonusPercent}% bonus
+            </span>
+          )}
         </div>
-        <Button onClick={() => setShowModal(true)} icon={<Plus className="h-4 w-4" />}>
+        <Button onClick={() => setShowModal(true)} icon={<Plus className="h-4 w-4" />} className="whitespace-nowrap">
           Submit Clip
         </Button>
       </div>

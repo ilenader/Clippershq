@@ -250,11 +250,61 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
     console.log(`[VERIFY] /function exception: ${err?.name} ${err?.message}`);
   }
 
-  console.log(`[VERIFY] ════ ALL 3 METHODS FAILED ════`);
+  console.log(`[VERIFY] ════ ALL 3 BROWSERLESS METHODS FAILED ════`);
+
+  // ── ATTEMPT 4: Apify Instagram Profile Scraper (fallback) ──
+  const apifyToken = process.env.APIFY_API_KEY || process.env.APIFY_TOKEN || "";
+  if (apifyToken) {
+    try {
+      console.log(`[VERIFY] Instagram: trying Apify...`);
+      const apifyCtrl = new AbortController();
+      const apifyTimeout = setTimeout(() => apifyCtrl.abort(), 60000);
+
+      const apifyRes = await fetch(
+        `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${apifyToken}`,
+        {
+          method: "POST",
+          signal: apifyCtrl.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            usernames: [username],
+            resultsLimit: 1,
+          }),
+        }
+      );
+      clearTimeout(apifyTimeout);
+
+      if (apifyRes.ok) {
+        const apifyData = await apifyRes.json();
+        const bio = apifyData?.[0]?.biography || apifyData?.[0]?.bio || "";
+        console.log(`[VERIFY] Apify returned bio: "${String(bio).substring(0, 200)}"`);
+
+        const codeUpper = code.trim().toUpperCase();
+        const bioUpper = String(bio).toUpperCase();
+        const foundInBio = bioUpper.includes(codeUpper);
+        console.log(`[VERIFY] Code "${code}" found in bio: ${foundInBio}`);
+
+        if (foundInBio) {
+          console.log(`[VERIFY] ✓ Code found via Apify`);
+          return { found: true };
+        }
+        console.log(`[VERIFY] ✗ Apify: code not found in bio`);
+      } else {
+        const errText = await apifyRes.text().catch(() => "");
+        console.log(`[VERIFY] Apify failed: HTTP ${apifyRes.status} - ${errText.substring(0, 300)}`);
+      }
+    } catch (err: any) {
+      console.log(`[VERIFY] Apify exception: ${err?.name} ${err?.message}`);
+    }
+  } else {
+    console.log(`[VERIFY] No APIFY_API_KEY set — skipping Apify fallback`);
+  }
+
+  console.log(`[VERIFY] ════ ALL METHODS FAILED ════`);
   return {
     found: false,
-    error: "Verification code not found in your Instagram bio. Make sure the code is in your bio, your profile is PUBLIC, wait 30 seconds, and try again. If it keeps failing, ask an admin to verify manually.",
-    debug: "All 3 Browserless methods failed",
+    error: "Instagram verification failed. Please ask an admin to verify manually.",
+    debug: "All Browserless + Apify methods failed",
   };
 }
 
@@ -393,6 +443,21 @@ export async function POST(
     // Code found → auto-approve (skip VERIFIED waiting state)
     if (db) {
       try {
+        // Duplicate check: ensure no other user already has this account approved
+        const duplicate = await db.clipAccount.findFirst({
+          where: {
+            username: account.username,
+            platform: account.platform,
+            status: "APPROVED",
+            userId: { not: session.user.id },
+            deletedByUser: false,
+          },
+        });
+        if (duplicate) {
+          console.log(`[VERIFY] ✗ Duplicate: account ${account.username}/${account.platform} already approved for user ${duplicate.userId}`);
+          return NextResponse.json({ verified: false, message: "This account is already verified by another user." }, { status: 400 });
+        }
+
         await db.clipAccount.update({
           where: { id },
           data: { status: "APPROVED", verifiedAt: new Date() },

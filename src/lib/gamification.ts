@@ -461,9 +461,10 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
         },
       });
 
-      // Update agency earnings for CPM_SPLIT
+      // Update agency earnings for CPM_SPLIT (proportional to capped clipper earnings)
       if ((clip.campaign as any).pricingModel === "CPM_SPLIT" && (clip.campaign as any).ownerCpm) {
-        const ownerAmt = calculateOwnerEarnings(stat.views, (clip.campaign as any).ownerCpm);
+        const cCpm = clip.campaign.clipperCpm ?? clip.campaign.cpmRate ?? null;
+        const ownerAmt = calculateOwnerEarnings(stat.views, (clip.campaign as any).ownerCpm, result.clipperEarnings, cCpm);
         if (ownerAmt > 0) {
           await db.agencyEarning.upsert({
             where: { clipId: clip.id },
