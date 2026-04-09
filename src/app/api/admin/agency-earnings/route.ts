@@ -24,7 +24,18 @@ export async function GET() {
       select: {
         id: true, name: true, platform: true, pricingModel: true,
         ownerCpm: true, agencyFee: true, budget: true, status: true,
-        agencyEarnings: { select: { amount: true, views: true, createdAt: true } },
+        agencyEarnings: {
+          select: {
+            amount: true, views: true, createdAt: true, clipId: true,
+            clip: {
+              select: {
+                clipUrl: true, earnings: true, reviewedAt: true, createdAt: true,
+                clipAccount: { select: { username: true, platform: true } },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -37,6 +48,17 @@ export async function GET() {
       // For AGENCY_FEE: the fee is the campaign's agencyFee field (flat amount)
       // For CPM_SPLIT: earnings come from AgencyEarning records (views × ownerCpm)
       const displayEarnings = pricing === "CPM_SPLIT" ? Math.round(totalOwnerEarnings * 100) / 100 : (c.agencyFee || 0);
+      const clips = c.agencyEarnings.map((ae: any) => ({
+        clipId: ae.clipId,
+        clipUrl: ae.clip?.clipUrl || null,
+        accountName: ae.clip?.clipAccount?.username || null,
+        accountPlatform: ae.clip?.clipAccount?.platform || null,
+        views: ae.views || 0,
+        clipperEarnings: Math.round((ae.clip?.earnings || 0) * 100) / 100,
+        ownerEarnings: Math.round((ae.amount || 0) * 100) / 100,
+        date: ae.clip?.reviewedAt || ae.clip?.createdAt || ae.createdAt,
+      }));
+
       return {
         id: c.id,
         name: c.name,
@@ -50,6 +72,7 @@ export async function GET() {
         displayEarnings,
         totalViews,
         clipCount: c.agencyEarnings.length,
+        clips,
       };
     });
 

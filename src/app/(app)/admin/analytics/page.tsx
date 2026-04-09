@@ -99,6 +99,7 @@ export default function AdminAnalyticsPage() {
   const [allCampaigns, setAllCampaigns] = useState<any[]>([]);
   const [allClips, setAllClips] = useState<any[]>([]);
   const [allAccounts, setAllAccounts] = useState<any[]>([]);
+  const [spendByCampaign, setSpendByCampaign] = useState<Record<string, number>>({});
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(["views"]);
   const [clipStatusFilter, setClipStatusFilter] = useState("APPROVED");
@@ -110,11 +111,13 @@ export default function AdminAnalyticsPage() {
       fetch("/api/campaigns?scope=manage").then((r) => r.json()),
       fetch("/api/clips").then((r) => r.json()),
       fetch("/api/accounts").then((r) => r.json()).catch(() => []),
+      fetch("/api/campaigns/spend").then((r) => r.json()).catch(() => ({})),
     ])
-      .then(([campaigns, clips, accounts]) => {
+      .then(([campaigns, clips, accounts, spend]) => {
         setAllCampaigns(Array.isArray(campaigns) ? campaigns : []);
         setAllClips(Array.isArray(clips) ? clips : []);
         setAllAccounts(Array.isArray(accounts) ? accounts : []);
+        setSpendByCampaign(typeof spend === "object" && spend !== null ? spend : {});
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -138,7 +141,11 @@ export default function AdminAnalyticsPage() {
   const avgCpm = withCpm.length > 0 ? withCpm.reduce((s: number, c: any) => s + c.cpmRate, 0) / withCpm.length : 0;
   const approvedClips = filteredClips.filter((c: any) => c.status === "APPROVED").length;
   const pendingClips = filteredClips.filter((c: any) => c.status === "PENDING").length;
-  const totalEarnings = filteredClips.filter((c: any) => c.status === "APPROVED").reduce((s: number, c: any) => s + (c.earnings || 0), 0);
+  // Total campaign spend: use /api/campaigns/spend which includes clipper + owner earnings
+  const relevantCampaignIds = selectedCampaigns.length > 0
+    ? selectedCampaigns
+    : allCampaigns.map((c: any) => c.id);
+  const totalEarnings = relevantCampaignIds.reduce((s: number, cid: string) => s + (spendByCampaign[cid] || 0), 0);
   const clipsToday = filteredClips.filter((c: any) => c.createdAt && isToday(c.createdAt)).length;
 
   const clipsPerDay = buildDailyChart(filteredClips, timeframeDays);
