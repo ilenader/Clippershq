@@ -16,15 +16,17 @@ export const maxDuration = 60; // Allow up to 60s for Apify calls
  * In development, accessible without secret.
  */
 export async function GET(req: NextRequest) {
-  // Production: verify cron secret
-  if (process.env.NODE_ENV === "production") {
-    const secret = req.headers.get("authorization");
-    if (secret !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Production: verify Vercel cron secret
+  // Vercel sends: Authorization: Bearer <CRON_SECRET>
+  if (process.env.NODE_ENV === "production" && process.env.CRON_SECRET) {
+    const authHeader = req.headers.get("authorization");
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      console.log("[CRON] Unauthorized — invalid or missing authorization header");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
 
-  console.log("[Tracking Cron] Starting...");
+  console.log("[CRON] Tracking cron fired at", new Date().toISOString());
   const start = Date.now();
 
   const result = await runDueTrackingJobs();

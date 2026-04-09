@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { registerSSEClient, unregisterSSEClient } from "@/lib/sse-broadcast";
 import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,9 @@ export async function GET(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Register this controller for broadcast events (clip_updated, earnings_updated, etc.)
+      registerSSEClient(userId, controller);
+
       controller.enqueue(encoder.encode("event: connected\ndata: ok\n\n"));
 
       async function checkNotifs() {
@@ -67,6 +71,7 @@ export async function GET(req: NextRequest) {
         closed = true;
         clearInterval(interval);
         clearInterval(heartbeat);
+        unregisterSSEClient(userId, controller);
         try { controller.close(); } catch {}
       });
     },

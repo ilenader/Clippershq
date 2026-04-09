@@ -19,6 +19,7 @@ import { db } from "@/lib/db";
 import { fetchClipStats } from "@/lib/apify";
 import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
 import { computeFraudLevel } from "@/lib/fraud";
+import { broadcastToUser } from "@/lib/sse-broadcast";
 
 /** Interval tiers in minutes: 2h → 4h → 8h → 16h → 24h → 72h */
 const TIERS = [120, 240, 480, 960, 1440, 2880];
@@ -357,6 +358,14 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
             });
             const { updateUserLevel } = await import("@/lib/gamification");
             await updateUserLevel(clip.userId);
+          }
+
+          // Broadcast real-time update to clipper's SSE stream
+          if (earningsChanged && clip.userId) {
+            try {
+              broadcastToUser(clip.userId, "clip_updated", { clipId: clip.id, views: stats.views, earnings: newEarnings });
+              broadcastToUser(clip.userId, "earnings_updated", { reason: "tracking" });
+            } catch {}
           }
         }
 

@@ -63,7 +63,18 @@ export default function EarningsPage() {
   useEffect(() => {
     fetchData([], true);
   }, [fetchData]);
-  useAutoRefresh(useCallback(() => fetchData(selectedCampaigns), [fetchData, selectedCampaigns]), 60000);
+  useAutoRefresh(useCallback(() => fetchData(selectedCampaigns), [fetchData, selectedCampaigns]), 120000); // Fallback polling
+
+  // SSE real-time: refresh when earnings change
+  useEffect(() => {
+    const handler = () => { fetchData(selectedCampaigns); };
+    window.addEventListener("sse:earnings_updated", handler);
+    window.addEventListener("sse:clip_updated", handler);
+    return () => {
+      window.removeEventListener("sse:earnings_updated", handler);
+      window.removeEventListener("sse:clip_updated", handler);
+    };
+  }, [fetchData, selectedCampaigns]);
 
   // Re-fetch when campaign selection changes
   const handleCampaignChange = useCallback((values: string[]) => {

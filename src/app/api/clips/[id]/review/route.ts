@@ -9,6 +9,7 @@ import { sendClipApproved, sendClipRejected } from "@/lib/email";
 import { updateUserLevel } from "@/lib/gamification";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
+import { broadcastToUser } from "@/lib/sse-broadcast";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -303,6 +304,14 @@ export async function POST(
         await updateStreak(clip.userId);
       } catch {}
     }
+
+    // Broadcast real-time update to the clipper's SSE stream
+    try {
+      broadcastToUser(clip.userId, "clip_updated", { clipId: id, status: action });
+      if (action === "APPROVED" || action === "REJECTED") {
+        broadcastToUser(clip.userId, "earnings_updated", { reason: action.toLowerCase() });
+      }
+    } catch {}
 
     // Audit log
     await logAudit({

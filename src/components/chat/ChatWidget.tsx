@@ -194,11 +194,10 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [needsHumanSupport, setNeedsHumanSupport] = useState(false);
 
-  // Global — unread tracking with ref to prevent duplicate pings
+  // Global — unread tracking
   const [unreadCount, setUnreadCount] = useState(0);
-  const lastKnownUnreadRef = useRef(-1);
-  const soundPlayedForCountRef = useRef(-1);
   const sseRef = useRef<EventSource | null>(null);
+  const chatSseInitializedRef = useRef(false);
 
   // Chat filter for admin/owner
   type ChatFilter = "all" | "needs-agent" | "direct" | string; // string = campaignId
@@ -221,12 +220,13 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
 
   // ── Handle unread count update (shared by SSE + polling fallback) ──
   const handleUnreadUpdate = useCallback((newCount: number) => {
-    // Only play sound for genuinely new messages, not on initial load/reconnect
-    if (lastKnownUnreadRef.current >= 0 && newCount > lastKnownUnreadRef.current && soundPlayedForCountRef.current !== newCount) {
-      soundPlayedForCountRef.current = newCount;
+    // Compare against sessionStorage (survives navigation)
+    let prevCount = newCount;
+    try { const v = sessionStorage.getItem("chat_unread_count"); if (v !== null) prevCount = parseInt(v, 10); } catch {}
+    if (newCount > prevCount) {
       playNotificationSound();
     }
-    lastKnownUnreadRef.current = newCount;
+    try { sessionStorage.setItem("chat_unread_count", String(newCount)); } catch {}
     setUnreadCount(newCount);
 
     // If viewing a thread, refresh messages on new incoming
@@ -293,6 +293,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
         sseRef.current.close();
         sseRef.current = null;
       }
+      chatSseInitializedRef.current = false;
 
       try {
         const es = new EventSource("/api/chat/sse");
@@ -301,7 +302,15 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
         es.addEventListener("unread", (event) => {
           try {
             const data = JSON.parse(event.data);
-            handleUnreadUpdate(data.count || 0);
+            const newCount = data.count || 0;
+            // First event after (re)connect: seed count without sound
+            if (!chatSseInitializedRef.current) {
+              chatSseInitializedRef.current = true;
+              try { sessionStorage.setItem("chat_unread_count", String(newCount)); } catch {}
+              setUnreadCount(newCount);
+              return;
+            }
+            handleUnreadUpdate(newCount);
           } catch {}
         });
 
@@ -314,7 +323,8 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
         });
 
         es.onerror = () => {
-          // SSE failed — close and reconnect after delay
+          // SSE failed — mark uninitialized so reconnect seeds without sound
+          chatSseInitializedRef.current = false;
           es.close();
           sseRef.current = null;
           // Start fallback polling while reconnecting

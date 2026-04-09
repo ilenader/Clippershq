@@ -51,7 +51,7 @@ export function Navbar() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
   const bellBtnRef = useRef<HTMLButtonElement>(null);
-  const prevNotifCountRef = useRef(-1);
+  const sseInitializedRef = useRef(false);
   const sseRef = useRef<EventSource | null>(null);
   const [notifPos, setNotifPos] = useState<{ top: number; right: number } | null>(null);
 
@@ -62,16 +62,17 @@ export function Navbar() {
       const data = await res.json();
       if (data.notifications) setNotifications(data.notifications.slice(0, 8));
       const newCount = data.unreadCount || 0;
-      prevNotifCountRef.current = newCount;
       setNotifCount(newCount);
+      // Seed sessionStorage so SSE knows the baseline
+      try { sessionStorage.setItem("notif_count", String(newCount)); } catch {}
     } catch {}
   }, []);
 
   // SSE connection for instant notification delivery
-  // Browsers do NOT throttle SSE in background tabs (unlike setInterval)
   useEffect(() => {
-    // Initial fetch for notification list
     fetchNotifList();
+
+    sseInitializedRef.current = false;
 
     const es = new EventSource("/api/notifications/sse");
     sseRef.current = es;
@@ -79,21 +80,38 @@ export function Navbar() {
     es.addEventListener("notif", (e) => {
       try {
         const { count } = JSON.parse(e.data);
-        // Play sound if count increased
-        if (count > prevNotifCountRef.current && prevNotifCountRef.current >= 0) {
+        // First event after (re)connect: seed without sound
+        if (!sseInitializedRef.current) {
+          sseInitializedRef.current = true;
+          setNotifCount(count);
+          try { sessionStorage.setItem("notif_count", String(count)); } catch {}
+          if (count > 0) fetchNotifList();
+          return;
+        }
+        // Compare against sessionStorage (survives navigation)
+        let prevCount = count; // default: no change
+        try { const v = sessionStorage.getItem("notif_count"); if (v !== null) prevCount = parseInt(v, 10); } catch {}
+        if (count > prevCount) {
           playNotifSound();
         }
-        prevNotifCountRef.current = count;
         setNotifCount(count);
-        // Refresh notification list when count changes
+        try { sessionStorage.setItem("notif_count", String(count)); } catch {}
         if (count > 0) {
           fetchNotifList();
         }
       } catch {}
     });
 
+    // Forward data-update events to window so page components can listen
+    es.addEventListener("clip_updated", (e) => {
+      try { window.dispatchEvent(new CustomEvent("sse:clip_updated", { detail: JSON.parse(e.data) })); } catch {}
+    });
+    es.addEventListener("earnings_updated", (e) => {
+      try { window.dispatchEvent(new CustomEvent("sse:earnings_updated", { detail: JSON.parse(e.data) })); } catch {}
+    });
+
     es.onerror = () => {
-      // SSE reconnects automatically — EventSource handles this
+      sseInitializedRef.current = false;
     };
 
     return () => {

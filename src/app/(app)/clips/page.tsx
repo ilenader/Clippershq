@@ -82,7 +82,18 @@ export default function ClipsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  useAutoRefresh(load, 30000);
+  useAutoRefresh(load, 60000); // Fallback polling (SSE handles instant updates)
+
+  // SSE real-time: refresh when clip status or earnings change
+  useEffect(() => {
+    const handler = () => { load(); };
+    window.addEventListener("sse:clip_updated", handler);
+    window.addEventListener("sse:earnings_updated", handler);
+    return () => {
+      window.removeEventListener("sse:clip_updated", handler);
+      window.removeEventListener("sse:earnings_updated", handler);
+    };
+  }, [load]);
 
   // Compute remaining daily submissions per campaign
   const getDailyRemaining = (campaignId: string): { remaining: number; limit: number } => {
