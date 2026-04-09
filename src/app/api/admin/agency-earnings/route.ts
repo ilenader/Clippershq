@@ -20,10 +20,10 @@ export async function GET() {
   try {
     // Get all campaigns with their agency earnings and agency fees
     const campaigns = await db.campaign.findMany({
-      where: { isArchived: false },
+      where: {},
       select: {
         id: true, name: true, platform: true, pricingModel: true,
-        ownerCpm: true, agencyFee: true, budget: true, status: true,
+        ownerCpm: true, agencyFee: true, budget: true, status: true, isArchived: true,
         agencyEarnings: {
           select: {
             amount: true, views: true, createdAt: true, clipId: true,
@@ -67,7 +67,8 @@ export async function GET() {
         ownerCpm: c.ownerCpm,
         agencyFee: c.agencyFee,
         budget: c.budget,
-        status: c.status,
+        status: c.isArchived ? "ARCHIVED" : c.status,
+        isArchived: c.isArchived || false,
         totalOwnerEarnings: Math.round(totalOwnerEarnings * 100) / 100,
         displayEarnings,
         totalViews,
