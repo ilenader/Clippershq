@@ -51,28 +51,38 @@ export function Navbar() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
   const bellBtnRef = useRef<HTMLButtonElement>(null);
-  const sseInitializedRef = useRef(false);
   const sseRef = useRef<EventSource | null>(null);
+  const mountTimeRef = useRef(Date.now());
   const [notifPos, setNotifPos] = useState<{ top: number; right: number } | null>(null);
 
-  // Fetch full notification list (for dropdown content)
+  // Fetch notification list — plays sound only for genuinely new notifications
+  // after the page has been open for 3+ seconds
   const fetchNotifList = useCallback(async () => {
     try {
       const res = await fetch("/api/notifications");
       const data = await res.json();
-      if (data.notifications) setNotifications(data.notifications.slice(0, 8));
+      const notifs: any[] = data.notifications ? data.notifications.slice(0, 8) : [];
+      setNotifications(notifs);
       const newCount = data.unreadCount || 0;
       setNotifCount(newCount);
-      // Seed sessionStorage so SSE knows the baseline
-      try { sessionStorage.setItem("notif_count", String(newCount)); } catch {}
+
+      // Sound: compare newest notification ID against sessionStorage
+      if (notifs.length > 0) {
+        const newestId = notifs[0].id;
+        const lastSeenId = sessionStorage.getItem("last_seen_notif_id") || "";
+        const elapsed = Date.now() - mountTimeRef.current;
+        if (newestId !== lastSeenId && lastSeenId !== "" && elapsed > 3000) {
+          playNotifSound();
+        }
+        sessionStorage.setItem("last_seen_notif_id", newestId);
+      }
     } catch {}
   }, []);
 
-  // SSE connection for instant notification delivery
+  // SSE connection — NO sound here, only count/data updates
   useEffect(() => {
+    mountTimeRef.current = Date.now();
     fetchNotifList();
-
-    sseInitializedRef.current = false;
 
     const es = new EventSource("/api/notifications/sse");
     sseRef.current = es;
@@ -80,25 +90,9 @@ export function Navbar() {
     es.addEventListener("notif", (e) => {
       try {
         const { count } = JSON.parse(e.data);
-        // First event after (re)connect: seed without sound
-        if (!sseInitializedRef.current) {
-          sseInitializedRef.current = true;
-          setNotifCount(count);
-          try { sessionStorage.setItem("notif_count", String(count)); } catch {}
-          if (count > 0) fetchNotifList();
-          return;
-        }
-        // Compare against sessionStorage (survives navigation)
-        let prevCount = count; // default: no change
-        try { const v = sessionStorage.getItem("notif_count"); if (v !== null) prevCount = parseInt(v, 10); } catch {}
-        if (count > prevCount) {
-          playNotifSound();
-        }
         setNotifCount(count);
-        try { sessionStorage.setItem("notif_count", String(count)); } catch {}
-        if (count > 0) {
-          fetchNotifList();
-        }
+        // Fetch full list (sound decision happens inside fetchNotifList)
+        if (count > 0) fetchNotifList();
       } catch {}
     });
 
@@ -110,9 +104,7 @@ export function Navbar() {
       try { window.dispatchEvent(new CustomEvent("sse:earnings_updated", { detail: JSON.parse(e.data) })); } catch {}
     });
 
-    es.onerror = () => {
-      sseInitializedRef.current = false;
-    };
+    es.onerror = () => {};
 
     return () => {
       es.close();

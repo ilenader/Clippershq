@@ -197,7 +197,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   // Global — unread tracking
   const [unreadCount, setUnreadCount] = useState(0);
   const sseRef = useRef<EventSource | null>(null);
-  const chatSseInitializedRef = useRef(false);
+  const chatMountTimeRef = useRef(Date.now());
 
   // Chat filter for admin/owner
   type ChatFilter = "all" | "needs-agent" | "direct" | string; // string = campaignId
@@ -219,11 +219,12 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   useEffect(() => { activeConvoIdRef.current = threadInfo?.convoId || ""; }, [threadInfo]);
 
   // ── Handle unread count update (shared by SSE + polling fallback) ──
+  // Sound is ONLY played when count increases AND page has been open > 3 seconds
   const handleUnreadUpdate = useCallback((newCount: number) => {
-    // Compare against sessionStorage (survives navigation)
     let prevCount = newCount;
     try { const v = sessionStorage.getItem("chat_unread_count"); if (v !== null) prevCount = parseInt(v, 10); } catch {}
-    if (newCount > prevCount) {
+    const elapsed = Date.now() - chatMountTimeRef.current;
+    if (newCount > prevCount && elapsed > 3000) {
       playNotificationSound();
     }
     try { sessionStorage.setItem("chat_unread_count", String(newCount)); } catch {}
@@ -293,7 +294,6 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
         sseRef.current.close();
         sseRef.current = null;
       }
-      chatSseInitializedRef.current = false;
 
       try {
         const es = new EventSource("/api/chat/sse");
@@ -302,20 +302,11 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
         es.addEventListener("unread", (event) => {
           try {
             const data = JSON.parse(event.data);
-            const newCount = data.count || 0;
-            // First event after (re)connect: seed count without sound
-            if (!chatSseInitializedRef.current) {
-              chatSseInitializedRef.current = true;
-              try { sessionStorage.setItem("chat_unread_count", String(newCount)); } catch {}
-              setUnreadCount(newCount);
-              return;
-            }
-            handleUnreadUpdate(newCount);
+            handleUnreadUpdate(data.count || 0);
           } catch {}
         });
 
         es.addEventListener("connected", () => {
-          // SSE connected — stop fallback polling
           if (fallbackInterval) {
             clearInterval(fallbackInterval);
             fallbackInterval = null;
@@ -323,8 +314,6 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
         });
 
         es.onerror = () => {
-          // SSE failed — mark uninitialized so reconnect seeds without sound
-          chatSseInitializedRef.current = false;
           es.close();
           sseRef.current = null;
           // Start fallback polling while reconnecting
@@ -342,6 +331,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
     }
 
     // Initial unread fetch + connect SSE
+    chatMountTimeRef.current = Date.now();
     fetchUnread();
     connectSSE();
 

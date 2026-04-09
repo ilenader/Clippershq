@@ -198,6 +198,12 @@ export async function POST(
         });
       }
 
+      // Broadcast IMMEDIATELY after save — before slow operations (email, stats sync)
+      try {
+        broadcastToUser(clip.userId, "clip_updated", { clipId: id, status: action, earnings: finalClipperEarnings });
+        broadcastToUser(clip.userId, "earnings_updated", { reason: action.toLowerCase() });
+      } catch {}
+
       // Notify clipper (in-app + email)
       createNotification(clip.userId, "CLIP_APPROVED", "Clip approved!", "Your clip has been approved and earnings have been calculated.").catch(() => {});
       if (clip.user?.email) {
@@ -218,6 +224,11 @@ export async function POST(
           earnings: 0,
         },
       });
+      // Broadcast immediately
+      try {
+        broadcastToUser(clip.userId, "clip_updated", { clipId: id, status: action, earnings: 0 });
+        broadcastToUser(clip.userId, "earnings_updated", { reason: action.toLowerCase() });
+      } catch {}
       if (action === "REJECTED") {
         try {
           await db.trackingJob.updateMany({
@@ -244,6 +255,7 @@ export async function POST(
           reviewedAt: new Date(),
         },
       });
+      try { broadcastToUser(clip.userId, "clip_updated", { clipId: id, status: action }); } catch {}
     }
 
     // ── Sync user totalEarnings, totalViews, and level ──
@@ -304,14 +316,6 @@ export async function POST(
         await updateStreak(clip.userId);
       } catch {}
     }
-
-    // Broadcast real-time update to the clipper's SSE stream
-    try {
-      broadcastToUser(clip.userId, "clip_updated", { clipId: id, status: action });
-      if (action === "APPROVED" || action === "REJECTED") {
-        broadcastToUser(clip.userId, "earnings_updated", { reason: action.toLowerCase() });
-      }
-    } catch {}
 
     // Audit log
     await logAudit({
