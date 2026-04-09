@@ -40,6 +40,21 @@ export async function GET() {
       spendMap[row.campaignId] = Math.round((row._sum.earnings || 0) * 100) / 100;
     }
 
+    // For CPM_SPLIT campaigns, budget covers both clipper and owner earnings
+    // Add agency earnings to the spend totals
+    try {
+      const agencyResult = await db.agencyEarning.groupBy({
+        by: ["campaignId"],
+        _sum: { amount: true },
+      });
+      for (const row of agencyResult) {
+        const ownerSpend = Math.round((row._sum.amount || 0) * 100) / 100;
+        if (ownerSpend > 0) {
+          spendMap[row.campaignId] = Math.round(((spendMap[row.campaignId] || 0) + ownerSpend) * 100) / 100;
+        }
+      }
+    } catch {}
+
     return NextResponse.json(spendMap);
   } catch (err: any) {
     console.error("GET /api/campaigns/spend error:", err?.message);
