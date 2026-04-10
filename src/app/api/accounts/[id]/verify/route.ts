@@ -109,15 +109,150 @@ function logHtmlDiagnostics(html: string, code: string, profileLink: string) {
 }
 
 async function checkInstagramBio(profileLink: string, code: string): Promise<{ found: boolean; error?: string; debug?: string }> {
+  const apiKey = process.env.BROWSERLESS_API_KEY || process.env.BROWSERLESS_TOKEN || "";
+  if (!apiKey) {
+    console.log(`[VERIFY] No BROWSERLESS_API_KEY set — cannot verify Instagram`);
+    return { found: false, error: "Instagram verification is not configured. Ask an admin to verify manually.", debug: "No BROWSERLESS_API_KEY" };
+  }
+
+  const baseUrl = process.env.BROWSERLESS_URL || "https://chrome.browserless.io";
   const username = profileLink.split("/").filter(Boolean).pop() || "";
   console.log(`[VERIFY] ════ INSTAGRAM VERIFY START ════`);
+  console.log(`[VERIFY] Base URL: ${baseUrl}`);
   console.log(`[VERIFY] Profile: ${profileLink}`);
   console.log(`[VERIFY] Username: ${username}`);
   console.log(`[VERIFY] Code: ${code}`);
 
-  // Instagram requires login for Browserless — skip directly to Apify
-  console.log(`[VERIFY] Instagram detected — skipping Browserless, using Apify directly`);
+  // ── ATTEMPT 1: /content endpoint (full rendered HTML) ──
+  try {
+    console.log(`[VERIFY] ── Attempt 1: /content ──`);
+    const contentUrl = `${baseUrl}/content?token=${apiKey}`;
+    const ctrl1 = new AbortController();
+    const t1 = setTimeout(() => ctrl1.abort(), 40000);
 
+    const res1 = await fetch(contentUrl, {
+      method: "POST",
+      signal: ctrl1.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: profileLink,
+        waitForTimeout: 6000,
+        gotoOptions: { waitUntil: "networkidle0", timeout: 30000 },
+      }),
+    });
+    clearTimeout(t1);
+
+    console.log(`[VERIFY] /content: HTTP ${res1.status} ${res1.statusText}, content-type: ${res1.headers.get("content-type")}`);
+
+    if (res1.ok) {
+      const html = await res1.text();
+      console.log(`[VERIFY] /content: ${html.length} chars`);
+
+      const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      console.log(`[VERIFY] /content title: "${titleMatch?.[1]?.substring(0, 200) || "(none)"}"`);
+
+      if (html.length > 1000) {
+        const result = searchHtmlForCode(html, code);
+        if (result.found) {
+          console.log(`[VERIFY] ✓ Code found via /content (${result.method})`);
+          return { found: true };
+        }
+        console.log(`[VERIFY] ✗ /content: code not found. Dumping diagnostics...`);
+        logHtmlDiagnostics(html, code, profileLink);
+      } else {
+        console.log(`[VERIFY] /content HTML too short (${html.length}). First 500: ${html.substring(0, 500)}`);
+      }
+    } else {
+      const errBody = await res1.text().catch(() => "");
+      console.log(`[VERIFY] /content failed: ${errBody.substring(0, 500)}`);
+    }
+  } catch (err: any) {
+    console.log(`[VERIFY] /content exception: ${err?.name} ${err?.message}`);
+  }
+
+  // ── ATTEMPT 2: /scrape endpoint (targeted element extraction) ──
+  try {
+    console.log(`[VERIFY] ── Attempt 2: /scrape ──`);
+    const scrapeUrl = `${baseUrl}/scrape?token=${apiKey}`;
+    const ctrl2 = new AbortController();
+    const t2 = setTimeout(() => ctrl2.abort(), 35000);
+
+    const res2 = await fetch(scrapeUrl, {
+      method: "POST",
+      signal: ctrl2.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: profileLink,
+        elements: [
+          { selector: "meta[property='og:description']" },
+          { selector: "header section" },
+          { selector: "span" },
+        ],
+        waitForTimeout: 5000,
+        gotoOptions: { waitUntil: "networkidle0", timeout: 30000 },
+      }),
+    });
+    clearTimeout(t2);
+
+    console.log(`[VERIFY] /scrape: HTTP ${res2.status}`);
+
+    if (res2.ok) {
+      const scrapeData = await res2.json();
+      const scrapeStr = JSON.stringify(scrapeData);
+      console.log(`[VERIFY] /scrape result (${scrapeStr.length} chars): ${scrapeStr.substring(0, 1000)}`);
+
+      if (scrapeStr.toUpperCase().includes(code.trim().toUpperCase())) {
+        console.log(`[VERIFY] ✓ Code found via /scrape`);
+        return { found: true };
+      }
+      console.log(`[VERIFY] ✗ /scrape: code not found in scraped elements`);
+    } else {
+      const errBody = await res2.text().catch(() => "");
+      console.log(`[VERIFY] /scrape failed: ${errBody.substring(0, 500)}`);
+    }
+  } catch (err: any) {
+    console.log(`[VERIFY] /scrape exception: ${err?.name} ${err?.message}`);
+  }
+
+  // ── ATTEMPT 3: /function endpoint (custom JS to extract bio) ──
+  try {
+    console.log(`[VERIFY] ── Attempt 3: /function ──`);
+    const fnUrl = `${baseUrl}/function?token=${apiKey}`;
+    const ctrl3 = new AbortController();
+    const t3 = setTimeout(() => ctrl3.abort(), 35000);
+
+    const jsCode = `module.exports=async({page})=>{await page.goto('${profileLink}',{waitUntil:'networkidle0',timeout:30000});await new Promise(r=>setTimeout(r,3000));const bio=await page.evaluate(()=>{const spans=document.querySelectorAll('header section span, header section div');let text='';spans.forEach(s=>{if(s.textContent)text+=s.textContent+' '});const ogDesc=document.querySelector('meta[property="og:description"]');if(ogDesc)text+=' OG:'+ogDesc.content;return text.substring(0,2000)});return{type:'application/json',data:JSON.stringify({bio})}};`;
+
+    const res3 = await fetch(fnUrl, {
+      method: "POST",
+      signal: ctrl3.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: jsCode }),
+    });
+    clearTimeout(t3);
+
+    console.log(`[VERIFY] /function: HTTP ${res3.status}`);
+
+    if (res3.ok) {
+      const fnText = await res3.text();
+      console.log(`[VERIFY] /function result (${fnText.length} chars): ${fnText.substring(0, 1000)}`);
+
+      if (fnText.toUpperCase().includes(code.trim().toUpperCase())) {
+        console.log(`[VERIFY] ✓ Code found via /function`);
+        return { found: true };
+      }
+      console.log(`[VERIFY] ✗ /function: code not found in bio extract`);
+    } else {
+      const errBody = await res3.text().catch(() => "");
+      console.log(`[VERIFY] /function failed: ${errBody.substring(0, 500)}`);
+    }
+  } catch (err: any) {
+    console.log(`[VERIFY] /function exception: ${err?.name} ${err?.message}`);
+  }
+
+  console.log(`[VERIFY] ════ ALL 3 BROWSERLESS METHODS FAILED ════`);
+
+  // ── ATTEMPT 4: Apify Instagram Profile Scraper (fallback) ──
   const apifyToken = process.env.APIFY_API_KEY || process.env.APIFY_TOKEN || "";
   if (apifyToken) {
     try {
@@ -162,14 +297,14 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
       console.log(`[VERIFY] Apify exception: ${err?.name} ${err?.message}`);
     }
   } else {
-    console.log(`[VERIFY] No APIFY_API_KEY set — cannot verify Instagram`);
+    console.log(`[VERIFY] No APIFY_API_KEY set — skipping Apify fallback`);
   }
 
-  console.log(`[VERIFY] ════ INSTAGRAM VERIFY FAILED ════`);
+  console.log(`[VERIFY] ════ ALL METHODS FAILED ════`);
   return {
     found: false,
-    error: "Verification code not found in your Instagram bio. Make sure it's visible and try again.",
-    debug: "Apify method failed",
+    error: "Instagram verification failed. Please ask an admin to verify manually.",
+    debug: "All Browserless + Apify methods failed",
   };
 }
 
