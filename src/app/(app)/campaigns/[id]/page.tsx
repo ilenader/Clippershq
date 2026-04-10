@@ -77,7 +77,7 @@ export default function CampaignDetailPage() {
 
   const handleQuickJoin = async () => {
     if (approvedAccounts.length === 0) {
-      toast.error("You need a verified account before joining. Go to My Accounts to add one.");
+      router.push("/accounts?message=add-account-first");
       return;
     }
     // Find first approved account matching campaign platforms

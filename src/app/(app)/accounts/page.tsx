@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,14 @@ const healthColors: Record<string, { bg: string; text: string; border: string }>
 export default function AccountsPage() {
   const { data: session } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const userRole = (session?.user as any)?.role;
+
+  useEffect(() => {
+    if (searchParams.get("message") === "add-account-first") {
+      toast.error("You need to add and verify an account before joining a campaign.");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (session && userRole && userRole !== "CLIPPER") {
