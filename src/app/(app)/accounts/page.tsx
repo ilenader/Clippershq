@@ -68,6 +68,14 @@ export default function AccountsPage() {
   const [checking, setChecking] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [verifyCooldown, setVerifyCooldown] = useState<string | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) { setVerifyCooldown(null); return; }
+    const timer = setTimeout(() => setCooldownSeconds(prev => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldownSeconds]);
 
   const load = () => {
     Promise.all([
@@ -162,6 +170,8 @@ export default function AccountsPage() {
       }
     } catch { toast.error("Verification check failed. Try again."); }
     setChecking(null);
+    setVerifyCooldown(accountId);
+    setCooldownSeconds(10);
   };
 
   const copyCode = (code: string) => { navigator.clipboard.writeText(code); toast.success("Code copied!"); };
@@ -252,8 +262,8 @@ export default function AccountsPage() {
                       </button>
                     </div>
                     <p className="text-sm text-[var(--text-muted)] mb-3">Add this code to your {account.platform} bio, wait a few seconds, then click verify.</p>
-                    <Button size="sm" className="w-full" loading={checking === account.id} onClick={() => checkVerification(account.id)} icon={<CheckCircle className="h-4 w-4" />}>
-                      Verify now
+                    <Button size="sm" className={`w-full ${verifyCooldown === account.id ? "opacity-50 cursor-not-allowed" : ""}`} loading={checking === account.id} disabled={verifyCooldown === account.id} onClick={() => checkVerification(account.id)} icon={<CheckCircle className="h-4 w-4" />}>
+                      {verifyCooldown === account.id ? `Wait ${cooldownSeconds}s` : "Verify now"}
                     </Button>
                   </div>
                 )}
@@ -322,7 +332,7 @@ export default function AccountsPage() {
             </div>
             <div className="flex gap-3">
               <Button variant="ghost" className="flex-1" onClick={() => { setPendingVerify(null); setShowModal(false); }}>Later</Button>
-              <Button className="flex-1" loading={checking === pendingVerify.accountId} onClick={() => checkVerification(pendingVerify.accountId)} icon={<CheckCircle className="h-4 w-4" />}>Verify now</Button>
+              <Button className={`flex-1 ${verifyCooldown === pendingVerify.accountId ? "opacity-50 cursor-not-allowed" : ""}`} loading={checking === pendingVerify.accountId} disabled={verifyCooldown === pendingVerify.accountId} onClick={() => checkVerification(pendingVerify.accountId)} icon={<CheckCircle className="h-4 w-4" />}>{verifyCooldown === pendingVerify.accountId ? `Wait ${cooldownSeconds}s` : "Verify now"}</Button>
             </div>
           </div>
         ) : (
