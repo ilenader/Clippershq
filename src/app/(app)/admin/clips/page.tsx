@@ -303,7 +303,10 @@ export default function AdminClipsPage() {
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.comments) : "0"}</span> <span className="text-[var(--text-muted)]">comments</span></span>
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.shares) : "0"}</span> <span className="text-[var(--text-muted)]">shares</span></span>
                     {clip.earnings > 0 && (
-                      <span className="font-medium text-accent tabular-nums">{formatCurrency(clip.earnings)}</span>
+                      <span className="font-medium text-accent tabular-nums">
+                        {formatCurrency(clip.earnings)}
+                        {clip.bonusAmount > 0 && <span className="text-emerald-400 text-xs ml-1">(+{formatCurrency(clip.bonusAmount)} bonus)</span>}
+                      </span>
                     )}
                   </div>
                 </div>
