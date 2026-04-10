@@ -45,44 +45,60 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
 
 function wrap(content: string): string {
   return `<!DOCTYPE html>
-<html>
+<html style="background-color: #0a0d12;">
 <head>
 <meta charset="utf-8">
-<meta name="color-scheme" content="dark">
-<meta name="supported-color-schemes" content="dark">
-<style>
-  body, html, table, td, div, p { background-color: #0a0d12 !important; }
-  @media (prefers-color-scheme: light) {
-    body, html { background-color: #0a0d12 !important; }
+<meta name="color-scheme" content="dark only">
+<meta name="supported-color-schemes" content="dark only">
+<style type="text/css">
+  :root { color-scheme: dark only; }
+  body, html, table, td, div, p, span, h1, h2, h3, ol, li, a {
+    background-color: #0a0d12 !important;
+    color: #e8edf2 !important;
   }
+  .inner-box, .inner-box td { background-color: #111720 !important; }
+  .footer-bg { background-color: #0d1117 !important; }
+  .stats-cell { background-color: #0d1117 !important; }
+  .btn-cell { background-color: #2596be !important; }
+  .btn-cell a { background-color: #2596be !important; color: #ffffff !important; }
+  @media (prefers-color-scheme: light) {
+    body, html, table, td, div, p, span, h1, h2, h3 {
+      background-color: #0a0d12 !important;
+      color: #e8edf2 !important;
+    }
+    .inner-box, .inner-box td { background-color: #111720 !important; }
+  }
+  u + .body { background-color: #0a0d12 !important; }
 </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0a0d12 !important; -webkit-text-size-adjust: 100%;">
+<body style="margin: 0; padding: 0; background-color: #0a0d12 !important; color: #e8edf2; -webkit-text-size-adjust: 100%;">
+<div class="body" style="background-color: #0a0d12;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0d12 !important;">
-<tr><td align="center" style="padding: 24px 16px; background-color: #0a0d12 !important;">
-  <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #111720 !important; border-radius: 16px; border: 1px solid #1c2333; overflow: hidden;">
-    <tr><td style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c2333; background-color: #111720 !important;">
+<tr style="background-color: #0a0d12;"><td align="center" style="padding: 24px 16px; background-color: #0a0d12 !important;">
+  <table class="inner-box" role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #111720 !important; border-radius: 16px; border: 1px solid #1c2333; overflow: hidden;">
+    <tr style="background-color: #111720;"><td style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c2333; background-color: #111720 !important;">
       <img src="https://clipershq.com/icon-512.png" width="40" height="40" alt="" style="display: block; margin: 0 auto 8px;" />
-      <h2 style="color: #ffffff; font-size: 20px; margin: 0; letter-spacing: 2px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">CLIPPERS HQ</h2>
+      <h2 style="color: #ffffff !important; font-size: 20px; margin: 0; letter-spacing: 2px; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">CLIPPERS HQ</h2>
     </td></tr>
-    <tr><td style="padding: 24px; color: #e8edf2; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <tr style="background-color: #111720;"><td style="padding: 24px; color: #e8edf2; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
       ${content}
     </td></tr>
-    <tr><td style="padding: 16px 24px; border-top: 1px solid #1c2333; text-align: center; background-color: #0d1117 !important;">
-      <p style="color: #6b7280; font-size: 12px; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280; text-decoration: none;">clipershq.com</a></p>
+    <tr style="background-color: #0d1117;"><td class="footer-bg" style="padding: 16px 24px; border-top: 1px solid #1c2333; text-align: center; background-color: #0d1117 !important;">
+      <p style="color: #6b7280 !important; font-size: 12px; margin: 0; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280 !important; text-decoration: none; background-color: #0d1117 !important;">clipershq.com</a></p>
     </td></tr>
   </table>
 </td></tr>
 </table>
+</div>
 </body>
 </html>`;
 }
 
 /** Centered button for emails (uses table for email client compatibility) */
 function emailButton(text: string, href: string): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
-<tr><td align="center" style="border-radius: 8px; background-color: #0095f6;">
-  <a href="${href}" target="_blank" style="display: inline-block; padding: 12px 28px; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto; background-color: #111720 !important;">
+<tr style="background-color: #111720;"><td class="btn-cell" align="center" style="border-radius: 8px; background-color: #2596be !important;">
+  <a href="${href}" target="_blank" style="display: inline-block; padding: 14px 32px; color: #ffffff !important; font-size: 16px; font-weight: 600; text-decoration: none; background-color: #2596be !important; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
     ${text}
   </a>
 </td></tr>
@@ -184,28 +200,32 @@ export async function sendCampaignRejected(email: string, campaignName: string):
 }
 export async function sendCampaignAlertEmail(email: string, campaignName: string, description: string, campaignId?: string, cpm?: number, budget?: number): Promise<boolean> {
   const link = campaignId ? `https://clipershq.com/campaigns/${campaignId}` : "https://clipershq.com/campaigns";
+  // If description is empty, just a number, or too short, use the default
+  const desc = (description && description.trim().length > 3 && !/^\d+$/.test(description.trim()))
+    ? description.trim()
+    : "A new campaign is live and ready for clippers!";
   return sendEmail({
     to: email,
     subject: `New Campaign: ${campaignName}`,
     html: wrap(`
-      <div style="text-align: center; padding: 8px 0 16px;">
-        <span style="font-size: 13px; color: #2596be; letter-spacing: 2px; text-transform: uppercase; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">New Campaign Alert</span>
+      <div style="text-align: center; padding: 8px 0 16px; background-color: #111720 !important;">
+        <span style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">New Campaign Alert</span>
       </div>
-      <h1 style="color: #ffffff; font-size: 26px; font-weight: 700; margin: 0 0 16px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${campaignName}</h1>
-      <p style="color: #a1a1aa; font-size: 15px; margin: 0 0 20px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${description || "A new campaign is live and ready for clippers!"}</p>
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 24px; background-color: #0a0d12 !important; border: 1px solid #1c2333; border-radius: 12px;">
-        <tr>
-          <td style="padding: 16px; text-align: center; border-right: 1px solid #1c2333; background-color: #0a0d12 !important;">
-            <p style="color: #6b7280; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">CPM Rate</p>
-            <p style="color: #2596be; font-size: 22px; font-weight: 700; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${cpm ? "$" + cpm.toFixed(2) : "\u2014"}</p>
+      <h1 style="color: #ffffff !important; font-size: 26px; font-weight: 700; margin: 0 0 16px; text-align: center; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${campaignName}</h1>
+      <p style="color: #a1a1aa !important; font-size: 15px; margin: 0 0 20px; text-align: center; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${desc}</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 24px; background-color: #0d1117 !important; border: 1px solid #1c2333; border-radius: 12px;">
+        <tr style="background-color: #0d1117;">
+          <td class="stats-cell" style="padding: 16px; text-align: center; border-right: 1px solid #1c2333; background-color: #0d1117 !important;">
+            <p style="color: #6b7280 !important; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">CPM Rate</p>
+            <p style="color: #2596be !important; font-size: 22px; font-weight: 700; margin: 0; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${cpm ? "$" + cpm.toFixed(2) : "\u2014"}</p>
           </td>
-          <td style="padding: 16px; text-align: center; background-color: #0a0d12 !important;">
-            <p style="color: #6b7280; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Budget</p>
-            <p style="color: #10b981; font-size: 22px; font-weight: 700; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${budget ? "$" + budget.toLocaleString() : "\u2014"}</p>
+          <td class="stats-cell" style="padding: 16px; text-align: center; background-color: #0d1117 !important;">
+            <p style="color: #6b7280 !important; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Budget</p>
+            <p style="color: #10b981 !important; font-size: 22px; font-weight: 700; margin: 0; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${budget ? "$" + budget.toLocaleString() : "\u2014"}</p>
           </td>
         </tr>
       </table>
-      <p style="color: #d4d4d8; font-size: 14px; text-align: center; margin: 0 0 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Spots fill up fast \u2014 join now and start earning!</p>
+      <p style="color: #d4d4d8 !important; font-size: 14px; text-align: center; margin: 0 0 24px; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Spots fill up fast \u2014 join now and start earning!</p>
       ${emailButton("Start Clipping Now", link)}
     `),
   });
