@@ -76,19 +76,34 @@ export async function POST(req: NextRequest) {
 
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
-  // Check if another user already has an APPROVED account with the same username + platform
+  // Check 1: Same user already has this username+platform (case-insensitive)
   try {
-    const duplicate = await db.clipAccount.findFirst({
+    const existingOwn = await db.clipAccount.findFirst({
       where: {
-        username: data.username,
+        userId: session.user.id,
+        username: { equals: data.username, mode: "insensitive" },
+        platform: data.platform,
+        deletedByUser: false,
+      },
+    });
+    if (existingOwn) {
+      return NextResponse.json({ error: "You already have this account added." }, { status: 400 });
+    }
+  } catch {}
+
+  // Check 2: Another user already has an APPROVED account with same username+platform (case-insensitive)
+  try {
+    const existingOther = await db.clipAccount.findFirst({
+      where: {
+        username: { equals: data.username, mode: "insensitive" },
         platform: data.platform,
         status: "APPROVED",
         userId: { not: session.user.id },
         deletedByUser: false,
       },
     });
-    if (duplicate) {
-      return NextResponse.json({ error: "This account is already verified by another user." }, { status: 400 });
+    if (existingOther) {
+      return NextResponse.json({ error: "This account is already claimed by another clipper." }, { status: 400 });
     }
   } catch {}
 
