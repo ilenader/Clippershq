@@ -40,6 +40,14 @@ export async function POST(
         status: "PAUSED",
       },
     });
+
+    // Reactivate all tracking jobs for this campaign
+    const reactivated = await db.trackingJob.updateMany({
+      where: { campaignId: id, isActive: false },
+      data: { isActive: true, nextCheckAt: new Date(Date.now() + 60 * 60 * 1000) },
+    });
+    console.log(`[RESTORE] Reactivated ${reactivated.count} tracking jobs for campaign:`, id);
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("Restore campaign failed:", err?.message);

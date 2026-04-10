@@ -199,6 +199,14 @@ export async function DELETE(
           status: "PAUSED",
         },
       });
+
+      // Deactivate all tracking jobs for this campaign
+      const deactivated = await db.trackingJob.updateMany({
+        where: { campaignId: id, isActive: true },
+        data: { isActive: false },
+      });
+      console.log(`[ARCHIVE] Deactivated ${deactivated.count} tracking jobs for campaign:`, id);
+
       return NextResponse.json({ success: true, message: "Campaign archived" });
     } catch (err: any) {
       console.error("Archive failed:", err?.message);
