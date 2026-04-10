@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
           // Agency earnings for CPM_SPLIT
           if (fullCampaign.pricingModel === "CPM_SPLIT" && fullCampaign.ownerCpm) {
             const cCpm = fullCampaign.clipperCpm ?? fullCampaign.cpmRate ?? null;
-            const ownerAmt = calculateOwnerEarnings(fetchedStats.views, fullCampaign.ownerCpm, breakdown.grossClipperEarnings, cCpm);
+            const ownerAmt = calculateOwnerEarnings(fetchedStats.views, fullCampaign.ownerCpm, breakdown.baseEarnings, cCpm);
             if (ownerAmt > 0) {
               try {
                 await db.agencyEarning.create({ data: { campaignId, clipId: clip.id, amount: ownerAmt, views: fetchedStats.views } });

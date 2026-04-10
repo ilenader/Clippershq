@@ -94,7 +94,7 @@ export async function POST(
         if (isCpmSplit) {
           const views = clipWithData.stats[0].views;
           const cCpm = (clipWithData.campaign as any).clipperCpm ?? (clipWithData.campaign as any).cpmRate;
-          finalOwnerAmt = calculateOwnerEarnings(views, oCpm, breakdown.grossClipperEarnings, cCpm);
+          finalOwnerAmt = calculateOwnerEarnings(views, oCpm, breakdown.baseEarnings, cCpm);
         }
 
         // ── Budget cap: check BEFORE saving status or earnings ──

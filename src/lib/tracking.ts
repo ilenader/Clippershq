@@ -262,7 +262,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           const isCpmSplit = (clip.campaign as any).pricingModel === "CPM_SPLIT" && (clip.campaign as any).ownerCpm;
           const cCpm = isCpmSplit ? ((clip.campaign as any).clipperCpm ?? (clip.campaign as any).cpmRate) : null;
           let newOwnerAmt = isCpmSplit
-            ? calculateOwnerEarnings(stats.views, (clip.campaign as any).ownerCpm, breakdown.grossClipperEarnings, cCpm)
+            ? calculateOwnerEarnings(stats.views, (clip.campaign as any).ownerCpm, breakdown.baseEarnings, cCpm)
             : 0;
 
           // Budget cap: don't exceed campaign budget (clipper + owner combined)

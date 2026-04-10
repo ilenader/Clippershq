@@ -63,7 +63,7 @@ export async function POST() {
     // Fix agency earnings for CPM_SPLIT campaigns (proportional to capped clipper earnings)
     if ((clip.campaign as any).pricingModel === "CPM_SPLIT" && (clip.campaign as any).ownerCpm && clip.stats[0]) {
       const cCpm = (clip.campaign as any).clipperCpm ?? (clip.campaign as any).cpmRate ?? null;
-      const ownerAmt = calculateOwnerEarnings(clip.stats[0].views, (clip.campaign as any).ownerCpm, breakdown.clipperEarnings, cCpm);
+      const ownerAmt = calculateOwnerEarnings(clip.stats[0].views, (clip.campaign as any).ownerCpm, breakdown.baseEarnings, cCpm);
       if (ownerAmt > 0) {
         try {
           await db.agencyEarning.upsert({
@@ -89,7 +89,7 @@ export async function POST() {
       if (ae.clip?.stats?.[0] && ae.clip?.campaign) {
         const cCpm = ae.clip.campaign.clipperCpm ?? ae.clip.campaign.cpmRate ?? null;
         const clipBreakdown = recalculateClipEarningsBreakdown({ stats: ae.clip.stats, campaign: ae.clip.campaign });
-        const newOwnerAmt = calculateOwnerEarnings(ae.clip.stats[0].views, ae.clip.campaign.ownerCpm, clipBreakdown.clipperEarnings, cCpm);
+        const newOwnerAmt = calculateOwnerEarnings(ae.clip.stats[0].views, ae.clip.campaign.ownerCpm, clipBreakdown.baseEarnings, cCpm);
         if (Math.abs(newOwnerAmt - ae.amount) > 0.01) {
           await db.agencyEarning.update({ where: { id: ae.id }, data: { amount: newOwnerAmt } });
           agencyUpdated++;
