@@ -92,7 +92,7 @@ export default function CampaignsPage() {
     e.preventDefault();
     e.stopPropagation();
     if (approvedAccounts.length === 0) {
-      toast.error("You need a verified account before joining. Go to My Accounts to add one.");
+      router.push("/accounts?message=add-account-first");
       return;
     }
     // Find first approved account whose platform matches the campaign
