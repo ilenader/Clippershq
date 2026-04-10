@@ -415,7 +415,7 @@ export async function POST(
   if (db) {
     try {
       account = await db.clipAccount.findFirst({
-        where: { id, userId: session.user.id },
+        where: { id, userId: session.user.id, deletedByUser: false },
       });
     } catch {
       // DB unavailable

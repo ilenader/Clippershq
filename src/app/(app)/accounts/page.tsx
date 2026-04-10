@@ -336,6 +336,7 @@ export default function AccountsPage() {
                 <li>Copy the code above</li>
                 <li>Go to your {pendingVerify.platform} profile</li>
                 <li>Paste the code anywhere in your bio</li>
+                <li>Make sure your account is set to PUBLIC (not private)</li>
                 <li>Wait a few seconds, then click "Verify now" below</li>
               </ol>
             </div>

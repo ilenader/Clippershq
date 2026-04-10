@@ -125,12 +125,19 @@ export async function POST(req: NextRequest) {
     }
   } catch {}
 
-  // Check for a soft-deleted account with the same profileLink — reactivate it
+  // Check for a soft-deleted account with the same username+platform — reactivate it
+  // Always reset to PENDING with a fresh verification code so the user re-proves ownership
   try {
     const existing = await db.clipAccount.findFirst({
-      where: { userId: session.user.id, profileLink: data.profileLink, deletedByUser: true },
+      where: {
+        userId: session.user.id,
+        username: { equals: data.username, mode: "insensitive" },
+        platform: data.platform,
+        deletedByUser: true,
+      },
     });
     if (existing) {
+      const newCode = generateVerificationCode();
       const reactivated = await db.clipAccount.update({
         where: { id: existing.id },
         data: {
@@ -138,11 +145,13 @@ export async function POST(req: NextRequest) {
           deletedAt: null,
           username: data.username,
           platform: data.platform,
-          status: existing.status === "APPROVED" ? "APPROVED" : "PENDING",
-          verificationCode: existing.status === "APPROVED" ? existing.verificationCode : generateVerificationCode(),
+          profileLink: data.profileLink || existing.profileLink,
+          status: "PENDING",
+          verificationCode: newCode,
+          verifiedAt: null,
         },
       });
-      return NextResponse.json({ ...reactivated, verificationCode: reactivated.verificationCode }, { status: 201 });
+      return NextResponse.json({ ...reactivated, verificationCode: newCode }, { status: 201 });
     }
   } catch {}
 
