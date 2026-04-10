@@ -12,7 +12,16 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { UserCircle, Plus, Copy, CheckCircle, Trash2 } from "lucide-react";
 import { toast } from "@/lib/toast";
-import { validateAccountLink } from "@/lib/account-validation";
+
+function buildProfileLink(platform: string, username: string): string {
+  const clean = username.replace(/^@/, "").trim();
+  switch (platform.toUpperCase()) {
+    case "TIKTOK": return `https://www.tiktok.com/@${clean}`;
+    case "INSTAGRAM": return `https://www.instagram.com/${clean}`;
+    case "YOUTUBE": return `https://www.youtube.com/@${clean}`;
+    default: return "";
+  }
+}
 
 const platformOptions = [
   { value: "TikTok", label: "TikTok" },
@@ -63,11 +72,10 @@ export default function AccountsPage() {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [pendingVerify, setPendingVerify] = useState<{ accountId: string; code: string; username: string; platform: string } | null>(null);
-  const [form, setForm] = useState({ platform: "", username: "", profileLink: "", contentNiche: "", country: "" });
+  const [form, setForm] = useState({ platform: "", username: "", contentNiche: "", country: "" });
   const [clips, setClips] = useState<any[]>([]);
   const [checking, setChecking] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [linkError, setLinkError] = useState<string | null>(null);
   const [verifyCooldown, setVerifyCooldown] = useState<string | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
@@ -111,31 +119,32 @@ export default function AccountsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.platform || !form.username || !form.profileLink) {
+    if (!form.platform || !form.username) {
       toast.error("Please fill in all required fields.");
       return;
     }
-    // Client-side platform/URL validation
-    if (form.platform && form.profileLink) {
-      const validation = validateAccountLink(form.platform, form.profileLink);
-      if (!validation.valid) {
-        setLinkError(validation.error);
-        return;
-      }
+    const cleanUsername = form.username.replace(/^@/, "").trim();
+    if (!cleanUsername) {
+      toast.error("Please enter a valid username.");
+      return;
     }
-    setLinkError(null);
+    const profileLink = buildProfileLink(form.platform, cleanUsername);
+    if (!profileLink) {
+      toast.error("Unsupported platform.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, username: cleanUsername, profileLink }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to submit");
       toast.success("Account submitted!");
-      setPendingVerify({ accountId: data.id, code: data.verificationCode, username: form.username, platform: form.platform });
-      setForm({ platform: "", username: "", profileLink: "", contentNiche: "", country: "" });
+      setPendingVerify({ accountId: data.id, code: data.verificationCode, username: cleanUsername, platform: form.platform });
+      setForm({ platform: "", username: "", contentNiche: "", country: "" });
       load();
     } catch (err: any) {
       toast.error(err.message || "Submission failed.");
@@ -337,21 +346,8 @@ export default function AccountsPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Select id="platform" label="Platform *" options={platformOptions} placeholder="Select platform" value={form.platform} onChange={(e) => { setForm({ ...form, platform: e.target.value }); setLinkError(null); }} />
+            <Select id="platform" label="Platform *" options={platformOptions} placeholder="Select platform" value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })} />
             <Input id="username" label="Username *" placeholder="your_username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
-            <div>
-              <Input id="profileLink" label="Profile link *" placeholder="https://tiktok.com/@your_username" value={form.profileLink} onChange={(e) => {
-                const val = e.target.value;
-                setForm({ ...form, profileLink: val });
-                if (form.platform && val.length > 10) {
-                  const v = validateAccountLink(form.platform, val);
-                  setLinkError(v.valid ? null : v.error);
-                } else {
-                  setLinkError(null);
-                }
-              }} />
-              {linkError && <p className="mt-1.5 text-xs text-red-400">{linkError}</p>}
-            </div>
             <Input id="contentNiche" label="Content niche" placeholder="e.g. Comedy, Gaming, Fashion" value={form.contentNiche} onChange={(e) => setForm({ ...form, contentNiche: e.target.value })} />
             <Input id="country" label="Country" placeholder="Optional" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2.5">
@@ -363,7 +359,7 @@ export default function AccountsPage() {
             </label>
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-              <Button type="submit" loading={submitting} disabled={!!linkError}>Submit account</Button>
+              <Button type="submit" loading={submitting}>Submit account</Button>
             </div>
           </form>
         )}

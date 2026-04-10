@@ -64,8 +64,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  if (!data.platform || !data.username || !data.profileLink) {
-    return NextResponse.json({ error: "Platform, username, and profile link are required" }, { status: 400 });
+  if (!data.platform || !data.username) {
+    return NextResponse.json({ error: "Platform and username are required" }, { status: 400 });
+  }
+
+  // Strip @ prefix from username
+  data.username = data.username.replace(/^@/, "").trim();
+  if (!data.username) {
+    return NextResponse.json({ error: "Please enter a valid username" }, { status: 400 });
+  }
+
+  // Auto-build profileLink if not provided
+  if (!data.profileLink) {
+    const clean = data.username;
+    if (data.platform === "TikTok") data.profileLink = `https://www.tiktok.com/@${clean}`;
+    else if (data.platform === "Instagram") data.profileLink = `https://www.instagram.com/${clean}`;
+    else if (data.platform === "YouTube") data.profileLink = `https://www.youtube.com/@${clean}`;
+  }
+
+  if (!data.profileLink) {
+    return NextResponse.json({ error: "Unsupported platform" }, { status: 400 });
   }
 
   // Validate platform matches the profile link
