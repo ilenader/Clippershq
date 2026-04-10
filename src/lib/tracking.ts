@@ -5,14 +5,10 @@
  * Tiered schedule:
  *   Phase 1 (0-4h after submission):   every 60 min
  *   Phase 2 (4-24h after submission):  every 120 min
- *   Phase 3 (24h+): growth-based tier adjustments:
- *     < 5% growth  → stay same or move up one tier (slower)
- *     5-9% growth  → drop DOWN one tier (faster)
- *     10-19% growth → drop DOWN two tiers (faster)
- *     20%+ growth  → go straight to 2h (minimum)
+ *   Phase 3 (24h+): view-bracket + growth-per-hour based intervals
  *
- *   Tiers: 2h → 4h → 8h → 16h → 24h → 72h
- *   Minimum: 2h. Maximum: 72h. Tracking never stops.
+ *   Tiers: 1h → 2h → 4h → 8h → 16h → 24h → 48h (72h for actually-dead only)
+ *   Tracking never stops.
  */
 
 import { db } from "@/lib/db";
@@ -21,22 +17,25 @@ import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwn
 import { computeFraudLevel } from "@/lib/fraud";
 import { broadcastToUser } from "@/lib/sse-broadcast";
 
-/** Interval tiers in minutes: 2h → 4h → 8h → 16h → 24h → 72h */
-const TIERS = [120, 240, 480, 960, 1440, 2880];
+/** Interval tiers in minutes: 1h → 2h → 4h → 8h → 16h → 24h → 48h */
+const TIERS = [60, 120, 240, 480, 960, 1440, 2880];
 
 /**
- * Determine the next check interval based on the tiered schedule.
- * Phase 3 uses percentage growth to bump down (faster) or up (slower).
+ * Determine the next check interval based on view bracket and growth per hour.
+ * Phase 1 (0-4h): 60 min. Phase 2 (4-24h): 120 min.
+ * Phase 3 (24h+): view-bracket + growthPerHour logic.
  */
-function getNextInterval(
+async function getNextInterval(
   currentIntervalMin: number,
   currentViews: number,
   previousViews: number,
   clipCreatedAt: Date | null,
-): number {
+  lastCheckedAt: Date | null,
+  clipId: string,
+): Promise<number> {
   const hoursSinceSubmission = clipCreatedAt
     ? (Date.now() - new Date(clipCreatedAt).getTime()) / 3_600_000
-    : 999; // if unknown, treat as old
+    : 999;
 
   // Phase 1: first 4 hours → always 60 min
   if (hoursSinceSubmission <= 4) return 60;
@@ -44,33 +43,124 @@ function getNextInterval(
   // Phase 2: hours 4-24 → always 120 min
   if (hoursSinceSubmission <= 24) return 120;
 
-  // Phase 3: after 24h — growth-based tier adjustments
+  // Phase 3: view-bracket + growth-per-hour
   const growthPercent = previousViews > 0
     ? ((currentViews - previousViews) / previousViews) * 100
     : (currentViews > 0 ? 100 : 0);
 
-  // Find current position on the tier ladder
-  let currentIdx = TIERS.indexOf(currentIntervalMin);
-  if (currentIdx === -1) {
-    // Not on a tier — find the closest tier at or above current interval
-    currentIdx = TIERS.findIndex((t) => t >= currentIntervalMin);
-    if (currentIdx === -1) currentIdx = TIERS.length - 1; // above max → use last tier
+  let hoursSinceLastCheck = lastCheckedAt
+    ? (Date.now() - new Date(lastCheckedAt).getTime()) / 3_600_000
+    : 1;
+  if (hoursSinceLastCheck < 0.5) hoursSinceLastCheck = 1;
+
+  const growthPerHour = growthPercent / hoursSinceLastCheck;
+
+  let bracket: string;
+  let interval: number;
+
+  if (currentViews >= 100_000) {
+    // Premium clips
+    bracket = "premium";
+    if (growthPerHour >= 15) interval = 60;
+    else if (growthPerHour >= 4) interval = 120;
+    else if (growthPerHour >= 2) interval = 120;
+    else if (growthPerHour >= 1) interval = 240;
+    else interval = 480;
+    interval = Math.min(interval, 960); // max 16h
+  } else if (currentViews >= 10_000) {
+    // High value
+    bracket = "high";
+    if (growthPerHour >= 15) interval = 60;
+    else if (growthPerHour >= 4) interval = 120;
+    else if (growthPerHour >= 2) interval = 120;
+    else if (growthPerHour >= 1) interval = 240;
+    else if (growthPerHour >= 0.2) interval = 480;
+    else interval = 960;
+    interval = Math.min(interval, 1440); // max 24h
+  } else if (currentViews >= 1_000) {
+    // Medium
+    bracket = "medium";
+    if (growthPerHour >= 4) interval = 240;
+    else if (growthPerHour >= 2) interval = 240;
+    else if (growthPerHour >= 1) interval = 480;
+    else if (growthPerHour >= 0.2) interval = 960;
+    else interval = 1440;
+    interval = Math.min(interval, 1440); // max 24h
+  } else if (currentViews >= 200) {
+    // Low
+    bracket = "low";
+    if (growthPerHour >= 4) interval = 240;
+    else interval = 1440;
+    interval = Math.min(interval, 1440); // max 24h
+  } else {
+    // Dead
+    bracket = "dead";
+    interval = 1440;
+    // max 48h (capped below by actually-dead check)
   }
 
-  if (growthPercent >= 20) {
-    // 20%+ → straight to minimum (2h)
-    return TIERS[0];
+  // Actually-dead check: last 3 non-manual stats, if total gain < 50 views → 72h
+  try {
+    const recentStats = await db.clipStat.findMany({
+      where: { clipId, isManual: false },
+      orderBy: { checkedAt: "desc" },
+      take: 3,
+      select: { views: true },
+    });
+    if (recentStats.length >= 3) {
+      const newest = recentStats[0].views || 0;
+      const oldest = recentStats[recentStats.length - 1].views || 0;
+      const totalGain = newest - oldest;
+
+      if (totalGain < 50) {
+        // Actually dead → 72h
+        interval = 4320;
+        bracket = "actually-dead";
+      }
+    }
+
+    // Resurrection check: was at 72h (actually-dead) and suddenly gained 5000+ views
+    if (currentIntervalMin === 4320 && (currentViews - previousViews) >= 5000) {
+      interval = 120;
+      bracket = "resurrected";
+      console.log(`[TRACKING-INTERVAL] Clip ${clipId} resurrected: ${previousViews}→${currentViews} views, checking fraud`);
+
+      // Run fraud check on resurrected clip
+      const allStats = await db.clipStat.findMany({
+        where: { clipId },
+        orderBy: { checkedAt: "desc" },
+        take: 10,
+        select: { views: true, likes: true, comments: true, shares: true },
+      });
+      const fraudResult = computeFraudLevel({ stats: allStats });
+      if (fraudResult.level === "FLAGGED" || fraudResult.level === "HIGH_RISK") {
+        await db.clip.update({
+          where: { id: clipId },
+          data: { status: "FLAGGED", fraudScore: fraudResult.score, fraudReasons: JSON.stringify(fraudResult.reasons), fraudCheckedAt: new Date() },
+        });
+        try {
+          const { createNotification } = await import("@/lib/notifications");
+          const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true } });
+          for (const owner of owners) {
+            await createNotification(
+              owner.id,
+              "CLIP_FLAGGED",
+              "Resurrected clip flagged",
+              `Clip gained ${currentViews - previousViews} views after being dead. Fraud: ${fraudResult.level} (score: ${fraudResult.score})`,
+              { clipId, fraudScore: fraudResult.score },
+            );
+          }
+        } catch {}
+        console.log(`[TRACKING-INTERVAL] Clip ${clipId} resurrected and FLAGGED (fraud: ${fraudResult.level}, score: ${fraudResult.score})`);
+      }
+    }
+  } catch (err: any) {
+    console.error(`[TRACKING-INTERVAL] Actually-dead check error for clip ${clipId}:`, err.message);
   }
-  if (growthPercent >= 10) {
-    // 10-19% → drop down two tiers
-    return TIERS[Math.max(currentIdx - 2, 0)];
-  }
-  if (growthPercent >= 5) {
-    // 5-9% → drop down one tier
-    return TIERS[Math.max(currentIdx - 1, 0)];
-  }
-  // < 5% → stay same or move up one tier (slower)
-  return TIERS[Math.min(currentIdx + 1, TIERS.length - 1)];
+
+  console.log(`[TRACKING-INTERVAL] clipId=${clipId} views=${currentViews} prev=${previousViews} growthPerHour=${growthPerHour.toFixed(2)}% bracket=${bracket} interval=${interval}min`);
+
+  return interval;
 }
 
 /**
@@ -380,14 +470,14 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
         // ── Calculate next interval using tiered schedule ──
         let newInterval: number;
         if (clip.status === "REJECTED") {
-          // Rejected clips: slow track at 48h, stats saved but no earnings
-          newInterval = 2880;
+          // Rejected clips: slow track at 72h, stats saved but no earnings
+          newInterval = 4320;
         } else if (clip.isOwnerOverride) {
-          // Owner override clips: 24h base, 72h if growth < 5%
-          const growthPct = prevViews > 0 ? ((stats.views - prevViews) / prevViews) * 100 : (stats.views > 0 ? 100 : 0);
-          newInterval = growthPct >= 5 ? 1440 : 2880;
+          // Owner override clips: run through normal logic, capped at 48h
+          newInterval = await getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt, job.lastCheckedAt, clip.id);
+          newInterval = Math.min(newInterval, 2880);
         } else {
-          newInterval = getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt);
+          newInterval = await getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt, job.lastCheckedAt, clip.id);
         }
         const nextCheck = roundToNextSlot(newInterval);
 
