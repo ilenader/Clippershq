@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { getUserCampaignIds } from "@/lib/campaign-access";
 import { fetchClipStats, detectPlatform } from "@/lib/apify";
+import { roundToNextSlot } from "@/lib/tracking";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
@@ -315,16 +316,11 @@ export async function POST(req: NextRequest) {
 
       // Create tracking job for trackable clips — schedule next check at the next round hour
       if (platform === "tiktok" || platform === "instagram") {
-        const now = new Date();
-        const nextHour = new Date(now);
-        nextHour.setMinutes(0, 0, 0);
-        nextHour.setHours(nextHour.getHours() + 1);
-
         await tx.trackingJob.create({
           data: {
             clipId: newClip.id,
             campaignId: data.campaignId,
-            nextCheckAt: nextHour,
+            nextCheckAt: roundToNextSlot(60),
             checkIntervalMin: 60, // Phase 1: every 1 hour
             isActive: true,
           },

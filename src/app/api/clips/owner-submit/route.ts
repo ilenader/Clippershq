@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
 import { detectPlatform, fetchClipStats } from "@/lib/apify";
 import { recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
+import { roundToNextSlot } from "@/lib/tracking";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
 
       // Tracking job: check immediately on next cron run, then every 2 hours
       await tx.trackingJob.create({
-        data: { clipId: newClip.id, campaignId, nextCheckAt: new Date(), checkIntervalMin: 120, isActive: true },
+        data: { clipId: newClip.id, campaignId, nextCheckAt: roundToNextSlot(120), checkIntervalMin: 120, isActive: true },
       });
 
       return newClip;

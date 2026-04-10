@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { fetchClipStats, detectPlatform } from "@/lib/apify";
+import { roundToNextSlot } from "@/lib/tracking";
 import { revalidatePath } from "next/cache";
 
 export async function getMyClips() {
@@ -90,16 +91,11 @@ export async function submitClip(data: {
     });
 
     if (platform === "tiktok" || platform === "instagram") {
-      const now = new Date();
-      const nextHour = new Date(now);
-      nextHour.setMinutes(0, 0, 0);
-      nextHour.setHours(nextHour.getHours() + 1);
-
       await tx.trackingJob.create({
         data: {
           clipId: newClip.id,
           campaignId: data.campaignId,
-          nextCheckAt: nextHour,
+          nextCheckAt: roundToNextSlot(60),
           checkIntervalMin: 60,
           isActive: true,
         },

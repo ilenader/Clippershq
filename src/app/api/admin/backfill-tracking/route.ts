@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
+import { roundToNextSlot } from "@/lib/tracking";
 import { checkBanStatus } from "@/lib/check-ban";
 import { NextResponse } from "next/server";
 
@@ -34,15 +35,11 @@ export async function POST() {
 
     let created = 0;
     for (const clip of clipsWithoutTracking) {
-      const nextCheck = new Date();
-      nextCheck.setMinutes(0, 0, 0);
-      nextCheck.setHours(nextCheck.getHours() + 1);
-
       await db.trackingJob.create({
         data: {
           clipId: clip.id,
           campaignId: clip.campaignId,
-          nextCheckAt: nextCheck,
+          nextCheckAt: roundToNextSlot(60),
           checkIntervalMin: 60,
           isActive: true,
         },
