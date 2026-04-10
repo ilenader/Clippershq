@@ -30,7 +30,7 @@ export async function POST(
   try {
     const campaign = await db.campaign.findUnique({
       where: { id },
-      select: { id: true, name: true, status: true, requirements: true },
+      select: { id: true, name: true, status: true, requirements: true, clipperCpm: true, cpmRate: true, budget: true },
     });
 
     if (!campaign) {
@@ -53,7 +53,7 @@ export async function POST(
     let sent = 0;
     for (const email of emails) {
       try {
-        await sendCampaignAlertEmail(email, campaign.name, campaign.requirements || "", campaign.id);
+        await sendCampaignAlertEmail(email, campaign.name, campaign.requirements || "", campaign.id, (campaign as any).clipperCpm || (campaign as any).cpmRate || undefined, (campaign as any).budget || undefined);
         sent++;
       } catch (err: any) {
         console.error(`[NOTIFY] Failed to send to ${email}:`, err?.message);

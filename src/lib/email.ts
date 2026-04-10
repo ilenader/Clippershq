@@ -46,19 +46,29 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
 function wrap(content: string): string {
   return `<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"></head>
-<body style="margin: 0; padding: 0; background-color: #0a0d12; -webkit-text-size-adjust: 100%;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0d12;">
-<tr><td align="center" style="padding: 24px 16px;">
-  <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width: 560px; width: 100%; background-color: #111720; border-radius: 16px; border: 1px solid #1c2333; overflow: hidden;">
-    <tr><td style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c2333; background-color: #111720;">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<style>
+  body, html, table, td, div, p { background-color: #0a0d12 !important; }
+  @media (prefers-color-scheme: light) {
+    body, html { background-color: #0a0d12 !important; }
+  }
+</style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0a0d12 !important; -webkit-text-size-adjust: 100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0d12 !important;">
+<tr><td align="center" style="padding: 24px 16px; background-color: #0a0d12 !important;">
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #111720 !important; border-radius: 16px; border: 1px solid #1c2333; overflow: hidden;">
+    <tr><td style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c2333; background-color: #111720 !important;">
       <img src="https://clipershq.com/icon-512.png" width="40" height="40" alt="" style="display: block; margin: 0 auto 8px;" />
       <h2 style="color: #ffffff; font-size: 20px; margin: 0; letter-spacing: 2px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">CLIPPERS HQ</h2>
     </td></tr>
-    <tr><td style="padding: 24px; color: #e8edf2; background-color: #111720; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <tr><td style="padding: 24px; color: #e8edf2; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
       ${content}
     </td></tr>
-    <tr><td style="padding: 16px 24px; border-top: 1px solid #1c2333; text-align: center; background-color: #0a0d12;">
+    <tr><td style="padding: 16px 24px; border-top: 1px solid #1c2333; text-align: center; background-color: #0d1117 !important;">
       <p style="color: #6b7280; font-size: 12px; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280; text-decoration: none;">clipershq.com</a></p>
     </td></tr>
   </table>
@@ -172,15 +182,30 @@ export async function sendCampaignApproved(email: string, campaignName: string):
 export async function sendCampaignRejected(email: string, campaignName: string): Promise<boolean> {
   return sendEmail({ to: email, subject: `Campaign not approved`, html: wrap(`<p style="font-size: 15px;">Your campaign <strong>${campaignName}</strong> was not approved.</p>`) });
 }
-export async function sendCampaignAlertEmail(email: string, campaignName: string, description: string, campaignId?: string): Promise<boolean> {
+export async function sendCampaignAlertEmail(email: string, campaignName: string, description: string, campaignId?: string, cpm?: number, budget?: number): Promise<boolean> {
   const link = campaignId ? `https://clipershq.com/campaigns/${campaignId}` : "https://clipershq.com/campaigns";
   return sendEmail({
     to: email,
     subject: `New Campaign: ${campaignName}`,
     html: wrap(`
-      <p style="font-size: 16px; margin: 0 0 12px;">🎬 New Campaign Alert!</p>
-      <p style="font-size: 18px; color: #fff; font-weight: bold; margin: 0 0 12px;">${campaignName}</p>
-      <p style="font-size: 15px; color: #a1a1aa; margin: 0 0 20px;">${description}</p>
+      <div style="text-align: center; padding: 8px 0 16px;">
+        <span style="font-size: 13px; color: #2596be; letter-spacing: 2px; text-transform: uppercase; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">New Campaign Alert</span>
+      </div>
+      <h1 style="color: #ffffff; font-size: 26px; font-weight: 700; margin: 0 0 16px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${campaignName}</h1>
+      <p style="color: #a1a1aa; font-size: 15px; margin: 0 0 20px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${description || "A new campaign is live and ready for clippers!"}</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 24px; background-color: #0a0d12 !important; border: 1px solid #1c2333; border-radius: 12px;">
+        <tr>
+          <td style="padding: 16px; text-align: center; border-right: 1px solid #1c2333; background-color: #0a0d12 !important;">
+            <p style="color: #6b7280; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">CPM Rate</p>
+            <p style="color: #2596be; font-size: 22px; font-weight: 700; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${cpm ? "$" + cpm.toFixed(2) : "\u2014"}</p>
+          </td>
+          <td style="padding: 16px; text-align: center; background-color: #0a0d12 !important;">
+            <p style="color: #6b7280; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Budget</p>
+            <p style="color: #10b981; font-size: 22px; font-weight: 700; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${budget ? "$" + budget.toLocaleString() : "\u2014"}</p>
+          </td>
+        </tr>
+      </table>
+      <p style="color: #d4d4d8; font-size: 14px; text-align: center; margin: 0 0 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Spots fill up fast \u2014 join now and start earning!</p>
       ${emailButton("Start Clipping Now", link)}
     `),
   });
