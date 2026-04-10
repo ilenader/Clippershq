@@ -13,7 +13,7 @@ import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
 import { CampaignImage } from "@/components/ui/campaign-image";
-import { Plus, Megaphone, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit } from "lucide-react";
+import { Plus, Megaphone, Mail, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit } from "lucide-react";
 import { toast } from "@/lib/toast";
 
 const platformList = [
@@ -219,6 +219,26 @@ export default function AdminCampaignsPage() {
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  const [notifyTarget, setNotifyTarget] = useState<any | null>(null);
+  const [notifyConfirmText, setNotifyConfirmText] = useState("");
+  const [notifying, setNotifying] = useState(false);
+
+  const sendNotification = async () => {
+    if (!notifyTarget) return;
+    setNotifying(true);
+    try {
+      const res = await fetch(`/api/campaigns/${notifyTarget.id}/notify`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      toast.success(`Notification sent to ${data.sent} clippers.`);
+      setNotifyTarget(null);
+      setNotifyConfirmText("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send notifications.");
+    }
+    setNotifying(false);
+  };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -444,6 +464,11 @@ export default function AdminCampaignsPage() {
                         {c.status === "ACTIVE" ? "Pause" : "Resume"}
                       </Button>
                     )}
+                    {isOwner && c.status === "ACTIVE" && (
+                      <Button size="sm" variant="outline" onClick={() => { setNotifyTarget(c); setNotifyConfirmText(""); }} icon={<Mail className="h-3 w-3" />}>
+                        Notify
+                      </Button>
+                    )}
                     {isOwner && (
                       <Button size="sm" variant="outline" onClick={() => { setDeleteTarget(c); setDeleteConfirmText(""); }} icon={<Trash2 className="h-3 w-3" />}
                         className="text-red-400 hover:text-red-300 hover:border-red-400/30">
@@ -600,6 +625,41 @@ export default function AdminCampaignsPage() {
                 onClick={confirmDelete}
               >
                 Archive campaign
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Notify Clippers Modal */}
+      <Modal open={!!notifyTarget} onClose={() => setNotifyTarget(null)} title="Send campaign notification">
+        {notifyTarget && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
+              <p className="text-sm text-[var(--text-secondary)]">
+                This will send an email to <strong className="text-[var(--text-primary)]">ALL active clippers</strong> about <strong className="text-accent">{notifyTarget.name}</strong>.
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-[var(--text-secondary)] mb-2">
+                Type <code className="rounded bg-[var(--bg-input)] px-1.5 py-0.5 text-xs font-bold text-[var(--text-primary)]">NOTIFY</code> to confirm:
+              </p>
+              <Input
+                id="notifyConfirm"
+                placeholder="NOTIFY"
+                value={notifyConfirmText}
+                onChange={(e) => setNotifyConfirmText(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="ghost" onClick={() => setNotifyTarget(null)}>Cancel</Button>
+              <Button
+                loading={notifying}
+                disabled={notifyConfirmText !== "NOTIFY"}
+                onClick={sendNotification}
+                icon={<Mail className="h-4 w-4" />}
+              >
+                Send Notification
               </Button>
             </div>
           </div>
