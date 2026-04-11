@@ -154,7 +154,7 @@ export default function AdminCampaignsPage() {
         examples: form.examples, soundLink: form.soundLink, assetLink: form.assetLink,
         imageUrl: form.imageUrl, captionRules: form.captionRules, hashtagRules: form.hashtagRules,
         aiKnowledge: form.aiKnowledge,
-        startDate: form.startDate,
+        startDate: editingId ? form.startDate : new Date().toISOString().split("T")[0],
       };
 
       if (editingId) {
@@ -495,10 +495,7 @@ export default function AdminCampaignsPage() {
         )}
         <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-5 overflow-y-auto pr-2">
           <Input id="name" label="Campaign name *" value={form.name} onChange={(e) => updateField("name", e.target.value)} className="text-lg" />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input id="clientName" label="Client name" value={form.clientName} onChange={(e) => updateField("clientName", e.target.value)} />
-            <Input id="startDate" label="Start date" type="date" value={form.startDate} onChange={(e) => updateField("startDate", e.target.value)} />
-          </div>
+          <Input id="clientName" label="Client name" value={form.clientName} onChange={(e) => updateField("clientName", e.target.value)} />
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-[var(--text-primary)]">Platforms *</label>
             <div className="flex flex-wrap gap-2">
