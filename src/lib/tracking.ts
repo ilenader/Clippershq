@@ -343,13 +343,13 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
         }
 
         // Recalculate earnings if clip is approved (with budget cap)
-        // If campaign is PAUSED, tracking continues (stats saved above) but earnings freeze
-        const campaignStatus = await db.campaign.findUnique({
+        // Fresh-read campaign status so we catch pauses from earlier clips in this loop
+        const freshCampaign = await db.campaign.findUnique({
           where: { id: clip.campaignId },
-          select: { status: true },
+          select: { status: true, budget: true },
         });
 
-        if (clip.status === "APPROVED" && clip.campaign && campaignStatus?.status !== "PAUSED") {
+        if (clip.status === "APPROVED" && clip.campaign && freshCampaign?.status !== "PAUSED" && freshCampaign?.status !== "ARCHIVED") {
           const breakdown = recalculateClipEarningsBreakdown({
             stats: [{ views: stats.views }],
             campaign: clip.campaign,
@@ -368,7 +368,10 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
             const { getCampaignBudgetStatus } = await import("@/lib/balance");
             const budgetStatus = await getCampaignBudgetStatus(clip.campaignId);
             if (budgetStatus && budgetStatus.budget > 0) {
-              // Subtract THIS clip's current contribution from total spent to get "other" spent
+              // Fresh-read THIS clip's current DB earnings (not the stale value from loop start)
+              const freshClip = await db.clip.findUnique({ where: { id: clip.id }, select: { earnings: true } });
+              const currentClipEarnings = freshClip?.earnings || 0;
+
               let thisClipCurrentOwner = 0;
               if (isCpmSplit) {
                 try {
@@ -376,13 +379,16 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
                   thisClipCurrentOwner = existingAe?.amount || 0;
                 } catch {}
               }
-              const otherSpent = budgetStatus.spent - (clip.earnings || 0) - thisClipCurrentOwner;
+              const otherSpent = budgetStatus.spent - currentClipEarnings - thisClipCurrentOwner;
               const remaining = Math.max(budgetStatus.budget - otherSpent, 0);
               const totalForThisClip = newEarnings + newOwnerAmt;
 
+              console.log(`[BUDGET-CHECK] Campaign: ${clip.campaignId} Budget: $${budgetStatus.budget} Total spent: $${budgetStatus.spent.toFixed(2)} This clip DB earnings: $${currentClipEarnings} Other spent: $${otherSpent.toFixed(2)} Remaining: $${remaining.toFixed(2)} New clipper: $${newEarnings} New owner: $${newOwnerAmt}`);
+
               if (remaining <= 0) {
-                newEarnings = 0;
-                newOwnerAmt = 0;
+                newEarnings = currentClipEarnings;
+                newOwnerAmt = thisClipCurrentOwner;
+                console.log(`[BUDGET-CHECK] No budget remaining, keeping current earnings for clip ${clip.id}`);
               } else if (totalForThisClip > remaining) {
                 const scaleFactor = remaining / totalForThisClip;
                 newEarnings = Math.round(newEarnings * scaleFactor * 100) / 100;
@@ -390,22 +396,33 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
                 if (newEarnings + newOwnerAmt > remaining) {
                   newEarnings = Math.round((remaining - newOwnerAmt) * 100) / 100;
                 }
+                // Add back this clip's existing contribution — new earnings fill remaining only
+                newEarnings = Math.max(newEarnings, 0);
+                console.log(`[BUDGET-CHECK] Capped clip ${clip.id}: clipper=$${newEarnings} owner=$${newOwnerAmt}`);
               }
 
-              // Auto-pause if budget fully spent
+              // Auto-pause BEFORE saving earnings so next clips in loop see PAUSED
               const newTotalSpent = otherSpent + newEarnings + newOwnerAmt;
               if (newTotalSpent >= budgetStatus.budget) {
                 await db.campaign.update({
                   where: { id: clip.campaignId },
                   data: { status: "PAUSED" },
                 });
-                console.log(`[BUDGET] Campaign ${clip.campaignId} paused — budget $${budgetStatus.budget} reached`);
+                console.log(`[BUDGET] Campaign ${clip.campaignId} paused — budget $${budgetStatus.budget} reached (spent: $${newTotalSpent.toFixed(2)})`);
                 details.push(`Campaign ${clip.campaignId}: AUTO-PAUSED (budget $${budgetStatus.budget} reached)`);
+              }
+
+              // Double-check: re-read budget after potential pause from concurrent processing
+              const freshBudget = await getCampaignBudgetStatus(clip.campaignId);
+              if (freshBudget && freshBudget.budget > 0 && freshBudget.spent >= freshBudget.budget) {
+                console.log(`[BUDGET-CHECK] Campaign already over budget after recheck, keeping current earnings for clip ${clip.id}`);
+                newEarnings = currentClipEarnings;
+                newOwnerAmt = thisClipCurrentOwner;
               }
             }
           } catch {}
 
-          const earningsChanged = newEarnings !== clip.earnings;
+          const earningsChanged = newEarnings !== (clip.earnings || 0);
           if (earningsChanged) {
             await db.clip.update({
               where: { id: clip.id },
@@ -465,6 +482,8 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
               broadcastToUser(clip.userId, "earnings_updated", { reason: "tracking" });
             } catch {}
           }
+        } else if (clip.status === "APPROVED" && (freshCampaign?.status === "PAUSED" || freshCampaign?.status === "ARCHIVED")) {
+          console.log(`[BUDGET-CHECK] Skipping earnings for clip ${clip.id} — campaign is ${freshCampaign?.status}`);
         }
 
         // ── Calculate next interval using tiered schedule ──

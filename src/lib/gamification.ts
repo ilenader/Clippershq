@@ -278,6 +278,7 @@ export async function updateUserLevel(userId: string): Promise<void> {
   const newBonus = config.levelBonuses[newLevel] || 0;
 
   if (newLevel !== user.level) {
+    console.log(`[LEVEL] User ${userId} level changed from ${user.level} to ${newLevel} - recalculating unpaid earnings`);
     await db.user.update({
       where: { id: userId },
       data: { level: newLevel, bonusPercentage: newBonus },
@@ -421,6 +422,8 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
   let clipsUpdated = 0;
   let oldTotal = 0;
   let newTotal = 0;
+
+  console.log(`[RECALC] Recalculating ${clips.length} unpaid clips for user ${userId} with level ${user.level}`);
 
   for (const clip of clips) {
     const stat = clip.stats[0];
