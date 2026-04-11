@@ -426,7 +426,7 @@ async function processTrackingJob(
 
 /**
  * Execute tracking jobs. Called by the cron endpoint or manual trigger.
- * Processes clips in parallel batches for speed.
+ * Processes campaigns in parallel, clips within same campaign sequentially (budget-safe).
  * @param options.campaignIds - If provided, only check clips from these campaigns (ignores nextCheckAt)
  * @param options.source - "cron" or "manual" — manual checks don't change the next scheduled cron time
  */
@@ -441,7 +441,6 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
   let processed = 0;
   let errors = 0;
   const startTime = Date.now();
-  const BATCH_SIZE = 10;
   const processedCampaignIds = new Set<string>();
 
   try {
@@ -470,28 +469,51 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     console.log(`[TRACKING] Found ${dueJobs.length} due jobs`);
     details.push(`Found ${dueJobs.length} due jobs`);
 
-    // Collect campaign IDs for final budget sweep
-    for (const j of dueJobs) {
-      if (j.clip?.campaignId) processedCampaignIds.add(j.clip.campaignId);
+    // Group jobs by campaign: parallel across campaigns, sequential within same campaign
+    // This prevents budget overflow from parallel clips in the same campaign
+    const jobsByCampaign: Record<string, any[]> = {};
+    for (const job of dueJobs) {
+      const cId = job.clip?.campaignId || "unknown";
+      if (!jobsByCampaign[cId]) jobsByCampaign[cId] = [];
+      jobsByCampaign[cId].push(job);
+      if (cId !== "unknown") processedCampaignIds.add(cId);
     }
 
-    for (let i = 0; i < dueJobs.length; i += BATCH_SIZE) {
-      // Timeout safety: stop after 250 seconds (leave 50s buffer for Vercel's 300s limit)
+    const campaignGroupIds = Object.keys(jobsByCampaign);
+    const CAMPAIGN_BATCH_SIZE = 10;
+    console.log(`[TRACKING] ${dueJobs.length} jobs across ${campaignGroupIds.length} campaigns`);
+
+    for (let i = 0; i < campaignGroupIds.length; i += CAMPAIGN_BATCH_SIZE) {
       if (Date.now() - startTime > 250000) {
-        details.push(`Stopped early �� 250s timeout. ${processed} processed, ${dueJobs.length - processed} remaining.`);
+        details.push(`Stopped early — 250s timeout. ${processed} processed.`);
         break;
       }
 
-      const batch = dueJobs.slice(i, i + BATCH_SIZE);
-      console.log(`[TRACKING] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} clips in parallel`);
+      const campaignBatch = campaignGroupIds.slice(i, i + CAMPAIGN_BATCH_SIZE);
+      console.log(`[TRACKING] Processing ${campaignBatch.length} campaigns in parallel`);
 
       const results = await Promise.allSettled(
-        batch.map((job: any) => processTrackingJob(job, source, details))
+        campaignBatch.map(async (cId: string) => {
+          const jobs = jobsByCampaign[cId];
+          let campaignProcessed = 0;
+          let campaignErrors = 0;
+
+          // Sequential within same campaign to protect budget
+          for (const job of jobs) {
+            if (Date.now() - startTime > 250000) break;
+            const result = await processTrackingJob(job, source, details);
+            if (result.success) campaignProcessed++;
+            else campaignErrors++;
+          }
+
+          return { campaignProcessed, campaignErrors };
+        })
       );
 
       for (const result of results) {
-        if (result.status === "fulfilled" && result.value.success) {
-          processed++;
+        if (result.status === "fulfilled") {
+          processed += result.value.campaignProcessed;
+          errors += result.value.campaignErrors;
         } else {
           errors++;
         }
@@ -521,6 +543,6 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     console.error(`[BUDGET] Sweep error:`, sweepErr.message);
   }
 
-  console.log(`[TRACKING] Completed: ${processed} processed, ${errors} errors, batch size ${BATCH_SIZE}`);
+  console.log(`[TRACKING] Completed: ${processed} processed, ${errors} errors`);
   return { processed, errors, details };
 }
