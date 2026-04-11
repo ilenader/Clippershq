@@ -91,7 +91,6 @@ const ownerManageNav: NavSection = {
 const ownerExtraNav: NavSection = {
   title: "Owner",
   items: [
-    { label: "Progress", href: "/progress", icon: <Trophy className="h-[18px] w-[18px]" /> },
     { label: "Archive", href: "/admin/archive", icon: <Archive className="h-[18px] w-[18px]" /> },
     { label: "Team", href: "/admin/team", icon: <Shield className="h-[18px] w-[18px]" /> },
     { label: "Agency Earnings", href: "/admin/agency-earnings", icon: <DollarSign className="h-[18px] w-[18px]" /> },
