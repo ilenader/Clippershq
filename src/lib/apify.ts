@@ -187,13 +187,18 @@ async function fetchInstagramStats(postUrl: string): Promise<ClipStats> {
  */
 export async function fetchClipStats(clipUrl: string): Promise<ClipStats> {
   const platform = detectPlatform(clipUrl);
+  console.log(`[APIFY] Fetching stats for: ${clipUrl} (platform: ${platform})`);
 
   if (platform === "tiktok") {
-    return fetchTikTokStats(clipUrl);
+    const result = await fetchTikTokStats(clipUrl);
+    console.log(`[APIFY] TikTok result: views=${result.views} likes=${result.likes} comments=${result.comments} shares=${result.shares}`);
+    return result;
   }
 
   if (platform === "instagram") {
-    return fetchInstagramStats(clipUrl);
+    const result = await fetchInstagramStats(clipUrl);
+    console.log(`[APIFY] Instagram result: views=${result.views} likes=${result.likes} comments=${result.comments} shares=${result.shares}`);
+    return result;
   }
 
   if (platform === "youtube") {

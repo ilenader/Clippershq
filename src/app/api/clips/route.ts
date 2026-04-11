@@ -201,7 +201,9 @@ export async function POST(req: NextRequest) {
     if (platform === "tiktok" || platform === "instagram") {
       // Fetch REAL post time + stats from Apify — never trust user input
       try {
+        console.log(`[CLIP-SUBMIT] Fetching stats for URL: ${data.clipUrl}`);
         const stats = await fetchClipStats(data.clipUrl);
+        console.log(`[CLIP-SUBMIT] Stats result: views=${stats.views} likes=${stats.likes} comments=${stats.comments} shares=${stats.shares} createdAt=${stats.createdAt || "null"}`);
         console.log(`[FRESHNESS] ${platform} createdAt: ${stats.createdAt || "null"}`);
         if (stats.createdAt) {
           const postedTime = new Date(stats.createdAt).getTime();
@@ -224,6 +226,9 @@ export async function POST(req: NextRequest) {
           console.warn(`[FRESHNESS] TikTok createdAt unavailable — allowing (lenient)`);
         }
         fetchedStats = { views: stats.views, likes: stats.likes, comments: stats.comments, shares: stats.shares };
+        if (stats.views === 0 && stats.likes === 0 && stats.comments === 0 && stats.shares === 0) {
+          console.warn(`[CLIP-SUBMIT] WARNING: Stats returned all zeros for URL: ${data.clipUrl}`);
+        }
       } catch (err: any) {
         if (platform === "instagram") {
           console.error(`[FRESHNESS] Instagram API failed: ${err.message}`);

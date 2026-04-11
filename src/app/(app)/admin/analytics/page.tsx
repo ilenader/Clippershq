@@ -113,7 +113,7 @@ const metricColors: Record<string, string> = {
   likes: "#f43f5e",
   comments: "#8b5cf6",
   shares: "#f59e0b",
-  earnings: "#10b981",
+  earnings: "#2596be",
 };
 
 export default function AdminAnalyticsPage() {
@@ -316,7 +316,7 @@ export default function AdminAnalyticsPage() {
           <SimpleLineChart
             data={leftChartData}
             title={leftChartMode === "earnings" ? "Earnings per day" : "Clips submitted per day"}
-            color={leftChartMode === "earnings" ? "#10b981" : "#2596be"}
+            color="#2596be"
             height={200}
             valueSuffix={leftChartMode === "earnings" ? "" : " clips"}
           />
