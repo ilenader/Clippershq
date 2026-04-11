@@ -299,19 +299,23 @@ async function processTrackingJob(
             newOwnerAmt = thisClipCurrentOwner;
             console.log(`[BUDGET-CHECK] No budget remaining, keeping current earnings for clip ${clip.id}`);
           } else if (totalForThisClip > remaining) {
-            const scaleFactor = remaining / totalForThisClip;
-            newEarnings = Math.round(newEarnings * scaleFactor * 100) / 100;
-            newOwnerAmt = Math.round(newOwnerAmt * scaleFactor * 100) / 100;
-            if (newEarnings + newOwnerAmt > remaining) {
-              newEarnings = Math.round((remaining - newOwnerAmt) * 100) / 100;
+            // Owner-first allocation: owner gets full share, clipper takes the rest
+            if (newOwnerAmt <= remaining) {
+              const clipperRemaining = Math.round((remaining - newOwnerAmt) * 100) / 100;
+              newEarnings = Math.min(newEarnings, clipperRemaining);
+            } else {
+              // Even owner alone exceeds remaining — give owner what's left
+              newOwnerAmt = Math.round(remaining * 100) / 100;
+              newEarnings = 0;
             }
             newEarnings = Math.max(newEarnings, 0);
-            console.log(`[BUDGET-CHECK] Capped clip ${clip.id}: clipper=$${newEarnings} owner=$${newOwnerAmt}`);
+            newOwnerAmt = Math.max(newOwnerAmt, 0);
+            console.log(`[BUDGET-CHECK] Owner-first allocation: clipper=$${newEarnings} owner=$${newOwnerAmt} remaining=$${remaining.toFixed(2)}`);
           }
 
-          // Auto-pause BEFORE saving earnings
+          // Auto-pause BEFORE saving earnings (with $0.01 tolerance)
           const newTotalSpent = otherSpent + newEarnings + newOwnerAmt;
-          if (newTotalSpent >= budgetStatus.budget) {
+          if (newTotalSpent >= budgetStatus.budget - 0.01) {
             await db.campaign.update({ where: { id: clip.campaignId }, data: { status: "PAUSED" } });
             console.log(`[BUDGET] Campaign ${clip.campaignId} paused — budget $${budgetStatus.budget} reached (spent: $${newTotalSpent.toFixed(2)})`);
             details.push(`Campaign ${clip.campaignId}: AUTO-PAUSED (budget $${budgetStatus.budget} reached)`);
@@ -319,7 +323,7 @@ async function processTrackingJob(
 
           // Double-check after potential concurrent pause
           const freshBudget = await getCampaignBudgetStatus(clip.campaignId);
-          if (freshBudget && freshBudget.budget > 0 && freshBudget.spent >= freshBudget.budget) {
+          if (freshBudget && freshBudget.budget > 0 && freshBudget.spent >= freshBudget.budget - 0.01) {
             console.log(`[BUDGET-CHECK] Campaign already over budget after recheck, keeping current earnings for clip ${clip.id}`);
             newEarnings = currentClipEarnings;
             newOwnerAmt = thisClipCurrentOwner;
@@ -438,6 +442,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
   let errors = 0;
   const startTime = Date.now();
   const BATCH_SIZE = 10;
+  const processedCampaignIds = new Set<string>();
 
   try {
     const where: any = { isActive: true };
@@ -465,6 +470,11 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     console.log(`[TRACKING] Found ${dueJobs.length} due jobs`);
     details.push(`Found ${dueJobs.length} due jobs`);
 
+    // Collect campaign IDs for final budget sweep
+    for (const j of dueJobs) {
+      if (j.clip?.campaignId) processedCampaignIds.add(j.clip.campaignId);
+    }
+
     for (let i = 0; i < dueJobs.length; i += BATCH_SIZE) {
       // Timeout safety: stop after 250 seconds (leave 50s buffer for Vercel's 300s limit)
       if (Date.now() - startTime > 250000) {
@@ -491,6 +501,24 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     console.error("[TRACKING] Fatal error:", err.message);
     details.push(`Fatal error: ${err.message}`);
     errors++;
+  }
+
+  // Final budget sweep: pause any campaigns that hit budget during this run
+  try {
+    const { getCampaignBudgetStatus } = await import("@/lib/balance");
+    for (const cId of processedCampaignIds) {
+      const bs = await getCampaignBudgetStatus(cId);
+      if (bs && bs.budget > 0 && bs.spent >= bs.budget - 0.01) {
+        const campaign = await db.campaign.findUnique({ where: { id: cId }, select: { status: true } });
+        if (campaign && campaign.status === "ACTIVE") {
+          await db.campaign.update({ where: { id: cId }, data: { status: "PAUSED" } });
+          console.log(`[BUDGET] Final sweep: Campaign ${cId} auto-paused — spent $${bs.spent.toFixed(2)} of $${bs.budget}`);
+          details.push(`Campaign ${cId}: AUTO-PAUSED in final sweep`);
+        }
+      }
+    }
+  } catch (sweepErr: any) {
+    console.error(`[BUDGET] Sweep error:`, sweepErr.message);
   }
 
   console.log(`[TRACKING] Completed: ${processed} processed, ${errors} errors, batch size ${BATCH_SIZE}`);
