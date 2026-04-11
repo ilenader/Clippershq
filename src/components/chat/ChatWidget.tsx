@@ -104,8 +104,8 @@ function getDisplayName(p: { name: string | null; username: string }): string {
 }
 
 function roleBadgeColor(role: string): string {
-  if (role === "OWNER") return "text-amber-400";
-  if (role === "ADMIN") return "text-blue-400";
+  if (role === "OWNER") return "text-red-400";
+  if (role === "ADMIN") return "text-amber-400";
   return "text-[var(--text-muted)]";
 }
 
@@ -136,10 +136,10 @@ function CampaignAvatar({ src, name, size = 44 }: { src: string | null; name: st
 
 function RoleBadge({ role }: { role: string }) {
   if (role === "OWNER") {
-    return <span className="inline-block rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">Owner</span>;
+    return <span className="inline-block rounded-md bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-400">Owner</span>;
   }
   if (role === "ADMIN") {
-    return <span className="inline-block rounded-md bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-400">Admin</span>;
+    return <span className="inline-block rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">Admin</span>;
   }
   return null;
 }
@@ -868,7 +868,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                               isMine
                                 ? `bg-accent text-white rounded-br-md ${isOptimistic ? "opacity-70" : ""}`
                                 : !isAIMsg && (senderRole === "OWNER" || senderRole === "ADMIN")
-                                  ? "bg-[var(--bg-card)] text-[var(--text-primary)] border border-amber-500/20 rounded-bl-md border-l-2 border-l-amber-500/40"
+                                  ? "bg-[var(--bg-card)] text-[var(--text-primary)] border border-red-500/20 rounded-bl-md border-l-2 border-l-red-500/40"
                                   : "bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-bl-md"
                             }`}>
                               <p className="whitespace-pre-wrap break-words">{msg.content}</p>
@@ -876,8 +876,8 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                                 {formatTimestamp(msg.createdAt)}
                               </p>
                             </div>
-                            {/* "Talk to a human" link below AI messages for clippers */}
-                            {isClipper && !isMine && idx === messages.length - 1 && (
+                            {/* "Talk to a human" link — only show when AI is responding, hide when human is already connected */}
+                            {isClipper && !isMine && idx === messages.length - 1 && !needsHumanSupport && !threadInfo?.needsHumanSupport && (
                               <button
                                 onClick={() => {
                                   setNeedsHumanSupport(true);
