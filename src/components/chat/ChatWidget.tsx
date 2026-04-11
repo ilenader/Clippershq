@@ -825,13 +825,17 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                       );
                     }
                     const isMine = msg.senderId === myId;
-                    const showAvatar = !isMine && (idx === 0 || messages[idx - 1].senderId !== msg.senderId);
                     const isOptimistic = msg.id.startsWith("opt-");
                     // AI message: uses the isAI field from the database
                     const isAIMsg = !!msg.isAI && !isMine;
+                    // New sender group: different sender OR AI status changed (AI→human or human→AI from same senderId)
+                    const prev = idx > 0 ? messages[idx - 1] : null;
+                    const isNewSenderGroup = !prev
+                      || prev.senderId === "system"
+                      || prev.senderId !== msg.senderId
+                      || (!!prev.isAI !== !!msg.isAI);
+                    const showAvatar = !isMine && isNewSenderGroup;
                     // Human admin/owner message (NOT AI): show their name + role badge
-                    // Always show on first message from this sender in a consecutive group
-                    const isNewSenderGroup = idx === 0 || messages[idx - 1].senderId !== msg.senderId;
                     const showRole = !isMine && isNewSenderGroup && !isAIMsg && (msg.sender.role === "ADMIN" || msg.sender.role === "OWNER");
                     return (
                       <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
