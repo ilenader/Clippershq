@@ -867,7 +867,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                             <div className={`rounded-2xl px-4 py-3 text-[14.5px] leading-relaxed ${
                               isMine
                                 ? `bg-accent text-white rounded-br-md ${isOptimistic ? "opacity-70" : ""}`
-                                : showRole
+                                : !isAIMsg && (senderRole === "OWNER" || senderRole === "ADMIN")
                                   ? "bg-[var(--bg-card)] text-[var(--text-primary)] border border-amber-500/20 rounded-bl-md border-l-2 border-l-amber-500/40"
                                   : "bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-bl-md"
                             }`}>
