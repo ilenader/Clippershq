@@ -299,18 +299,18 @@ async function processTrackingJob(
             newOwnerAmt = thisClipCurrentOwner;
             console.log(`[BUDGET-CHECK] No budget remaining, keeping current earnings for clip ${clip.id}`);
           } else if (totalForThisClip > remaining) {
-            // Owner-first allocation: owner gets full share, clipper takes the rest
+            // OWNER-FIRST: Owner gets their full calculated amount, clipper takes the rest
+            // This protects owner from clipper bonus eating into owner's share
             if (newOwnerAmt <= remaining) {
-              const clipperRemaining = Math.round((remaining - newOwnerAmt) * 100) / 100;
-              newEarnings = Math.min(newEarnings, clipperRemaining);
+              // Owner fits, clipper gets whatever is left
+              newEarnings = Math.round((remaining - newOwnerAmt) * 100) / 100;
             } else {
-              // Even owner alone exceeds remaining — give owner what's left
+              // Even owner exceeds remaining — give all remaining to owner, clipper gets 0
               newOwnerAmt = Math.round(remaining * 100) / 100;
               newEarnings = 0;
             }
             newEarnings = Math.max(newEarnings, 0);
-            newOwnerAmt = Math.max(newOwnerAmt, 0);
-            console.log(`[BUDGET-CHECK] Owner-first allocation: clipper=$${newEarnings} owner=$${newOwnerAmt} remaining=$${remaining.toFixed(2)}`);
+            console.log(`[BUDGET-CHECK] Owner-first: clipper=$${newEarnings} owner=$${newOwnerAmt} remaining=$${remaining.toFixed(2)}`);
           }
 
           // Auto-pause BEFORE saving earnings (with $0.01 tolerance)
