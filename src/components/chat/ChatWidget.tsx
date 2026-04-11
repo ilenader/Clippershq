@@ -809,13 +809,25 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
               ) : (
                 <>
                   {messages.map((msg, idx) => {
+                    // System messages: centered, different style
+                    if (msg.senderId === "system") {
+                      return (
+                        <div key={msg.id} className="flex justify-center py-1.5">
+                          <p className="text-xs text-[var(--text-muted)] italic text-center bg-[var(--bg-input)] rounded-lg px-4 py-2 max-w-[80%]">
+                            {msg.content}
+                          </p>
+                        </div>
+                      );
+                    }
                     const isMine = msg.senderId === myId;
                     const showAvatar = !isMine && (idx === 0 || messages[idx - 1].senderId !== msg.senderId);
                     const isOptimistic = msg.id.startsWith("opt-");
                     // AI message: uses the isAI field from the database
                     const isAIMsg = !!msg.isAI && !isMine;
                     // Human admin/owner message (NOT AI): show their name + role badge
-                    const showRole = !isMine && showAvatar && !isAIMsg && (msg.sender.role === "ADMIN" || msg.sender.role === "OWNER");
+                    // Always show on first message from this sender in a consecutive group
+                    const isNewSenderGroup = idx === 0 || messages[idx - 1].senderId !== msg.senderId;
+                    const showRole = !isMine && isNewSenderGroup && !isAIMsg && (msg.sender.role === "ADMIN" || msg.sender.role === "OWNER");
                     return (
                       <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                         <div className={`flex items-end gap-2 max-w-[85%] ${isMine ? "flex-row-reverse" : ""}`}>
@@ -857,6 +869,15 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                                 onClick={() => {
                                   setNeedsHumanSupport(true);
                                   handleSend("connect me");
+                                  // Insert a visible system-style feedback message
+                                  setMessages((prev) => [...prev, {
+                                    id: `sys-human-${Date.now()}`,
+                                    content: "Connecting you with our support team. Someone will be with you shortly!",
+                                    senderId: "system",
+                                    isAI: false,
+                                    createdAt: new Date().toISOString(),
+                                    sender: { id: "system", name: "System", username: "System", image: null, role: "SYSTEM" },
+                                  }]);
                                 }}
                                 className="flex items-center gap-1 mt-1 ml-0.5 text-[11px] text-accent hover:underline cursor-pointer"
                               >
@@ -910,6 +931,15 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                     // The backend already cleared needsHumanSupport when owner sent a message
                     // Next clipper message will be handled by AI
                     setThreadInfo((prev) => prev ? { ...prev, needsHumanSupport: false } : prev);
+                    // Insert a visible system-style feedback message
+                    setMessages((prev) => [...prev, {
+                      id: `sys-ai-${Date.now()}`,
+                      content: "AI support has been resumed.",
+                      senderId: "system",
+                      isAI: false,
+                      createdAt: new Date().toISOString(),
+                      sender: { id: "system", name: "System", username: "System", image: null, role: "SYSTEM" },
+                    }]);
                   }}
                   className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-accent hover:bg-accent/5 transition-colors cursor-pointer"
                 >
