@@ -288,7 +288,7 @@ export default function DashboardPage() {
                 Total Bonus
                 <Tooltip text="Level + streak + app bonuses combined. Applied to all earnings." />
               </p>
-              <Zap className="h-4 w-4 text-emerald-400" />
+              <Zap className="h-4 w-4 text-accent" />
             </div>
             <p className="text-3xl font-bold text-accent">+{gamification.bonusPercent}%</p>
             <div className="mt-2 space-y-0.5">
@@ -332,7 +332,7 @@ export default function DashboardPage() {
                   <p className="text-[15px] font-medium text-[var(--text-primary)]">{clip.campaign?.name}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <p className="text-sm text-[var(--text-muted)]">{clip.clipAccount?.username} · {formatRelative(clip.createdAt)}</p>
-                    <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
+                    <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline whitespace-nowrap">
                       <ExternalLink className="h-3 w-3" /> Open clip
                     </a>
                   </div>

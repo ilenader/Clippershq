@@ -15,6 +15,7 @@ const variantStyles: Record<StatusVariant, string> = {
   under_review: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   paid: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   verified: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+  voided: "bg-gray-500/10 text-gray-400 border-gray-500/20",
 };
 
 interface BadgeProps {

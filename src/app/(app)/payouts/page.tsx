@@ -363,6 +363,7 @@ export default function PayoutsPage() {
           onClick={() => setShowModal(true)}
           icon={<Plus className="h-4 w-4" />}
           disabled={(earnings?.available || 0) <= 0}
+          className="whitespace-nowrap"
         >
           Request Payout
         </Button>

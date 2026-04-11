@@ -196,7 +196,7 @@ export default function AccountsPage() {
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">My Accounts</h1>
           <p className="text-base text-[var(--text-secondary)]">Submit and manage your social media accounts.</p>
         </div>
-        <Button onClick={() => { setShowModal(true); setPendingVerify(null); }} icon={<Plus className="h-4 w-4" />}>
+        <Button onClick={() => { setShowModal(true); setPendingVerify(null); }} icon={<Plus className="h-4 w-4" />} className="whitespace-nowrap">
           Add Account
         </Button>
       </div>

@@ -104,7 +104,7 @@ export default function AdminPayoutsPage() {
 
   const statusMap: Record<string, string> = {
     REQUESTED: "pending", UNDER_REVIEW: "pending",
-    APPROVED: "approved", PAID: "active", REJECTED: "rejected", VOIDED: "rejected",
+    APPROVED: "approved", PAID: "active", REJECTED: "rejected", VOIDED: "voided",
   };
 
   return (

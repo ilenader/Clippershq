@@ -83,12 +83,12 @@ export default function ProgressPage() {
       <div className="grid gap-4 grid-cols-2">
         <Card className="border-accent/20 bg-accent/5 text-center py-6">
           <p className="text-xs font-medium uppercase tracking-wider text-accent">Total Bonus</p>
-          <p className="text-4xl font-bold text-accent mt-1">+{bonusPercent}%</p>
+          <p className="text-2xl sm:text-4xl font-bold text-accent mt-1">+{bonusPercent}%</p>
           <p className="text-xs text-[var(--text-secondary)] mt-1">Applied to all your earnings</p>
         </Card>
         <Card className="text-center py-6">
           <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Total Earned</p>
-          <p className="text-4xl font-bold text-[var(--text-primary)] mt-1">{formatCurrency(totalEarnings)}</p>
+          <p className="text-2xl sm:text-4xl font-bold text-[var(--text-primary)] mt-1">{formatCurrency(totalEarnings)}</p>
           <p className="text-xs text-[var(--text-secondary)] mt-1">Lifetime approved earnings</p>
         </Card>
       </div>

@@ -29,4 +29,5 @@ export type StatusVariant =
   | "requested"
   | "under_review"
   | "paid"
-  | "verified";
+  | "verified"
+  | "voided";
