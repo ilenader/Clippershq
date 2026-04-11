@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MessageCircle, X, ArrowLeft, Send, Plus, Search, Megaphone, UserRound, AlertTriangle, ChevronDown, Bot } from "lucide-react";
+import { MessageCircle, X, ArrowLeft, Send, Plus, Search, Megaphone, UserRound, AlertTriangle, ChevronDown, Bot, Clock } from "lucide-react";
 const WELCOME_MESSAGE = "Hey! I'm the Clippers HQ assistant. I can help with questions about campaigns, clips, earnings, payouts, and more. If you need to talk to a real person, just let me know and I'll connect you with our support team.";
 
 // ─── Types ──────────────────────────────────────────────────
@@ -811,11 +811,16 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                   {messages.map((msg, idx) => {
                     // System messages: centered, different style
                     if (msg.senderId === "system") {
+                      const isTransfer = msg.id.startsWith("sys-human");
                       return (
-                        <div key={msg.id} className="flex justify-center py-1.5">
-                          <p className="text-xs text-[var(--text-muted)] italic text-center bg-[var(--bg-input)] rounded-lg px-4 py-2 max-w-[80%]">
-                            {msg.content}
-                          </p>
+                        <div key={msg.id} className="flex justify-center py-2">
+                          <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--bg-input)] rounded-lg px-4 py-2.5 max-w-[85%] border border-[var(--border-subtle)]">
+                            {isTransfer
+                              ? <Clock className="h-3.5 w-3.5 text-accent flex-shrink-0" />
+                              : <Bot className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
+                            }
+                            <span className="italic">{msg.content}</span>
+                          </div>
                         </div>
                       );
                     }
@@ -872,7 +877,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                                   // Insert a visible system-style feedback message
                                   setMessages((prev) => [...prev, {
                                     id: `sys-human-${Date.now()}`,
-                                    content: "Connecting you with our support team. Someone will be with you shortly!",
+                                    content: "Connecting you with support. Someone will be with you shortly.",
                                     senderId: "system",
                                     isAI: false,
                                     createdAt: new Date().toISOString(),
