@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { MultiDropdown } from "@/components/ui/dropdown-filter";
+import { DropdownFilter, MultiDropdown } from "@/components/ui/dropdown-filter";
 import { SimpleLineChart, SimpleMultiLineChart } from "@/components/ui/simple-chart";
 import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-select";
 import { TrendingUp, Eye, Users, Film, Megaphone, Calendar, Heart, CheckCircle, Clock, DollarSign } from "lucide-react";
@@ -186,16 +186,17 @@ export default function AdminAnalyticsPage() {
         <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
         <MultiDropdown label="Campaign" options={campaignOptions} values={selectedCampaigns} onChange={setSelectedCampaigns} allLabel="All campaigns" />
         <MultiDropdown label="Metrics" options={metricOptions} values={selectedMetrics} onChange={setSelectedMetrics} allLabel="All metrics" />
-        <select
+        <DropdownFilter
+          label="Status"
+          options={[
+            { value: "APPROVED", label: "Approved only" },
+            { value: "REJECTED", label: "Rejected only" },
+            { value: "APPROVED_REJECTED", label: "Approved + Rejected" },
+            { value: "ALL", label: "All clips" },
+          ]}
           value={clipStatusFilter}
-          onChange={(e) => setClipStatusFilter(e.target.value)}
-          className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent focus:ring-1 focus:ring-accent focus:outline-none cursor-pointer"
-        >
-          <option value="APPROVED">Approved only</option>
-          <option value="REJECTED">Rejected only</option>
-          <option value="APPROVED_REJECTED">Approved + Rejected</option>
-          <option value="ALL">All clips</option>
-        </select>
+          onChange={setClipStatusFilter}
+        />
       </div>
 
       {/* Stats */}
