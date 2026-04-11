@@ -154,7 +154,10 @@ export default function AdminAnalyticsPage() {
   const totalViews = filteredClips.reduce((sum: number, c: any) => sum + (c.stats?.[0]?.views || 0), 0);
   const totalLikes = filteredClips.reduce((sum: number, c: any) => sum + (c.stats?.[0]?.likes || 0), 0);
   const activeCampaigns = allCampaigns.filter((c: any) => c.status === "ACTIVE");
-  const withCpm = activeCampaigns.filter((c: any) => (c.clipperCpm ?? c.cpmRate) > 0);
+  const displayedCampaigns = selectedCampaigns.length > 0
+    ? allCampaigns.filter((c: any) => selectedCampaigns.includes(c.id))
+    : activeCampaigns;
+  const withCpm = displayedCampaigns.filter((c: any) => (c.clipperCpm ?? c.cpmRate) > 0);
   const avgCpm = withCpm.length > 0 ? withCpm.reduce((s: number, c: any) => s + (c.clipperCpm ?? c.cpmRate ?? 0), 0) / withCpm.length : 0;
   const approvedClips = filteredClips.filter((c: any) => c.status === "APPROVED").length;
   const pendingClips = filteredClips.filter((c: any) => c.status === "PENDING").length;
