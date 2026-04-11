@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
-import { DropdownFilter, MultiDropdown } from "@/components/ui/dropdown-filter";
+import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { SimpleLineChart, SimpleMultiLineChart } from "@/components/ui/simple-chart";
 import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-select";
 import { TrendingUp, Eye, Users, Film, Megaphone, Calendar, Heart, CheckCircle, Clock, DollarSign } from "lucide-react";
@@ -103,6 +103,8 @@ export default function AdminAnalyticsPage() {
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(["views"]);
   const [clipStatusFilter, setClipStatusFilter] = useState("APPROVED");
+  const [statusDropOpen, setStatusDropOpen] = useState(false);
+  const statusDropRef = useRef<HTMLDivElement>(null);
   const [timeframeDays, setTimeframeDays] = useState(15);
   const [loading, setLoading] = useState(true);
 
@@ -122,6 +124,21 @@ export default function AdminAnalyticsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (statusDropRef.current && !statusDropRef.current.contains(e.target as Node)) setStatusDropOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const statusOptions = [
+    { value: "APPROVED", label: "Approved only" },
+    { value: "REJECTED", label: "Rejected only" },
+    { value: "APPROVED_REJECTED", label: "Approved + Rejected" },
+    { value: "ALL", label: "All clips" },
+  ];
 
   const campaignFilteredClips = selectedCampaigns.length > 0
     ? allClips.filter((c: any) => selectedCampaigns.includes(c.campaignId))
@@ -186,17 +203,40 @@ export default function AdminAnalyticsPage() {
         <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
         <MultiDropdown label="Campaign" options={campaignOptions} values={selectedCampaigns} onChange={setSelectedCampaigns} allLabel="All campaigns" />
         <MultiDropdown label="Metrics" options={metricOptions} values={selectedMetrics} onChange={setSelectedMetrics} allLabel="All metrics" />
-        <DropdownFilter
-          label="Status"
-          options={[
-            { value: "APPROVED", label: "Approved only" },
-            { value: "REJECTED", label: "Rejected only" },
-            { value: "APPROVED_REJECTED", label: "Approved + Rejected" },
-            { value: "ALL", label: "All clips" },
-          ]}
-          value={clipStatusFilter}
-          onChange={setClipStatusFilter}
-        />
+        <div className="relative" ref={statusDropRef}>
+          <button
+            onClick={() => setStatusDropOpen(!statusDropOpen)}
+            className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all cursor-pointer"
+          >
+            <span className="text-[var(--text-muted)]">Status:</span>
+            {statusOptions.find((o) => o.value === clipStatusFilter)?.label || "All"}
+            <svg className={`h-4 w-4 text-[var(--text-muted)] transition-transform ${statusDropOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          {statusDropOpen && (
+            <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
+              {statusOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => { setClipStatusFilter(opt.value); setStatusDropOpen(false); }}
+                  className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors cursor-pointer ${
+                    clipStatusFilter === opt.value ? "text-accent bg-accent/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  <div className={`h-3.5 w-3.5 rounded border transition-colors ${
+                    clipStatusFilter === opt.value
+                      ? "border-accent bg-accent"
+                      : "border-[var(--border-color)]"
+                  }`}>
+                    {clipStatusFilter === opt.value && (
+                      <svg className="h-full w-full text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>
+                    )}
+                  </div>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
