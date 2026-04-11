@@ -327,17 +327,15 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-2">
             {recentClips.map((clip: any) => (
-              <Card key={clip.id} className="flex items-center justify-between py-3">
-                <div>
-                  <p className="text-[15px] font-medium text-[var(--text-primary)]">{clip.campaign?.name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-sm text-[var(--text-muted)]">{clip.clipAccount?.username} · {formatRelative(clip.createdAt)}</p>
-                    <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline whitespace-nowrap">
-                      <ExternalLink className="h-3 w-3" /> Open clip
-                    </a>
-                  </div>
+              <Card key={clip.id} className="flex items-center gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-medium text-[var(--text-primary)] truncate">{clip.campaign?.name}</p>
+                  <p className="text-sm text-[var(--text-muted)] truncate mt-0.5">{clip.clipAccount?.username} · {formatRelative(clip.createdAt)}</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline whitespace-nowrap flex-shrink-0">
+                  <ExternalLink className="h-3 w-3" /> Open clip
+                </a>
+                <div className="flex items-center gap-3 flex-shrink-0">
                   {clip.earnings > 0 && (
                     <span className="text-sm font-medium text-[var(--text-primary)]">{formatCurrency(clip.earnings)}</span>
                   )}

@@ -107,22 +107,26 @@ export default function EarningsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Earnings</h1>
-          <p className="text-[15px] text-[var(--text-secondary)]">
-            {selectedCampaigns.length > 0
-              ? `Showing ${selectedCampaigns.length} campaign${selectedCampaigns.length > 1 ? "s" : ""}`
-              : "Track your earnings across all clips."}
-          </p>
+      <div>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Earnings</h1>
+            <p className="text-[15px] text-[var(--text-secondary)]">
+              {selectedCampaigns.length > 0
+                ? `Showing ${selectedCampaigns.length} campaign${selectedCampaigns.length > 1 ? "s" : ""}`
+                : "Track your earnings across all clips."}
+            </p>
+          </div>
         </div>
-        <MultiDropdown
-          label="Campaign"
-          options={campaignOptions.length > 0 ? campaignOptions : [{ value: "milenko", label: "milenko" }, { value: "dusan-ristic", label: "Dusan Ristic" }]}
-          values={selectedCampaigns}
-          onChange={handleCampaignChange}
-          allLabel="All campaigns"
-        />
+        <div className="mt-3">
+          <MultiDropdown
+            label="Campaign"
+            options={campaignOptions.length > 0 ? campaignOptions : [{ value: "milenko", label: "milenko" }, { value: "dusan-ristic", label: "Dusan Ristic" }]}
+            values={selectedCampaigns}
+            onChange={handleCampaignChange}
+            allLabel="All campaigns"
+          />
+        </div>
       </div>
 
       <EarningsSummary data={summary} />
