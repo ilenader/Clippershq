@@ -128,7 +128,7 @@ export async function sendWelcomeEmail(email: string, username: string): Promise
 export async function sendClipApproved(email: string, campaignName: string, earnings: number): Promise<boolean> {
   return sendEmail({
     to: email,
-    subject: "Your clip was approved!",
+    subject: "Your clip was approved",
     html: wrap(`
       <p style="font-size: 16px; margin: 0 0 12px;">Great news!</p>
       <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${campaignName}</strong> has been approved.</p>
@@ -153,9 +153,9 @@ export async function sendClipRejected(email: string, campaignName: string, reas
 export async function sendPayoutApproved(email: string, amount: number): Promise<boolean> {
   return sendEmail({
     to: email,
-    subject: "Payout sent!",
+    subject: "Payout sent",
     html: wrap(`
-      <p style="font-size: 16px; margin: 0 0 12px;">Your payout has been sent!</p>
+      <p style="font-size: 16px; margin: 0 0 12px;">Your payout has been sent.</p>
       <p style="font-size: 22px; color: #2596be; font-weight: bold; margin: 0 0 12px;">$${amount.toFixed(2)}</p>
       <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Check your wallet for the transfer. It may take a few business days to arrive.</p>
     `),
@@ -190,7 +190,7 @@ export async function sendClipSubmitted(email: string, clipUrl: string): Promise
   return sendEmail({ to: email, subject: "Clip submitted", html: wrap(`<p style="font-size: 15px;">Your clip was submitted and is being reviewed.</p>`) });
 }
 export async function sendStreakWarning(email: string, currentStreak: number): Promise<boolean> {
-  return sendEmail({ to: email, subject: "Don't lose your streak!", html: wrap(`<p style="font-size: 15px;">Your ${currentStreak}-day streak is at risk. Submit a clip today!</p>`) });
+  return sendEmail({ to: email, subject: "Don't lose your streak", html: wrap(`<p style="font-size: 15px;">Your ${currentStreak}-day streak is at risk. Submit a clip today!</p>`) });
 }
 export async function sendCampaignApproved(email: string, campaignName: string): Promise<boolean> {
   return sendEmail({ to: email, subject: `Campaign approved`, html: wrap(`<p style="font-size: 15px;">Your campaign <strong>${campaignName}</strong> is live.</p>`) });
@@ -209,7 +209,7 @@ export async function sendCampaignAlertEmail(email: string, campaignName: string
     subject: `New Campaign: ${campaignName}`,
     html: wrap(`
       <div style="text-align: center; padding: 8px 0 16px; background-color: #111720 !important;">
-        <span style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">New Campaign Alert</span>
+        <span style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">New Campaign Available</span>
       </div>
       <h1 style="color: #ffffff !important; font-size: 26px; font-weight: 700; margin: 0 0 16px; text-align: center; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${campaignName}</h1>
       <p style="color: #a1a1aa !important; font-size: 15px; margin: 0 0 20px; text-align: center; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${desc}</p>
@@ -225,12 +225,12 @@ export async function sendCampaignAlertEmail(email: string, campaignName: string
           </td>
         </tr>
       </table>
-      <p style="color: #d4d4d8 !important; font-size: 14px; text-align: center; margin: 0 0 24px; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Spots fill up fast \u2014 join now and start earning!</p>
-      ${emailButton("Start Clipping Now", link)}
+      <p style="color: #d4d4d8 !important; font-size: 14px; text-align: center; margin: 0 0 24px; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Check out the details and join when you're ready.</p>
+      ${emailButton("View Campaign", link)}
     `),
   });
 }
 
 export async function sendReferralSignup(email: string, referredName: string): Promise<boolean> {
-  return sendEmail({ to: email, subject: "New referral!", html: wrap(`<p style="font-size: 15px;"><strong>${referredName}</strong> signed up with your link. You earn 5% of their earnings forever.</p>`) });
+  return sendEmail({ to: email, subject: "New referral", html: wrap(`<p style="font-size: 15px;"><strong>${referredName}</strong> signed up with your link. You earn 5% of their earnings forever.</p>`) });
 }
