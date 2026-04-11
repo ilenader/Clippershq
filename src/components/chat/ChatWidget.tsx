@@ -34,6 +34,7 @@ interface CampaignChat {
   conversationId: string | null;
   lastMessage: { id: string; content: string; senderId: string; createdAt: string } | null;
   hasUnread: boolean;
+  needsHumanSupport?: boolean;
 }
 
 interface MessageData {
@@ -395,6 +396,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
     activeConvoIdRef.current = info.convoId;
     setMessages([]);
     setHasSentInThread(false);
+    setNeedsHumanSupport(info.needsHumanSupport || false);
     setView("thread");
     setLoadingMessages(true);
     await fetchMessages(info.convoId);
@@ -412,6 +414,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
       avatarSrc: chat.campaignImage,
       avatarName: chat.campaignName,
       otherRole: null,
+      needsHumanSupport: chat.needsHumanSupport || false,
     };
 
     if (chat.conversationId) {

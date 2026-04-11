@@ -96,6 +96,7 @@ export async function GET() {
           ? { id: lastMessage.id, content: lastMessage.content, senderId: lastMessage.senderId, createdAt: lastMessage.createdAt }
           : null,
         hasUnread,
+        needsHumanSupport: convo?.needsHumanSupport || false,
       };
     });
 

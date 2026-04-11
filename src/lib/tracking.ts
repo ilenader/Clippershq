@@ -297,20 +297,26 @@ async function processTrackingJob(
           if (remaining <= 0) {
             newEarnings = currentClipEarnings;
             newOwnerAmt = thisClipCurrentOwner;
-            console.log(`[BUDGET-CHECK] No budget remaining, keeping current earnings for clip ${clip.id}`);
+            console.log(`[BUDGET-CHECK] No budget remaining, keeping current for clip ${clip.id}`);
           } else if (totalForThisClip > remaining) {
-            // OWNER-FIRST: Owner gets their full calculated amount, clipper takes the rest
-            // This protects owner from clipper bonus eating into owner's share
-            if (newOwnerAmt <= remaining) {
-              // Owner fits, clipper gets whatever is left
+            // Ratio-based cap: split remaining budget by CPM ratio
+            const clipperCpmVal = (clip.campaign as any).clipperCpm || (clip.campaign as any).cpmRate || 1;
+            const ownerCpmVal = (clip.campaign as any).ownerCpm || 0;
+            const totalCpm = clipperCpmVal + ownerCpmVal;
+            const ownerRatio = ownerCpmVal / totalCpm;
+            const clipperRatio = clipperCpmVal / totalCpm;
+
+            newOwnerAmt = Math.round(remaining * ownerRatio * 100) / 100;
+            newEarnings = Math.round(remaining * clipperRatio * 100) / 100;
+
+            // Safety: ensure total doesn't exceed remaining
+            if (newEarnings + newOwnerAmt > remaining) {
               newEarnings = Math.round((remaining - newOwnerAmt) * 100) / 100;
-            } else {
-              // Even owner exceeds remaining — give all remaining to owner, clipper gets 0
-              newOwnerAmt = Math.round(remaining * 100) / 100;
-              newEarnings = 0;
             }
             newEarnings = Math.max(newEarnings, 0);
-            console.log(`[BUDGET-CHECK] Owner-first: clipper=$${newEarnings} owner=$${newOwnerAmt} remaining=$${remaining.toFixed(2)}`);
+            newOwnerAmt = Math.max(newOwnerAmt, 0);
+
+            console.log(`[BUDGET-CHECK] Ratio-based cap: clipper=$${newEarnings} (ratio ${clipperRatio.toFixed(2)}) owner=$${newOwnerAmt} (ratio ${ownerRatio.toFixed(2)}) remaining=$${remaining.toFixed(2)}`);
           }
 
           // Auto-pause BEFORE saving earnings (with $0.01 tolerance)
