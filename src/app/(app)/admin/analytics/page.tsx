@@ -8,7 +8,7 @@ import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-se
 import { TrendingUp, Eye, Users, Film, Megaphone, Calendar, Heart, CheckCircle, Clock, DollarSign } from "lucide-react";
 import { formatNumber, formatCurrency } from "@/lib/utils";
 
-type MetricKey = "views" | "likes" | "comments" | "shares";
+type MetricKey = "views" | "likes" | "comments" | "shares" | "earnings";
 
 function buildDailyChart(items: any[], days: number): { label: string; value: number }[] {
   const now = new Date();
@@ -45,6 +45,25 @@ function buildMetricByDay(clips: any[], days: number, metric: MetricKey): { labe
     }
   }
   return Object.entries(map).map(([label, value]) => ({ label, value }));
+}
+
+function buildEarningsByDay(clips: any[], days: number): { label: string; value: number }[] {
+  const now = new Date();
+  const map: Record<string, number> = {};
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    map[`${d.getMonth() + 1}/${d.getDate()}`] = 0;
+  }
+  for (const clip of clips) {
+    if (!clip.createdAt) continue;
+    const d = new Date(clip.createdAt);
+    const key = `${d.getMonth() + 1}/${d.getDate()}`;
+    if (key in map) {
+      map[key] += clip.earnings || 0;
+    }
+  }
+  return Object.entries(map).map(([label, value]) => ({ label, value: Math.round(value * 100) / 100 }));
 }
 
 function buildPlatformDist(accounts: any[]): { name: string; count: number; percent: number }[] {
@@ -86,6 +105,7 @@ const metricOptions = [
   { value: "likes", label: "Likes" },
   { value: "comments", label: "Comments" },
   { value: "shares", label: "Shares" },
+  { value: "earnings", label: "Earnings" },
 ];
 
 const metricColors: Record<string, string> = {
@@ -93,6 +113,7 @@ const metricColors: Record<string, string> = {
   likes: "#f43f5e",
   comments: "#8b5cf6",
   shares: "#f59e0b",
+  earnings: "#10b981",
 };
 
 export default function AdminAnalyticsPage() {
@@ -106,6 +127,7 @@ export default function AdminAnalyticsPage() {
   const [statusDropOpen, setStatusDropOpen] = useState(false);
   const statusDropRef = useRef<HTMLDivElement>(null);
   const [timeframeDays, setTimeframeDays] = useState(15);
+  const [leftChartMode, setLeftChartMode] = useState<"clips" | "earnings">("clips");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -178,9 +200,16 @@ export default function AdminAnalyticsPage() {
   // Build series for multi-line chart
   const chartSeries = activeMetrics.map((m) => ({
     label: metricOptions.find((o) => o.value === m)?.label || m,
-    data: buildMetricByDay(filteredClips, timeframeDays, m as MetricKey),
+    data: m === "earnings"
+      ? buildEarningsByDay(filteredClips, timeframeDays)
+      : buildMetricByDay(filteredClips, timeframeDays, m as MetricKey),
     color: metricColors[m] || "#2596be",
   }));
+
+  // Build left chart data
+  const leftChartData = leftChartMode === "earnings"
+    ? buildEarningsByDay(filteredClips, timeframeDays)
+    : clipsPerDay;
 
   if (loading) {
     return (
@@ -269,9 +298,28 @@ export default function AdminAnalyticsPage() {
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          {/* Spacer to match the legend height in the multi-line chart */}
-          <div className="mb-3 h-5" />
-          <SimpleLineChart data={clipsPerDay} title="Clips submitted per day" color="#2596be" height={200} valueSuffix=" clips" />
+          <div className="mb-3 flex items-center gap-1.5">
+            {(["clips", "earnings"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setLeftChartMode(mode)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+                  leftChartMode === mode
+                    ? "bg-accent text-white"
+                    : "border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)]"
+                }`}
+              >
+                {mode === "clips" ? "Clips" : "Earnings"}
+              </button>
+            ))}
+          </div>
+          <SimpleLineChart
+            data={leftChartData}
+            title={leftChartMode === "earnings" ? "Earnings per day" : "Clips submitted per day"}
+            color={leftChartMode === "earnings" ? "#10b981" : "#2596be"}
+            height={200}
+            valueSuffix={leftChartMode === "earnings" ? "" : " clips"}
+          />
           {filteredClips.length === 0 && <p className="mt-3 text-sm text-[var(--text-muted)]">No clips submitted yet.</p>}
         </Card>
         <Card>
