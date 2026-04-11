@@ -14,7 +14,7 @@ import { EarningsFilters } from "@/components/earnings/EarningsFilters";
 import { type EarningsFilterKey, type EarningsData } from "@/lib/earnings";
 import { formatCurrency, formatRelative } from "@/lib/utils";
 import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-select";
-import { DollarSign } from "lucide-react";
+import { DollarSign, ExternalLink } from "lucide-react";
 
 export default function EarningsPage() {
   const { data: session } = useSession();
@@ -155,14 +155,19 @@ export default function EarningsPage() {
         ) : (
           <div className="space-y-2">
             {clipsWithEarnings.map((clip: any) => (
-              <Card key={clip.id} className="flex items-center justify-between py-3">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">{clip.campaign?.name}</p>
-                  <p className="text-xs text-[var(--text-muted)]">
+              <Card key={clip.id} className="flex items-center gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">{clip.campaign?.name}</p>
+                  <p className="text-xs text-[var(--text-muted)] truncate">
                     {clip.clipAccount?.username} · {formatRelative(clip.createdAt)}
                   </p>
                 </div>
-                <div className="text-right">
+                {clip.clipUrl && (
+                  <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline whitespace-nowrap flex-shrink-0">
+                    <ExternalLink className="h-3 w-3" /> Open clip
+                  </a>
+                )}
+                <div className="text-right flex-shrink-0">
                   <p className="text-sm font-semibold text-emerald-400">{formatCurrency(clip.earnings)}</p>
                   <Badge variant={clip.status.toLowerCase() as any} className="mt-1">{clip.status}</Badge>
                 </div>
