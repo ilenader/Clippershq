@@ -826,6 +826,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                     }
                     const isMine = msg.senderId === myId;
                     const isOptimistic = msg.id.startsWith("opt-");
+                    const sender = msg.sender || { id: msg.senderId, name: null, username: "User", image: null, role: "CLIPPER" };
                     // AI message: uses the isAI field from the database
                     const isAIMsg = !!msg.isAI && !isMine;
                     // New sender group: different sender OR AI status changed (AI→human or human→AI from same senderId)
@@ -836,7 +837,8 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                       || (!!prev.isAI !== !!msg.isAI);
                     const showAvatar = !isMine && isNewSenderGroup;
                     // Human admin/owner message (NOT AI): show their name + role badge
-                    const showRole = !isMine && isNewSenderGroup && !isAIMsg && (msg.sender.role === "ADMIN" || msg.sender.role === "OWNER");
+                    const senderRole = sender.role;
+                    const showRole = !isMine && isNewSenderGroup && !isAIMsg && (senderRole === "ADMIN" || senderRole === "OWNER");
                     return (
                       <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                         <div className={`flex items-end gap-2 max-w-[85%] ${isMine ? "flex-row-reverse" : ""}`}>
@@ -844,7 +846,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                             <div className="flex-shrink-0 w-8">
                               {showAvatar && (isAIMsg
                                 ? <div className="rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28 }}><Bot className="h-4 w-4 text-white" /></div>
-                                : <Avatar src={msg.sender.image} name={getDisplayName(msg.sender)} size={28} />
+                                : <Avatar src={sender.image} name={getDisplayName(sender)} size={28} />
                               )}
                             </div>
                           )}
@@ -858,14 +860,16 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                             {/* Label: name + role badge for real human admin/owner */}
                             {showRole && (
                               <div className="mb-1 ml-0.5 flex items-center gap-1.5">
-                                <span className="text-[11px] font-medium text-[var(--text-muted)]">{getDisplayName(msg.sender)}</span>
-                                <RoleBadge role={msg.sender.role} />
+                                <span className="text-[11px] font-semibold text-[var(--text-primary)]">{getDisplayName(sender)}</span>
+                                <RoleBadge role={senderRole} />
                               </div>
                             )}
                             <div className={`rounded-2xl px-4 py-3 text-[14.5px] leading-relaxed ${
                               isMine
                                 ? `bg-accent text-white rounded-br-md ${isOptimistic ? "opacity-70" : ""}`
-                                : "bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-bl-md"
+                                : showRole
+                                  ? "bg-[var(--bg-card)] text-[var(--text-primary)] border border-amber-500/20 rounded-bl-md border-l-2 border-l-amber-500/40"
+                                  : "bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-bl-md"
                             }`}>
                               <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                               <p className={`text-[10px] mt-0.5 ${isMine ? "text-white/60" : "text-[var(--text-muted)]"}`}>
