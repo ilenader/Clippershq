@@ -278,17 +278,31 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const existing = await db.clip.findFirst({
-      where: { clipUrl: data.clipUrl, campaignId: data.campaignId },
+    // Normalize URL for duplicate detection: strip query params, protocol, www
+    const normalizedUrl = data.clipUrl.split("?")[0].toLowerCase().trim()
+      .replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
+
+    const existingOnCampaign = await db.clip.findFirst({
+      where: {
+        campaignId: data.campaignId,
+        clipUrl: { contains: normalizedUrl },
+        status: { in: ["PENDING", "APPROVED"] },
+        isDeleted: false,
+      },
     });
-    if (existing) {
-      return NextResponse.json({ error: "This clip URL has already been submitted for this campaign." }, { status: 400 });
+    if (existingOnCampaign) {
+      return NextResponse.json({ error: "This clip has already been submitted to this campaign." }, { status: 400 });
     }
 
-    const existingOther = await db.clip.findFirst({
-      where: { clipUrl: data.clipUrl, userId: session.user.id },
+    const existingByUser = await db.clip.findFirst({
+      where: {
+        userId: session.user.id,
+        clipUrl: { contains: normalizedUrl },
+        status: { in: ["PENDING", "APPROVED"] },
+        isDeleted: false,
+      },
     });
-    if (existingOther) {
+    if (existingByUser) {
       return NextResponse.json({ error: "You've already submitted this clip URL to another campaign." }, { status: 400 });
     }
 

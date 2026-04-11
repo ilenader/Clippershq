@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
-import { ClipboardList, Check, X, ExternalLink } from "lucide-react";
+import { ClipboardList, Check, X, ExternalLink, Trash2 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative } from "@/lib/utils";
 
@@ -38,6 +38,27 @@ export default function AdminAccountsPage() {
   const [rejectModal, setRejectModal] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [acting, setActing] = useState(false);
+  const [deleteModal, setDeleteModal] = useState<any | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const handlePermanentDelete = async (id: string) => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed");
+      }
+      toast.success("Account permanently deleted.");
+      setDeleteModal(null);
+      setDeleteConfirmText("");
+      load();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete account.");
+    }
+    setDeleting(false);
+  };
 
   const load = () => {
     fetch("/api/accounts")
@@ -105,15 +126,27 @@ export default function AdminAccountsPage() {
                   </a>
                   <p className="text-xs text-[var(--text-muted)] truncate">{account.user?.username || "-"}</p>
                 </div>
-                <Badge variant={(statusBadge[account.status] || "pending") as any}>
-                  {statusLabel[account.status] || account.status}
-                </Badge>
+                {account.deletedByUser ? (
+                  <span className="inline-block rounded-md bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-400">Deleted by user</span>
+                ) : (
+                  <Badge variant={(statusBadge[account.status] || "pending") as any}>
+                    {statusLabel[account.status] || account.status}
+                  </Badge>
+                )}
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">
                 <span className="font-medium text-[var(--text-primary)]">{account.platform}</span>
                 <span>{formatRelative(account.createdAt)}</span>
               </div>
-              {(account.status === "PENDING" || account.status === "VERIFIED") && (
+              {account.deletedByUser ? (
+                <div className="mt-3 flex gap-2">
+                  <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/5"
+                    onClick={() => { setDeleteModal(account); setDeleteConfirmText(""); }}
+                    icon={<Trash2 className="h-3 w-3" />}>
+                    Permanently Delete
+                  </Button>
+                </div>
+              ) : (account.status === "PENDING" || account.status === "VERIFIED") && (
                 <div className="mt-3 flex gap-2">
                   <Button size="sm" variant="ghost" onClick={() => handleReview(account.id, "APPROVED")} loading={acting} icon={<Check className="h-3 w-3" />}>
                     Approve
@@ -142,6 +175,30 @@ export default function AdminAccountsPage() {
             <Button variant="danger" loading={acting} onClick={() => rejectModal && handleReview(rejectModal, "REJECTED", rejectReason)}>Reject</Button>
           </div>
         </div>
+      </Modal>
+
+      <Modal open={!!deleteModal} onClose={() => setDeleteModal(null)} title="Permanently delete account">
+        {deleteModal && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
+              <p className="text-sm text-red-400">
+                This will permanently remove <strong>{deleteModal.username}</strong> ({deleteModal.platform}). This cannot be undone.
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-[var(--text-secondary)] mb-2">
+                Type <code className="rounded bg-[var(--bg-input)] px-1.5 py-0.5 text-xs font-bold text-[var(--text-primary)]">DELETE</code> to confirm:
+              </p>
+              <Input id="deleteConfirm" placeholder="DELETE" value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="ghost" onClick={() => setDeleteModal(null)}>Cancel</Button>
+              <Button variant="danger" loading={deleting} disabled={deleteConfirmText !== "DELETE"} onClick={() => handlePermanentDelete(deleteModal.id)}>
+                Permanently Delete
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
