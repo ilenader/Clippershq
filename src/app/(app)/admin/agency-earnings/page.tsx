@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, Film, TrendingUp, ChevronDown, ExternalLink } from "lucide-react";
@@ -11,6 +11,8 @@ export default function AgencyEarningsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCampaign, setSelectedCampaign] = useState("");
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
+  const [campaignDropOpen, setCampaignDropOpen] = useState(false);
+  const campaignDropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/admin/agency-earnings")
@@ -18,6 +20,14 @@ export default function AgencyEarningsPage() {
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (campaignDropRef.current && !campaignDropRef.current.contains(e.target as Node)) setCampaignDropOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
   if (loading) {
@@ -39,16 +49,46 @@ export default function AgencyEarningsPage() {
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Agency Earnings</h1>
           <p className="text-[15px] text-[var(--text-secondary)]">Owner/agency earnings across all campaigns.</p>
         </div>
-        <select
-          value={selectedCampaign}
-          onChange={(e) => setSelectedCampaign(e.target.value)}
-          className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent focus:ring-1 focus:ring-accent focus:outline-none cursor-pointer"
-        >
-          <option value="">All Campaigns</option>
-          {allCampaigns.map((c: any) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+        <div className="relative" ref={campaignDropRef}>
+          <button
+            onClick={() => setCampaignDropOpen(!campaignDropOpen)}
+            className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all cursor-pointer"
+          >
+            <span className="text-[var(--text-muted)]">Campaign:</span>
+            {selectedCampaign ? allCampaigns.find((c: any) => c.id === selectedCampaign)?.name || "Unknown" : "All Campaigns"}
+            <svg className={`h-4 w-4 text-[var(--text-muted)] transition-transform ${campaignDropOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          {campaignDropOpen && (
+            <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] max-h-72 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
+              <button
+                onClick={() => { setSelectedCampaign(""); setCampaignDropOpen(false); }}
+                className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors cursor-pointer ${
+                  !selectedCampaign ? "text-accent bg-accent/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                <div className={`h-3.5 w-3.5 rounded border transition-colors ${!selectedCampaign ? "border-accent bg-accent" : "border-[var(--border-color)]"}`}>
+                  {!selectedCampaign && <svg className="h-full w-full text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>}
+                </div>
+                All Campaigns
+              </button>
+              <div className="border-t border-[var(--border-subtle)] my-1" />
+              {allCampaigns.map((c: any) => (
+                <button
+                  key={c.id}
+                  onClick={() => { setSelectedCampaign(c.id); setCampaignDropOpen(false); }}
+                  className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors cursor-pointer ${
+                    selectedCampaign === c.id ? "text-accent bg-accent/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  <div className={`h-3.5 w-3.5 rounded border transition-colors ${selectedCampaign === c.id ? "border-accent bg-accent" : "border-[var(--border-color)]"}`}>
+                    {selectedCampaign === c.id && <svg className="h-full w-full text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>}
+                  </div>
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}
