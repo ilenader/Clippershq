@@ -210,7 +210,8 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
           if (Array.isArray(data)) {
             // Play sound if new message is from a real user (not AI)
             const latest = data[data.length - 1];
-            if (latest && !latest.isAI && latest.senderId !== myId && data.length > 0) {
+            if (latest && !latest.isAI && latest.senderId !== myId) {
+              console.log(`[CHAT-SOUND] New message from ${latest.senderId}, isAI=${latest.isAI}`);
               playChatSound();
             }
             setMessages(data);
@@ -219,6 +220,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
         .catch(() => {});
     } else if (newCount > prevCount) {
       // Not viewing a thread — play sound for new unread
+      console.log(`[CHAT-SOUND] Unread count increased: ${prevCount} → ${newCount}`);
       playChatSound();
     }
     prevUnreadRef.current = newCount;

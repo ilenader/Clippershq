@@ -50,10 +50,12 @@ export function Navbar() {
       if (notifs.length > 0) {
         try {
           const lastSeen = sessionStorage.getItem("last_seen_notif_id");
-          if (lastSeen && notifs[0].id !== lastSeen) {
+          const latestId = notifs[0].id;
+          if (lastSeen && latestId !== lastSeen) {
+            console.log(`[NOTIF-SOUND] New notification detected: ${latestId} (prev: ${lastSeen})`);
             playNotificationSound();
           }
-          sessionStorage.setItem("last_seen_notif_id", notifs[0].id);
+          sessionStorage.setItem("last_seen_notif_id", latestId);
         } catch {}
       }
     } catch {}

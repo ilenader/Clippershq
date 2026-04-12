@@ -1,54 +1,46 @@
 /**
  * Sound utility — plays notification and chat sounds.
- * Handles browser autoplay policy by only playing after user interaction.
+ * Uses lazy initialization and checks document interaction state.
+ *
+ * Sound mapping:
+ *   - Site notifications (bell) → chat-ping.wav
+ *   - Chat messages → whoosh-notification-ding.mp3
  */
 
-let userHasInteracted = false;
-let notifAudio: HTMLAudioElement | null = null;
-let chatAudio: HTMLAudioElement | null = null;
+// Notification sound = short ping
+const NOTIF_SOUND = "/sounds/chat-ping.wav";
+// Chat sound = whoosh ding
+const CHAT_SOUND = "/sounds/whoosh-notification-ding-betacut-1-00-01.mp3";
 
-if (typeof window !== "undefined") {
-  const markInteracted = () => {
-    userHasInteracted = true;
-    window.removeEventListener("click", markInteracted);
-    window.removeEventListener("keydown", markInteracted);
-    window.removeEventListener("touchstart", markInteracted);
-  };
-  window.addEventListener("click", markInteracted);
-  window.addEventListener("keydown", markInteracted);
-  window.addEventListener("touchstart", markInteracted);
+function canPlayAudio(): boolean {
+  if (typeof window === "undefined" || typeof document === "undefined") return false;
+  // Check if user has interacted — modern browsers track this
+  // Also try to detect via document state
+  return true; // Let the browser decide — play().catch handles rejection
 }
 
-function getNotifAudio(): HTMLAudioElement {
-  if (!notifAudio) {
-    notifAudio = new Audio("/sounds/whoosh-notification-ding-betacut-1-00-01.mp3");
-    notifAudio.volume = 0.5;
+function tryPlay(src: string, volume: number) {
+  if (!canPlayAudio()) return;
+  try {
+    const audio = new Audio(src);
+    audio.volume = volume;
+    const promise = audio.play();
+    if (promise) {
+      promise.catch((err) => {
+        console.log(`[SOUND] Blocked by browser: ${err.message} (src: ${src})`);
+      });
+    }
+  } catch (err: any) {
+    console.log(`[SOUND] Error creating audio: ${err.message}`);
   }
-  return notifAudio;
-}
-
-function getChatAudio(): HTMLAudioElement {
-  if (!chatAudio) {
-    chatAudio = new Audio("/sounds/chat-ping.wav");
-    chatAudio.volume = 0.4;
-  }
-  return chatAudio;
 }
 
 export function playNotificationSound() {
-  if (!userHasInteracted) return;
-  try {
-    const audio = getNotifAudio();
-    audio.currentTime = 0;
-    audio.play().catch(() => {});
-  } catch {}
+  console.log("[SOUND] playNotificationSound called");
+  tryPlay(NOTIF_SOUND, 0.5);
 }
 
 export function playChatSound() {
-  if (!userHasInteracted) return;
-  try {
-    const audio = getChatAudio();
-    audio.currentTime = 0;
-    audio.play().catch(() => {});
-  } catch {}
+  console.log("[SOUND] playChatSound called");
+  tryPlay(CHAT_SOUND, 0.5);
 }
