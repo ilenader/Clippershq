@@ -196,7 +196,16 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   useEffect(() => { activeConvoIdRef.current = threadInfo?.convoId || ""; }, [threadInfo]);
 
   // ── Handle unread count update (shared by SSE + polling fallback) ──
+  const lastSeenMsgIdRef = useRef<string>("");
+  const initialLoadDoneRef = useRef(false);
   const prevUnreadRef = useRef(0);
+
+  // Reset sound tracking when switching conversations
+  useEffect(() => {
+    lastSeenMsgIdRef.current = "";
+    initialLoadDoneRef.current = false;
+  }, [threadInfo?.convoId]);
+
   const handleUnreadUpdate = useCallback((newCount: number) => {
     const prevCount = prevUnreadRef.current;
     try { sessionStorage.setItem("chat_unread_count", String(newCount)); } catch {}
@@ -208,21 +217,28 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
         .then((r) => r.json())
         .then((data) => {
           if (Array.isArray(data)) {
-            // Play sound if new message is from a real user (not AI)
             const latest = data[data.length - 1];
-            if (latest && !latest.isAI && latest.senderId !== myId) {
-              console.log(`[CHAT-SOUND] New message from ${latest.senderId}, isAI=${latest.isAI}`);
+            // Only play sound if: not first load, new message ID, not self, not AI
+            if (
+              initialLoadDoneRef.current &&
+              latest &&
+              latest.id !== lastSeenMsgIdRef.current &&
+              latest.senderId !== myId &&
+              !latest.isAI
+            ) {
               playChatSound();
             }
+            if (latest) lastSeenMsgIdRef.current = latest.id;
+            initialLoadDoneRef.current = true;
             setMessages(data);
           }
         })
         .catch(() => {});
-    } else if (newCount > prevCount) {
-      // Not viewing a thread — play sound for new unread
-      console.log(`[CHAT-SOUND] Unread count increased: ${prevCount} → ${newCount}`);
+    } else if (initialLoadDoneRef.current && newCount > prevCount) {
+      // Not viewing a thread — play sound only if count genuinely increased after initial load
       playChatSound();
     }
+    if (!initialLoadDoneRef.current) initialLoadDoneRef.current = true;
     prevUnreadRef.current = newCount;
   }, [myId]);
 
@@ -256,7 +272,12 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
     try {
       const res = await fetch(`/api/chat/conversations/${convoId}/messages`);
       const data = await res.json();
-      if (Array.isArray(data)) setMessages(data);
+      if (Array.isArray(data)) {
+        setMessages(data);
+        // Seed last seen message ID so sound doesn't trigger on conversation open
+        const latest = data[data.length - 1];
+        if (latest) lastSeenMsgIdRef.current = latest.id;
+      }
     } catch {}
   }, []);
 
