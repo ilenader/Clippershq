@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Wallet, Check, X, Eye, Phone, Ban, ChevronDown, MessageCircle, DollarSign } from "lucide-react";
+import { Wallet, Check, X, Eye, Phone, Ban, ChevronDown, MessageCircle, DollarSign, Mail, Bell } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative, formatCurrency } from "@/lib/utils";
 
@@ -62,6 +62,33 @@ export default function AdminPayoutsPage() {
   const summaryTotalPaid = unpaidCampaigns.reduce((s: number, c: any) => s + c.totalPaid, 0);
   const summaryTotalLocked = unpaidCampaigns.reduce((s: number, c: any) => s + c.totalLocked, 0);
   const summaryTotalUnpaid = unpaidCampaigns.reduce((s: number, c: any) => s + c.totalUnpaid, 0);
+
+  const [notifying, setNotifying] = useState<string | null>(null);
+
+  const sendReminder = async (clipper: any, action: "email" | "notification" | "dm") => {
+    const key = `${clipper.userId}-${action}`;
+    setNotifying(key);
+    try {
+      const res = await fetch("/api/admin/payouts/unpaid/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: clipper.userId,
+          campaignId: clipper.campaignId,
+          campaignName: clipper.campaignName,
+          unpaidAmount: clipper.unpaid,
+          action,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      const labels: Record<string, string> = { email: "Email sent", notification: "Notification sent", dm: "Message sent" };
+      toast.success(labels[action] || "Sent");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send");
+    }
+    setNotifying(null);
+  };
 
   const load = () => {
     Promise.all([
@@ -260,9 +287,32 @@ export default function AdminPayoutsPage() {
                             <td className="py-2.5 pr-3 text-right text-yellow-400 tabular-nums">{formatCurrency(c.locked)}</td>
                             <td className="py-2.5 pr-3 text-right font-semibold text-accent tabular-nums">{formatCurrency(c.unpaid)}</td>
                             <td className="py-2.5 text-right">
-                              <a href={`/admin/users/${c.userId}`} className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-accent transition-colors" title="View profile">
-                                <MessageCircle className="h-3 w-3" />
-                              </a>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => sendReminder(c, "email")}
+                                  disabled={notifying === `${c.userId}-email`}
+                                  title="Send email reminder"
+                                  className="text-[var(--text-muted)] hover:text-accent transition-colors cursor-pointer disabled:opacity-40"
+                                >
+                                  {notifying === `${c.userId}-email` ? <div className="h-3.5 w-3.5 animate-spin rounded-full border border-accent border-t-transparent" /> : <Mail className="h-3.5 w-3.5" />}
+                                </button>
+                                <button
+                                  onClick={() => sendReminder(c, "notification")}
+                                  disabled={notifying === `${c.userId}-notification`}
+                                  title="Send app notification"
+                                  className="text-[var(--text-muted)] hover:text-accent transition-colors cursor-pointer disabled:opacity-40"
+                                >
+                                  {notifying === `${c.userId}-notification` ? <div className="h-3.5 w-3.5 animate-spin rounded-full border border-accent border-t-transparent" /> : <Bell className="h-3.5 w-3.5" />}
+                                </button>
+                                <button
+                                  onClick={() => sendReminder(c, "dm")}
+                                  disabled={notifying === `${c.userId}-dm`}
+                                  title="Send DM"
+                                  className="text-[var(--text-muted)] hover:text-accent transition-colors cursor-pointer disabled:opacity-40"
+                                >
+                                  {notifying === `${c.userId}-dm` ? <div className="h-3.5 w-3.5 animate-spin rounded-full border border-accent border-t-transparent" /> : <MessageCircle className="h-3.5 w-3.5" />}
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
