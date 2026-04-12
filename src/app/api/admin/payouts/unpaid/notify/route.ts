@@ -66,15 +66,19 @@ export async function POST(req: NextRequest) {
     // ── DM ──
     if (action === "dm") {
       const ownerId = session.user.id;
+      const campaignId = body.campaignId || null;
 
-      // Find or create conversation
+      // Find or create campaign-specific conversation
+      const existingWhere: any = {
+        AND: [
+          { participants: { some: { userId: ownerId } } },
+          { participants: { some: { userId } } },
+        ],
+      };
+      if (campaignId) existingWhere.campaignId = campaignId;
+
       const existing = await db.conversation.findFirst({
-        where: {
-          AND: [
-            { participants: { some: { userId: ownerId } } },
-            { participants: { some: { userId } } },
-          ],
-        },
+        where: existingWhere,
         select: { id: true },
       });
 
@@ -85,6 +89,7 @@ export async function POST(req: NextRequest) {
         const epoch = new Date(0);
         const convo = await db.conversation.create({
           data: {
+            campaignId,
             participants: {
               create: [
                 { userId: ownerId },
