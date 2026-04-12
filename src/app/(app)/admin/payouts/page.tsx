@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Wallet, Check, X, Eye, Phone, Ban } from "lucide-react";
+import { Wallet, Check, X, Eye, Phone, Ban, ChevronDown, MessageCircle, DollarSign } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative, formatCurrency } from "@/lib/utils";
 
@@ -30,6 +30,38 @@ export default function AdminPayoutsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [acting, setActing] = useState(false);
   const [calls, setCalls] = useState<any[]>([]);
+
+  // Unpaid balances section
+  const [unpaidOpen, setUnpaidOpen] = useState(false);
+  const [unpaidData, setUnpaidData] = useState<any>(null);
+  const [unpaidLoading, setUnpaidLoading] = useState(false);
+  const [unpaidCampaign, setUnpaidCampaign] = useState("");
+  const [unpaidDropOpen, setUnpaidDropOpen] = useState(false);
+  const [showAllClippers, setShowAllClippers] = useState(false);
+
+  const loadUnpaid = (campaignId?: string) => {
+    setUnpaidLoading(true);
+    const url = campaignId ? `/api/admin/payouts/unpaid?campaignId=${campaignId}` : "/api/admin/payouts/unpaid";
+    fetch(url).then((r) => r.json()).then(setUnpaidData).catch(() => {}).finally(() => setUnpaidLoading(false));
+  };
+
+  useEffect(() => {
+    if (unpaidOpen && !unpaidData) loadUnpaid();
+  }, [unpaidOpen]);
+
+  const handleUnpaidCampaignChange = (cId: string) => {
+    setUnpaidCampaign(cId);
+    setUnpaidDropOpen(false);
+    loadUnpaid(cId || undefined);
+  };
+
+  const unpaidCampaigns: any[] = unpaidData?.campaigns || [];
+  const unpaidClippers: any[] = unpaidData?.clippers || [];
+  const displayedClippers = showAllClippers ? unpaidClippers : unpaidClippers.filter((c: any) => c.unpaid > 0);
+  const summaryTotalEarned = unpaidCampaigns.reduce((s: number, c: any) => s + c.totalEarned, 0);
+  const summaryTotalPaid = unpaidCampaigns.reduce((s: number, c: any) => s + c.totalPaid, 0);
+  const summaryTotalLocked = unpaidCampaigns.reduce((s: number, c: any) => s + c.totalLocked, 0);
+  const summaryTotalUnpaid = unpaidCampaigns.reduce((s: number, c: any) => s + c.totalUnpaid, 0);
 
   const load = () => {
     Promise.all([
@@ -112,6 +144,136 @@ export default function AdminPayoutsPage() {
       <div>
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Payout Review</h1>
         <p className="text-[15px] text-[var(--text-secondary)]">Review and process payout requests.</p>
+      </div>
+
+      {/* ── Unpaid Balances (collapsible) ── */}
+      <div className="rounded-xl border border-[var(--border-color)] overflow-hidden">
+        <button
+          onClick={() => setUnpaidOpen(!unpaidOpen)}
+          className="flex w-full items-center justify-between px-5 py-3.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-accent" />
+            Unpaid Balances
+          </div>
+          <ChevronDown className={`h-4 w-4 text-[var(--text-muted)] transition-transform ${unpaidOpen ? "rotate-180" : ""}`} />
+        </button>
+        {unpaidOpen && (
+          <div className="border-t border-[var(--border-color)] px-5 py-4 space-y-4">
+            {/* Campaign filter */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative">
+                <button
+                  onClick={() => setUnpaidDropOpen(!unpaidDropOpen)}
+                  className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all cursor-pointer"
+                >
+                  <span className="text-[var(--text-muted)]">Campaign:</span>
+                  {unpaidCampaign ? unpaidCampaigns.find((c: any) => c.campaignId === unpaidCampaign)?.campaignName || "Unknown" : "All Campaigns"}
+                  <ChevronDown className={`h-4 w-4 text-[var(--text-muted)] transition-transform ${unpaidDropOpen ? "rotate-180" : ""}`} />
+                </button>
+                {unpaidDropOpen && (
+                  <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] max-h-64 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
+                    <button onClick={() => handleUnpaidCampaignChange("")}
+                      className={`flex w-full items-center gap-2 px-4 py-2 text-sm cursor-pointer transition-colors ${!unpaidCampaign ? "text-accent bg-accent/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"}`}>
+                      <div className={`h-3.5 w-3.5 rounded border ${!unpaidCampaign ? "border-accent bg-accent" : "border-[var(--border-color)]"}`}>
+                        {!unpaidCampaign && <svg className="h-full w-full text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>}
+                      </div>
+                      All Campaigns
+                    </button>
+                    <div className="border-t border-[var(--border-subtle)] my-1" />
+                    {unpaidCampaigns.map((c: any) => (
+                      <button key={c.campaignId} onClick={() => handleUnpaidCampaignChange(c.campaignId)}
+                        className={`flex w-full items-center gap-2 px-4 py-2 text-sm cursor-pointer transition-colors ${unpaidCampaign === c.campaignId ? "text-accent bg-accent/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"}`}>
+                        <div className={`h-3.5 w-3.5 rounded border ${unpaidCampaign === c.campaignId ? "border-accent bg-accent" : "border-[var(--border-color)]"}`}>
+                          {unpaidCampaign === c.campaignId && <svg className="h-full w-full text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>}
+                        </div>
+                        {c.campaignName}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setShowAllClippers(!showAllClippers)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${showAllClippers ? "bg-accent text-white" : "border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}
+              >
+                {showAllClippers ? "Showing all" : "Unpaid only"}
+              </button>
+            </div>
+
+            {unpaidLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-color)] border-t-accent" />
+              </div>
+            ) : (
+              <>
+                {/* Summary bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: "Total Earned", value: formatCurrency(summaryTotalEarned), color: "text-[var(--text-primary)]" },
+                    { label: "Total Paid", value: formatCurrency(summaryTotalPaid), color: "text-emerald-400" },
+                    { label: "Locked in Requests", value: formatCurrency(summaryTotalLocked), color: "text-yellow-400" },
+                    { label: "Unpaid", value: formatCurrency(summaryTotalUnpaid), color: "text-accent" },
+                  ].map((s) => (
+                    <div key={s.label} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">{s.label}</p>
+                      <p className={`text-lg font-bold ${s.color} mt-0.5`}>{s.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Clipper breakdown */}
+                {displayedClippers.length === 0 ? (
+                  <p className="text-sm text-[var(--text-muted)] text-center py-4">No clippers with unpaid balances.</p>
+                ) : (
+                  <div className="overflow-x-auto -mx-5 px-5">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
+                          <th className="text-left py-2 pr-3">Clipper</th>
+                          <th className="text-left py-2 pr-3">Campaign</th>
+                          <th className="text-right py-2 pr-3">Earned</th>
+                          <th className="text-right py-2 pr-3">Paid</th>
+                          <th className="text-right py-2 pr-3">Locked</th>
+                          <th className="text-right py-2 pr-3">Unpaid</th>
+                          <th className="text-right py-2">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayedClippers.map((c: any, i: number) => (
+                          <tr key={`${c.userId}-${c.campaignId}-${i}`} className="border-t border-[var(--border-subtle)] hover:bg-[var(--bg-card-hover)] transition-colors">
+                            <td className="py-2.5 pr-3">
+                              <div className="flex items-center gap-2">
+                                {c.image ? (
+                                  <img src={c.image} alt="" className="h-6 w-6 rounded-full object-cover flex-shrink-0" />
+                                ) : (
+                                  <div className="h-6 w-6 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 text-accent text-xs font-semibold">
+                                    {(c.username || "?").charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <a href={`/admin/users/${c.userId}`} className="text-sm font-medium text-accent hover:underline truncate max-w-[120px]">{c.username}</a>
+                              </div>
+                            </td>
+                            <td className="py-2.5 pr-3 text-[var(--text-muted)] truncate max-w-[120px]">{c.campaignName}</td>
+                            <td className="py-2.5 pr-3 text-right text-[var(--text-primary)] tabular-nums">{formatCurrency(c.earned)}</td>
+                            <td className="py-2.5 pr-3 text-right text-emerald-400 tabular-nums">{formatCurrency(c.paid)}</td>
+                            <td className="py-2.5 pr-3 text-right text-yellow-400 tabular-nums">{formatCurrency(c.locked)}</td>
+                            <td className="py-2.5 pr-3 text-right font-semibold text-accent tabular-nums">{formatCurrency(c.unpaid)}</td>
+                            <td className="py-2.5 text-right">
+                              <a href={`/admin/users/${c.userId}`} className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-accent transition-colors" title="View profile">
+                                <MessageCircle className="h-3 w-3" />
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <MultiDropdown label="Status" options={statusFilterOptions} values={filterStatuses} onChange={setFilterStatuses} allLabel="All statuses" />
