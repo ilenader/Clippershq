@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-select";
 import { formatCurrency, formatNumber, formatRelative } from "@/lib/utils";
-import { ArrowLeft, Star, Flame, Users, Zap, Film, DollarSign, ExternalLink, Shield, Percent, ShieldOff } from "lucide-react";
+import { ArrowLeft, Star, Flame, Users, Zap, Film, DollarSign, ExternalLink, Shield, Percent, ShieldOff, ChevronDown } from "lucide-react";
 import { toast } from "@/lib/toast";
 
 export default function UserProfilePage() {
@@ -24,6 +24,8 @@ export default function UserProfilePage() {
   const [showBanModal, setShowBanModal] = useState(false);
   const [banConfirmText, setBanConfirmText] = useState("");
   const [banning, setBanning] = useState(false);
+  const [campDropOpen, setCampDropOpen] = useState(false);
+  const campDropRef = useRef<HTMLDivElement>(null);
 
   const currentUserId = session?.user?.id;
   const isViewingOwnProfile = currentUserId === id;
@@ -37,6 +39,13 @@ export default function UserProfilePage() {
   };
 
   useEffect(() => { loadUser(); }, [id]);
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (campDropRef.current && !campDropRef.current.contains(e.target as Node)) setCampDropOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   if (loading) {
     return (
@@ -80,6 +89,23 @@ export default function UserProfilePage() {
     if (c.id && c.name && !seenCampaigns.has(c.id)) {
       seenCampaigns.add(c.id);
       userCampaigns.push({ id: c.id, name: c.name });
+    }
+  }
+
+  // Per-campaign payout calculations
+  const payoutRequests: any[] = user.payoutRequests || [];
+  const scopedPayouts = selectedCampaignId
+    ? payoutRequests.filter((p: any) => p.campaignId === selectedCampaignId)
+    : payoutRequests;
+  const filteredPaidOut = scopedPayouts.filter((p: any) => p.status === "PAID").reduce((s: number, p: any) => s + p.amount, 0);
+  const filteredPendingPayout = scopedPayouts.filter((p: any) => ["REQUESTED", "UNDER_REVIEW", "APPROVED"].includes(p.status)).reduce((s: number, p: any) => s + p.amount, 0);
+  const filteredUnpaid = Math.max(Math.round((filteredEarnings - filteredPaidOut - filteredPendingPayout) * 100) / 100, 0);
+
+  // Per-account views (keyed by clipAccountId which matches clipAccounts[].id)
+  const accountViewsMap: Record<string, number> = {};
+  for (const clip of allClips) {
+    if (clip.clipAccountId && clip.stats?.[0]?.views) {
+      accountViewsMap[clip.clipAccountId] = (accountViewsMap[clip.clipAccountId] || 0) + (clip.stats[0].views || 0);
     }
   }
 
@@ -244,22 +270,43 @@ export default function UserProfilePage() {
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">Activity</h2>
         <div className="flex items-center gap-2">
           {userCampaigns.length > 1 && (
-            <select
-              value={selectedCampaignId}
-              onChange={(e) => setSelectedCampaignId(e.target.value)}
-              className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-accent focus:ring-1 focus:ring-accent focus:outline-none cursor-pointer"
-            >
-              <option value="">All Campaigns</option>
-              {userCampaigns.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <div className="relative" ref={campDropRef}>
+              <button
+                onClick={() => setCampDropOpen(!campDropOpen)}
+                className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all cursor-pointer"
+              >
+                <span className="text-[var(--text-muted)]">Campaign:</span>
+                {selectedCampaignId ? userCampaigns.find((c) => c.id === selectedCampaignId)?.name || "Unknown" : "All Campaigns"}
+                <ChevronDown className={`h-4 w-4 text-[var(--text-muted)] transition-transform ${campDropOpen ? "rotate-180" : ""}`} />
+              </button>
+              {campDropOpen && (
+                <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] max-h-64 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
+                  <button onClick={() => { setSelectedCampaignId(""); setCampDropOpen(false); }}
+                    className={`flex w-full items-center gap-2 px-4 py-2 text-sm cursor-pointer transition-colors ${!selectedCampaignId ? "text-accent bg-accent/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"}`}>
+                    <div className={`h-3.5 w-3.5 rounded border ${!selectedCampaignId ? "border-accent bg-accent" : "border-[var(--border-color)]"}`}>
+                      {!selectedCampaignId && <svg className="h-full w-full text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>}
+                    </div>
+                    All Campaigns
+                  </button>
+                  <div className="border-t border-[var(--border-subtle)] my-1" />
+                  {userCampaigns.map((c) => (
+                    <button key={c.id} onClick={() => { setSelectedCampaignId(c.id); setCampDropOpen(false); }}
+                      className={`flex w-full items-center gap-2 px-4 py-2 text-sm cursor-pointer transition-colors ${selectedCampaignId === c.id ? "text-accent bg-accent/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"}`}>
+                      <div className={`h-3.5 w-3.5 rounded border ${selectedCampaignId === c.id ? "border-accent bg-accent" : "border-[var(--border-color)]"}`}>
+                        {selectedCampaignId === c.id && <svg className="h-full w-full text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>}
+                      </div>
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
         <Card>
           <p className="text-xs text-[var(--text-muted)]">Earnings</p>
           <p className="text-xl font-bold text-accent">{formatCurrency(filteredEarnings)}</p>
@@ -270,11 +317,15 @@ export default function UserProfilePage() {
         </Card>
         <Card>
           <p className="text-xs text-[var(--text-muted)]">Paid Out</p>
-          <p className="text-xl font-bold text-emerald-400">{formatCurrency(user.paidOut || 0)}</p>
+          <p className="text-xl font-bold text-emerald-400">{formatCurrency(filteredPaidOut)}</p>
         </Card>
         <Card>
           <p className="text-xs text-[var(--text-muted)]">Pending Payout</p>
-          <p className="text-xl font-bold text-amber-400">{formatCurrency(user.pendingPayout || 0)}</p>
+          <p className="text-xl font-bold text-amber-400">{formatCurrency(filteredPendingPayout)}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-[var(--text-muted)]">Unpaid</p>
+          <p className="text-xl font-bold text-accent">{formatCurrency(filteredUnpaid)}</p>
         </Card>
       </div>
 
@@ -299,15 +350,19 @@ export default function UserProfilePage() {
         <Card>
           <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Social Accounts</h2>
           <div className="flex flex-wrap gap-2">
-            {user.clipAccounts.map((a: any) => (
-              <div key={a.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${a.deletedByUser ? "border-[var(--border-subtle)] opacity-60" : "border-[var(--border-color)]"}`}>
-                <span className="text-sm font-medium text-[var(--text-primary)]">{a.username}</span>
-                <Badge variant={a.status.toLowerCase() as any}>{a.platform}</Badge>
-                {a.deletedByUser && (
-                  <span className="rounded-md bg-[var(--bg-input)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">Removed by user</span>
-                )}
-              </div>
-            ))}
+            {user.clipAccounts.map((a: any) => {
+              const views = accountViewsMap[a.id] || 0;
+              return (
+                <div key={a.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${a.deletedByUser ? "border-[var(--border-subtle)] opacity-60" : "border-[var(--border-color)]"}`}>
+                  <span className="text-sm font-medium text-[var(--text-primary)]">{a.username}</span>
+                  <Badge variant={a.status.toLowerCase() as any}>{a.platform}</Badge>
+                  {views > 0 && <span className="text-xs text-[var(--text-muted)] tabular-nums">{formatNumber(views)} views</span>}
+                  {a.deletedByUser && (
+                    <span className="rounded-md bg-[var(--bg-input)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">Removed by user</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
