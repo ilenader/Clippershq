@@ -9,7 +9,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-// ─── Notification sounds disabled — all updates are silent ─────────────
+import { playNotificationSound } from "@/lib/sounds";
 
 function formatNotifTime(dateStr: string): string {
   try {
@@ -46,9 +46,15 @@ export function Navbar() {
       const newCount = data.unreadCount || 0;
       setNotifCount(newCount);
 
-      // Track latest notification ID (no sound — updates are silent)
+      // Play sound if there's a genuinely new notification
       if (notifs.length > 0) {
-        try { sessionStorage.setItem("last_seen_notif_id", notifs[0].id); } catch {}
+        try {
+          const lastSeen = sessionStorage.getItem("last_seen_notif_id");
+          if (lastSeen && notifs[0].id !== lastSeen) {
+            playNotificationSound();
+          }
+          sessionStorage.setItem("last_seen_notif_id", notifs[0].id);
+        } catch {}
       }
     } catch {}
   }, []);

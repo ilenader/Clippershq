@@ -133,7 +133,7 @@ function CampaignAvatar({ src, name, size = 44 }: { src: string | null; name: st
   );
 }
 
-// ─── Notification sounds disabled — all updates are silent ─────────────
+import { playChatSound } from "@/lib/sounds";
 
 function RoleBadge({ role }: { role: string }) {
   if (role === "OWNER") {
@@ -196,8 +196,9 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   useEffect(() => { activeConvoIdRef.current = threadInfo?.convoId || ""; }, [threadInfo]);
 
   // ── Handle unread count update (shared by SSE + polling fallback) ──
-  // All updates are silent — no notification sounds
+  const prevUnreadRef = useRef(0);
   const handleUnreadUpdate = useCallback((newCount: number) => {
+    const prevCount = prevUnreadRef.current;
     try { sessionStorage.setItem("chat_unread_count", String(newCount)); } catch {}
     setUnreadCount(newCount);
 
@@ -205,10 +206,23 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
     if (activeConvoIdRef.current && newCount > 0) {
       fetch(`/api/chat/conversations/${activeConvoIdRef.current}/messages`)
         .then((r) => r.json())
-        .then((data) => { if (Array.isArray(data)) setMessages(data); })
+        .then((data) => {
+          if (Array.isArray(data)) {
+            // Play sound if new message is from a real user (not AI)
+            const latest = data[data.length - 1];
+            if (latest && !latest.isAI && latest.senderId !== myId && data.length > 0) {
+              playChatSound();
+            }
+            setMessages(data);
+          }
+        })
         .catch(() => {});
+    } else if (newCount > prevCount) {
+      // Not viewing a thread — play sound for new unread
+      playChatSound();
     }
-  }, []);
+    prevUnreadRef.current = newCount;
+  }, [myId]);
 
   // ── Data fetchers ──
 
