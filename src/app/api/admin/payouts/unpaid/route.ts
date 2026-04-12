@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 
     const payouts = await db.payoutRequest.findMany({
       where: payoutWhere,
-      select: { userId: true, campaignId: true, amount: true, status: true },
+      select: { userId: true, campaignId: true, amount: true, feeAmount: true, finalAmount: true, status: true },
     });
 
     // 3. Aggregate earnings by user+campaign
@@ -75,10 +75,14 @@ export async function GET(req: NextRequest) {
     const lockedMap = new Map<string, number>();
     for (const p of payouts) {
       const key = `${p.userId}:${p.campaignId || ""}`;
+      // Use finalAmount (after fee) if available, otherwise estimate
+      const effectiveAmount = p.finalAmount != null ? p.finalAmount
+        : p.feeAmount != null ? p.amount - p.feeAmount
+        : p.amount * 0.91;
       if (p.status === "PAID") {
-        paidMap.set(key, (paidMap.get(key) || 0) + p.amount);
+        paidMap.set(key, (paidMap.get(key) || 0) + effectiveAmount);
       } else if (["REQUESTED", "UNDER_REVIEW", "APPROVED"].includes(p.status)) {
-        lockedMap.set(key, (lockedMap.get(key) || 0) + p.amount);
+        lockedMap.set(key, (lockedMap.get(key) || 0) + effectiveAmount);
       }
     }
 

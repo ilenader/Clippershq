@@ -97,8 +97,9 @@ export default function UserProfilePage() {
   const scopedPayouts = selectedCampaignId
     ? payoutRequests.filter((p: any) => p.campaignId === selectedCampaignId)
     : payoutRequests;
-  const filteredPaidOut = scopedPayouts.filter((p: any) => p.status === "PAID").reduce((s: number, p: any) => s + p.amount, 0);
-  const filteredPendingPayout = scopedPayouts.filter((p: any) => ["REQUESTED", "UNDER_REVIEW", "APPROVED"].includes(p.status)).reduce((s: number, p: any) => s + p.amount, 0);
+  const getEffectiveAmount = (p: any) => p.finalAmount != null ? p.finalAmount : p.feeAmount != null ? p.amount - p.feeAmount : p.amount * 0.91;
+  const filteredPaidOut = scopedPayouts.filter((p: any) => p.status === "PAID").reduce((s: number, p: any) => s + getEffectiveAmount(p), 0);
+  const filteredPendingPayout = scopedPayouts.filter((p: any) => ["REQUESTED", "UNDER_REVIEW", "APPROVED"].includes(p.status)).reduce((s: number, p: any) => s + getEffectiveAmount(p), 0);
   const filteredUnpaid = Math.max(Math.round((filteredEarnings - filteredPaidOut - filteredPendingPayout) * 100) / 100, 0);
 
   // Per-account views (keyed by clipAccountId which matches clipAccounts[].id)
