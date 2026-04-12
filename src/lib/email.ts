@@ -234,3 +234,16 @@ export async function sendCampaignAlertEmail(email: string, campaignName: string
 export async function sendReferralSignup(email: string, referredName: string): Promise<boolean> {
   return sendEmail({ to: email, subject: "New referral", html: wrap(`<p style="font-size: 15px;"><strong>${referredName}</strong> signed up with your link. You earn 5% of their earnings forever.</p>`) });
 }
+
+export async function sendPayoutReminder(email: string, campaignName: string, amount: string): Promise<boolean> {
+  return sendEmail({
+    to: email,
+    subject: "Payout reminder",
+    html: wrap(`
+      <p style="font-size: 16px; margin: 0 0 12px; text-align: center; background-color: #111720 !important;">Payout Reminder</p>
+      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 16px; text-align: center; background-color: #111720 !important;">You have <strong style="color: #2596be;">${amount}</strong> unpaid from <strong style="color: #fff;">${campaignName}</strong>.</p>
+      <p style="font-size: 14px; color: #a1a1aa; margin: 0 0 24px; text-align: center; background-color: #111720 !important;">Please request your payout so we can process it.</p>
+      ${emailButton("Go to Payouts", "https://clipershq.com/payouts")}
+    `),
+  });
+}
