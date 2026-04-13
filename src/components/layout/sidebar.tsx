@@ -174,16 +174,18 @@ export function Sidebar({ role }: SidebarProps) {
 
       {/* Bottom */}
       <div className="border-t border-[var(--border-color)] px-4 py-4 space-y-1">
-        <a
-          href="https://discord.gg/7TpufG6ak6"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all"
-        >
-          <MessageCircle className="h-[18px] w-[18px] text-accent" />
-          Join our Discord
-        </a>
-        {!isInstalled && (
+        {role !== "OWNER" && (
+          <a
+            href="https://discord.gg/7TpufG6ak6"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all"
+          >
+            <MessageCircle className="h-[18px] w-[18px] text-accent" />
+            Join our Discord
+          </a>
+        )}
+        {!isInstalled && role !== "OWNER" && (
           <button
             onClick={async () => {
               if (hasNativePrompt) {

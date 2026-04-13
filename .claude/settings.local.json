@@ -125,7 +125,8 @@
       "Bash(node:*)",
       "Bash(ls:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npx skills:*)"
+      "Bash(npx skills:*)",
+      "Bash(git clone:*)"
     ]
   }
 }
