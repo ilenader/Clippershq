@@ -150,7 +150,7 @@ export default function ProgressPage() {
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${level >= 4 ? "bg-gradient-to-br from-accent to-blue-700" : level >= 2 ? "bg-gradient-to-br from-accent to-blue-600" : "bg-gradient-to-br from-accent/60 to-accent"}`}>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent">
                 <Award className="h-6 w-6 text-white" />
               </div>
               <div>
@@ -234,7 +234,7 @@ export default function ProgressPage() {
           {/* Countdown timer */}
           <div className="mb-4 rounded-xl border border-[var(--border-color)] px-4 py-3 text-center">
             {todayStatus === "confirmed" ? (
-              <p className="text-sm sm:text-base font-medium text-emerald-400">
+              <p className="text-sm sm:text-base font-medium text-accent">
                 <Check className="h-4 w-4 inline-block mr-1 -mt-0.5" />
                 Streak safe for today!
               </p>
@@ -307,7 +307,7 @@ export default function ProgressPage() {
                 // Upcoming day
                 bgClass = "border-[var(--border-color)] bg-[var(--bg-card)]";
                 content = milestone
-                  ? <span className="text-[10px] sm:text-[11px] font-bold text-accent/50">+{milestone.bonus}%</span>
+                  ? <span className="text-[10px] sm:text-[11px] font-bold text-accent">+{milestone.bonus}%</span>
                   : <span className="text-[11px] text-[var(--text-muted)]">{dayNumber}</span>;
               }
 
@@ -335,6 +335,7 @@ export default function ProgressPage() {
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1.5 mt-5 mb-2 text-[10px] sm:text-[11px] text-[var(--text-muted)]">
             <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent/60" /> Completed</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-500/30 border border-amber-500/50" /> Under review</span>
             <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--bg-card)] border border-[var(--border-color)]" /> Upcoming</span>
           </div>
 
