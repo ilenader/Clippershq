@@ -65,23 +65,21 @@ export async function loadConfig() {
 function dayBounds(d: Date, timezone?: string | null): { start: Date; end: Date } {
   if (timezone) {
     try {
-      // Get the date string in the user's timezone (YYYY-MM-DD)
+      // Get the YYYY-MM-DD in the user's timezone
       const dateStr = d.toLocaleDateString("en-CA", { timeZone: timezone });
-      // Create midnight in that timezone by parsing as local then adjusting
-      const start = new Date(`${dateStr}T00:00:00`);
-      // Verify the timezone offset is correct by using a more reliable method
-      const parts = new Intl.DateTimeFormat("en-US", {
-        timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-      }).formatToParts(d);
-      const y = parts.find((p) => p.type === "year")?.value || "2024";
-      const m = parts.find((p) => p.type === "month")?.value || "01";
-      const dd = parts.find((p) => p.type === "day")?.value || "01";
-      const midnightLocal = new Date(`${y}-${m}-${dd}T00:00:00`);
-      // Calculate UTC offset: the difference between UTC midnight and local midnight
-      const utcMidnight = new Date(`${y}-${m}-${dd}T00:00:00Z`);
-      const offset = midnightLocal.getTime() - utcMidnight.getTime();
-      const tzStart = new Date(utcMidnight.getTime() + offset);
+      // Get the UTC offset for this timezone at this date using shortOffset
+      const fmt = new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "shortOffset" });
+      const offsetStr = fmt.formatToParts(d).find((p) => p.type === "timeZoneName")?.value || "GMT";
+      // Parse offset: "GMT", "GMT+5", "GMT-5:30", "GMT+5:30" → minutes
+      let offsetMinutes = 0;
+      const match = offsetStr.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+      if (match) {
+        const sign = match[1] === "+" ? 1 : -1;
+        offsetMinutes = sign * (parseInt(match[2]) * 60 + parseInt(match[3] || "0"));
+      }
+      // Midnight in user's timezone = midnight UTC minus their offset
+      const utcMidnight = new Date(`${dateStr}T00:00:00Z`);
+      const tzStart = new Date(utcMidnight.getTime() - offsetMinutes * 60_000);
       const tzEnd = new Date(tzStart.getTime() + 24 * 60 * 60 * 1000 - 1);
       return { start: tzStart, end: tzEnd };
     } catch {
