@@ -40,10 +40,10 @@ export async function POST(
   const oldStreak = user.currentStreak;
   const newLongest = Math.max(days, user.longestStreak);
 
-  // Set lastActiveDate to yesterday (in user timezone or UTC)
-  const yesterday = new Date();
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  yesterday.setUTCHours(0, 0, 0, 0);
+  // Set lastActiveDate to yesterday in user's timezone
+  const tz = user.timezone || "UTC";
+  const yesterdayStr = new Date(Date.now() - 86400_000).toLocaleDateString("en-CA", { timeZone: tz });
+  const yesterday = new Date(`${yesterdayStr}T00:00:00Z`);
 
   await db.user.update({
     where: { id },
@@ -51,6 +51,7 @@ export async function POST(
       currentStreak: days,
       longestStreak: newLongest,
       lastActiveDate: yesterday,
+      streakRestoredAt: new Date(),
     },
   });
 

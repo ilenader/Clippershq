@@ -349,6 +349,14 @@ export async function POST(req: NextRequest) {
       return newClip;
     });
 
+    // Clear streak restore protection on first clip submission after restore
+    try {
+      const clipUser = await db.user.findUnique({ where: { id: session.user.id }, select: { streakRestoredAt: true } });
+      if (clipUser?.streakRestoredAt) {
+        await db.user.update({ where: { id: session.user.id }, data: { streakRestoredAt: null } });
+      }
+    } catch {}
+
     // Update clipper streak (non-blocking)
     import("@/lib/gamification").then(({ updateStreak }) => updateStreak(session.user.id)).catch(() => {});
 

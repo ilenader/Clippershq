@@ -162,9 +162,18 @@ export async function updateStreak(userId: string): Promise<void> {
 
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { lastActiveDate: true, currentStreak: true, longestStreak: true, timezone: true },
+    select: { lastActiveDate: true, currentStreak: true, longestStreak: true, timezone: true, streakRestoredAt: true },
   });
   if (!user) return;
+
+  // If streak was recently restored, skip evaluation to give clipper time to post
+  if (user.streakRestoredAt) {
+    const hoursAgo = (Date.now() - new Date(user.streakRestoredAt).getTime()) / 3_600_000;
+    if (hoursAgo < 36) {
+      console.log(`[STREAK] Skipping evaluation for user ${userId} — streak restored ${Math.round(hoursAgo)}h ago`);
+      return;
+    }
+  }
 
   const tz = user.timezone || null;
   const now = new Date();

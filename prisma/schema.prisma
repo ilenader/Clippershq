@@ -86,6 +86,7 @@ model User {
   manualBonusOverride Float?
   isPWAUser     Boolean    @default(false)
   timezone      String?
+  streakRestoredAt DateTime?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
