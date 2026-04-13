@@ -93,6 +93,11 @@ function dayBounds(d: Date, timezone?: string | null): { start: Date; end: Date 
   return { start, end };
 }
 
+/** Public helper: get day bounds for a timezone (used by review endpoint) */
+export function dayBoundsForTz(d: Date, timezone: string): { start: Date; end: Date } {
+  return dayBounds(d, timezone);
+}
+
 /** Helper: add N days to a date */
 function addDays(d: Date, n: number): Date {
   const r = new Date(d);
@@ -144,13 +149,13 @@ async function evaluateDay(userId: string, date: Date, timezone?: string | null)
 }
 
 /**
- * Evaluate and update a user's streak with 48-hour grace period.
+ * Evaluate and update a user's streak.
  *
- * Logic:
- * 1. Find the latest evaluable day (2 days ago — 48h grace)
- * 2. Walk from lastActiveDate+1 to the latest evaluable day
- * 3. For each day: check clips → passed/failed/pending
- * 4. Update streak count accordingly
+ * Rules:
+ * - Evaluate ALL days from lastActiveDate+1 to yesterday (today is never evaluated)
+ * - No grace period — days are evaluated as soon as they end
+ * - "pending" days stop evaluation (wait for review, don't break streak)
+ * - Streak freezes when user has no actively-posting campaigns
  */
 export async function updateStreak(userId: string): Promise<void> {
   if (!db) return;
@@ -166,8 +171,8 @@ export async function updateStreak(userId: string): Promise<void> {
   const today = new Date(now);
   today.setUTCHours(0, 0, 0, 0);
 
-  // Latest day we can fully evaluate = 2 days ago (48h grace)
-  const latestEvaluable = addDays(today, -2);
+  // Latest evaluable day = yesterday (today isn't over yet)
+  const latestEvaluable = addDays(today, -1);
 
   // Where to start evaluating from
   let evalStart: Date;
@@ -176,23 +181,35 @@ export async function updateStreak(userId: string): Promise<void> {
     last.setUTCHours(0, 0, 0, 0);
     evalStart = addDays(last, 1); // day after last confirmed
   } else {
-    // No streak history — start from 7 days ago max
-    evalStart = addDays(today, -7);
+    // No streak history — start from 14 days ago max
+    evalStart = addDays(today, -14);
   }
 
   // If eval start is after the latest evaluable day, nothing to do
   if (evalStart > latestEvaluable) return;
 
-  // Streak protection: if ALL of clipper's campaigns are PAUSED, freeze streak
+  // Freeze check: does user have any actively-posting campaigns?
+  // "Actively posting" = campaign is ACTIVE and user has at least 1 clip in it
   try {
     const memberships = await db.campaignAccount.findMany({
       where: { clipAccount: { userId } },
-      include: { campaign: { select: { status: true } } },
+      include: { campaign: { select: { id: true, status: true } } },
     });
     if (memberships.length > 0) {
-      const hasActiveCampaign = memberships.some((m: any) => m.campaign.status === "ACTIVE");
-      if (!hasActiveCampaign) {
-        // All campaigns paused — freeze streak, don't evaluate
+      const activeCampaignIds = memberships
+        .filter((m: any) => m.campaign.status === "ACTIVE")
+        .map((m: any) => m.campaign.id);
+      if (activeCampaignIds.length === 0) {
+        // No active campaigns — freeze streak
+        return;
+      }
+      // Check if user has posted any clips in active campaigns
+      const clipInActive = await db.clip.findFirst({
+        where: { userId, campaignId: { in: activeCampaignIds } },
+        select: { id: true },
+      });
+      if (!clipInActive) {
+        // Has active campaigns but hasn't posted in any — freeze streak
         return;
       }
     }
@@ -202,7 +219,7 @@ export async function updateStreak(userId: string): Promise<void> {
   let lastPassedDate = user.lastActiveDate ? new Date(user.lastActiveDate) : null;
   let streakBroken = false;
 
-  // Walk each day from evalStart to latestEvaluable
+  // Walk each day from evalStart to yesterday
   const cursor = new Date(evalStart);
   cursor.setUTCHours(0, 0, 0, 0);
 
@@ -222,7 +239,7 @@ export async function updateStreak(userId: string): Promise<void> {
       streakBroken = true;
       currentStreak = 0;
     } else {
-      // "pending" — stop evaluating, wait for reviews
+      // "pending" — stop evaluating, wait for reviews (don't break streak)
       break;
     }
 

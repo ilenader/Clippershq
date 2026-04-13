@@ -5,7 +5,7 @@ import { logAudit } from "@/lib/audit";
 import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
 import { getCampaignBudgetStatus } from "@/lib/balance";
 import { createNotification } from "@/lib/notifications";
-import { sendClipApproved, sendClipRejected } from "@/lib/email";
+import { sendClipApproved, sendClipRejected, sendStreakRejectionWarning, sendConsecutiveRejectionWarning } from "@/lib/email";
 import { updateUserLevel } from "@/lib/gamification";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
@@ -239,11 +239,83 @@ export async function POST(
           });
         } catch {}
         createNotification(clip.userId, "CLIP_REJECTED", "Clip rejected", body.rejectionReason ? `Reason: ${body.rejectionReason}` : "Your clip was rejected. Check the reason and try again.").catch(() => {});
+        const rejCampName = (await db.campaign.findUnique({ where: { id: clip.campaignId }, select: { name: true } }))?.name || "your campaign";
         if (clip.user?.email) {
-          const rejCampName = (await db.campaign.findUnique({ where: { id: clip.campaignId }, select: { name: true } }))?.name || "your campaign";
           await sendClipRejected(clip.user.email, rejCampName, body.rejectionReason);
-        } else {
-          console.log(`[EMAIL] No email for user ${clip.userId} — skipping clip rejected email`);
+        }
+
+        // Streak warning: check if this rejection leaves the day with no safe clips
+        try {
+          const clipUser = await db.user.findUnique({
+            where: { id: clip.userId },
+            select: { timezone: true, currentStreak: true },
+          });
+          if (clipUser && clipUser.currentStreak > 0) {
+            const tz = clipUser.timezone || "UTC";
+            const clipDate = new Date(clip.createdAt);
+            const dateStr = clipDate.toLocaleDateString("en-CA", { timeZone: tz });
+            const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+            const isToday = dateStr === todayStr;
+
+            if (isToday) {
+              // Check other clips for today in user's timezone
+              const { dayBoundsForTz } = await import("@/lib/gamification");
+              const bounds = dayBoundsForTz(new Date(), tz);
+              const otherClips = await db.clip.findMany({
+                where: {
+                  userId: clip.userId,
+                  id: { not: id },
+                  createdAt: { gte: bounds.start, lte: bounds.end },
+                  isDeleted: false,
+                },
+                select: { status: true, streakDayLocked: true },
+              });
+              const hasSafeClip = otherClips.some((c: any) => c.streakDayLocked || c.status === "APPROVED" || c.status === "PENDING");
+              if (!hasSafeClip) {
+                // Calculate hours left until midnight in user's timezone
+                const nowParts = new Intl.DateTimeFormat("en-US", {
+                  timeZone: tz, hour: "numeric", minute: "numeric", hour12: false,
+                }).formatToParts(new Date());
+                const h = parseInt(nowParts.find((p) => p.type === "hour")?.value || "0");
+                const m = parseInt(nowParts.find((p) => p.type === "minute")?.value || "0");
+                const hoursLeft = (23 - h) + (59 - m) / 60;
+
+                const msg = `Your clip for ${rejCampName} was rejected. You have ${Math.floor(hoursLeft)}h ${Math.round((hoursLeft % 1) * 60)}m left to post today to keep your streak!`;
+                createNotification(clip.userId, "STREAK_WARNING", "Post now to save your streak!", msg).catch(() => {});
+                if (clip.user?.email) {
+                  sendStreakRejectionWarning(clip.user.email, rejCampName, hoursLeft).catch(() => {});
+                }
+                console.log(`[STREAK] Warning sent to user ${clip.userId}: ${Math.floor(hoursLeft)}h left`);
+              }
+            }
+          }
+        } catch (streakErr: any) {
+          console.error(`[STREAK] Warning check failed:`, streakErr?.message);
+        }
+
+        // Consecutive rejection check: 3+ rejections in a row
+        try {
+          const recentClips = await db.clip.findMany({
+            where: { userId: clip.userId, isDeleted: false },
+            orderBy: { createdAt: "desc" },
+            take: 10,
+            select: { status: true },
+          });
+          let consecutiveRejections = 0;
+          for (const c of recentClips) {
+            if (c.status === "REJECTED") consecutiveRejections++;
+            else break;
+          }
+          if (consecutiveRejections >= 3) {
+            const msg = `${consecutiveRejections} clips in a row have been rejected. Please review campaign requirements before submitting more clips.`;
+            createNotification(clip.userId, "CLIP_REJECTED", "Multiple clips rejected", msg).catch(() => {});
+            if (clip.user?.email) {
+              sendConsecutiveRejectionWarning(clip.user.email, consecutiveRejections).catch(() => {});
+            }
+            console.log(`[QUALITY] ${consecutiveRejections} consecutive rejections warning sent to user ${clip.userId}`);
+          }
+        } catch (qualErr: any) {
+          console.error(`[QUALITY] Check failed:`, qualErr?.message);
         }
       }
     } else if (action === "FLAGGED") {

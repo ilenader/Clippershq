@@ -247,3 +247,34 @@ export async function sendPayoutReminder(email: string, campaignName: string, am
     `),
   });
 }
+
+export async function sendStreakRejectionWarning(email: string, campaignName: string, hoursLeft: number): Promise<boolean> {
+  const h = Math.floor(hoursLeft);
+  const m = Math.round((hoursLeft - h) * 60);
+  const timeStr = m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return sendEmail({
+    to: email,
+    subject: "Clip rejected — post again to save your streak!",
+    html: wrap(`
+      <p style="font-size: 16px; margin: 0 0 12px;">Your clip was rejected</p>
+      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${campaignName}</strong> was rejected.</p>
+      <p style="font-size: 18px; color: #f59e0b; font-weight: bold; margin: 0 0 12px;">You have ${timeStr} left to post today to keep your streak!</p>
+      <p style="font-size: 14px; color: #a1a1aa; margin: 0 0 24px;">Submit a new clip now before the day ends.</p>
+      ${emailButton("Submit a Clip", "https://clipershq.com/clips")}
+    `),
+  });
+}
+
+export async function sendConsecutiveRejectionWarning(email: string, rejectionCount: number): Promise<boolean> {
+  return sendEmail({
+    to: email,
+    subject: "Multiple clips rejected — please review requirements",
+    html: wrap(`
+      <p style="font-size: 16px; margin: 0 0 12px;">Quality warning</p>
+      <p style="font-size: 15px; color: #f87171; margin: 0 0 12px;"><strong>${rejectionCount} clips in a row</strong> have been rejected.</p>
+      <p style="font-size: 14px; color: #d4d4d8; margin: 0 0 12px;">Please review the campaign requirements carefully before submitting more clips. Low quality submissions may result in account restrictions.</p>
+      <p style="font-size: 14px; color: #a1a1aa; margin: 0 0 24px;">Check the campaign page for detailed requirements and examples.</p>
+      ${emailButton("View Campaigns", "https://clipershq.com/campaigns")}
+    `),
+  });
+}
