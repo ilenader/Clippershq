@@ -56,6 +56,7 @@ export default function ProgressPage() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFull60, setShowFull60] = useState(false);
+  const [showStreakHelp, setShowStreakHelp] = useState(false);
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0 });
 
   useEffect(() => {
@@ -232,25 +233,56 @@ export default function ProgressPage() {
 
           {/* Countdown timer */}
           <div className="mb-4 rounded-xl border border-[var(--border-color)] px-4 py-3 text-center">
-            {postedToday ? (
-              <p className="text-sm font-medium text-emerald-400">
+            {todayStatus === "confirmed" ? (
+              <p className="text-sm sm:text-base font-medium text-emerald-400">
                 <Check className="h-4 w-4 inline-block mr-1 -mt-0.5" />
-                {todayStatus === "confirmed" ? "You've posted today — streak safe!" : "Clip submitted — waiting for review"}
+                Streak safe for today!
+              </p>
+            ) : todayStatus === "pending" ? (
+              <p className="text-sm sm:text-base font-medium text-amber-400">
+                <Clock className="h-4 w-4 inline-block mr-1 -mt-0.5" />
+                Clip submitted — waiting for review. Your streak is safe while pending.
               </p>
             ) : (
-              <p className="text-sm font-medium text-accent">
-                <Clock className="h-4 w-4 inline-block mr-1 -mt-0.5" />
+              <p className="text-base sm:text-lg font-semibold text-accent">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5 inline-block mr-1 -mt-0.5" />
                 {countdown.hours}h {countdown.minutes}m left to post today
               </p>
             )}
           </div>
 
-          <p className="text-sm text-[var(--text-secondary)] mb-2">
-            You need at least <strong className="text-[var(--text-primary)]">1 approved clip per day</strong> to keep your streak. Rejected or flagged clips do <strong className="text-[var(--text-primary)]">not</strong> count.
-          </p>
-          <p className="text-xs text-[var(--text-muted)] mb-4">
-            Clips have a 48-hour grace period for review before the day is counted.
-          </p>
+          {/* Collapsible "How streaks work" */}
+          <button
+            onClick={() => setShowStreakHelp(!showStreakHelp)}
+            className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer mb-3"
+          >
+            {showStreakHelp ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            How streaks work
+          </button>
+          {showStreakHelp && (
+            <div className="mb-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 text-sm text-[var(--text-secondary)] space-y-3">
+              <p>Post at least 1 clip every day to build your streak. Higher streaks = bigger bonus on <strong className="text-[var(--text-primary)]">ALL</strong> your earnings.</p>
+              <div>
+                <p className="font-medium text-[var(--text-primary)] mb-1">How it works:</p>
+                <ul className="space-y-1 text-xs list-none">
+                  <li>• Submit a clip before your day ends (see the countdown above)</li>
+                  <li>• Your clip gets reviewed by our team</li>
+                  <li>• If approved — your streak day is <strong className="text-[var(--text-primary)]">locked in forever</strong></li>
+                  <li>• If rejected — you can submit another clip before the day ends</li>
+                  <li>• If ALL your clips for a day are rejected and the day is over — streak resets</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-medium text-[var(--text-primary)] mb-1">Tips:</p>
+                <ul className="space-y-1 text-xs list-none">
+                  <li>• Submit 2-3 clips per day to be safe — if one gets rejected, the others can save your streak</li>
+                  <li>• Follow campaign requirements carefully to avoid rejections</li>
+                  <li>• If none of your campaigns are active, your streak automatically freezes — no penalty</li>
+                </ul>
+              </div>
+              <p className="text-xs text-[var(--text-muted)]">Your streak bonus applies to ALL your earnings across ALL campaigns. A 5% bonus at 30 days means an extra $50 on every $1,000 you earn.</p>
+            </div>
+          )}
 
           {/* Streak grid — calendar view (0=today, reversed) */}
           <div className="grid grid-cols-10 gap-1 sm:gap-1.5 mb-1">
@@ -292,7 +324,9 @@ export default function ProgressPage() {
                   key={i}
                   title={isToday ? "Today" : status === "pending" ? "Waiting for review" : status === "confirmed" ? "Approved" : `Day ${dayNumber}`}
                   className={`relative flex items-center justify-center h-7 w-7 sm:h-8 sm:w-auto rounded-lg border font-bold transition-all ${bgClass} ${
-                    isToday ? "ring-2 ring-accent ring-offset-1 ring-offset-[var(--bg-page)]" : ""
+                    isToday
+                      ? `ring-2 ring-accent ring-offset-1 ring-offset-[var(--bg-page)] ${status === "empty" ? "animate-pulse" : ""}`
+                      : ""
                   }`}
                 >
                   {content}
@@ -307,10 +341,10 @@ export default function ProgressPage() {
           </div>
 
           {/* Legend */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-5 mb-2 text-[10px] sm:text-[11px] text-[var(--text-muted)]">
-            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent/60" /> Approved</span>
-            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-500/30 border border-amber-500/50" /> Pending review</span>
-            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--bg-card)] border border-[var(--border-color)]" /> No clip</span>
+          <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1.5 mt-5 mb-2 text-[10px] sm:text-[11px] text-[var(--text-muted)]">
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent/60" /> Approved — day locked in</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-500/30 border border-amber-500/50" /> Under review — streak safe</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--bg-card)] border border-[var(--border-color)]" /> No clip posted</span>
           </div>
 
           {/* Toggle 30/60 days */}
