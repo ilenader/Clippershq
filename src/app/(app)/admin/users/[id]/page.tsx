@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-select";
 import { formatCurrency, formatNumber, formatRelative } from "@/lib/utils";
-import { ArrowLeft, Star, Flame, Users, Zap, Film, DollarSign, ExternalLink, Shield, Percent, ShieldOff, ChevronDown } from "lucide-react";
+import { ArrowLeft, Star, Flame, Users, Zap, Film, DollarSign, ExternalLink, Shield, Percent, ShieldOff, ChevronDown, RotateCcw } from "lucide-react";
 import { toast } from "@/lib/toast";
 
 export default function UserProfilePage() {
@@ -25,9 +25,15 @@ export default function UserProfilePage() {
   const [banConfirmText, setBanConfirmText] = useState("");
   const [banning, setBanning] = useState(false);
   const [campDropOpen, setCampDropOpen] = useState(false);
+  const [showStreakRestore, setShowStreakRestore] = useState(false);
+  const [restoreDays, setRestoreDays] = useState("");
+  const [restoreReason, setRestoreReason] = useState("Review delayed");
+  const [restoring, setRestoring] = useState(false);
   const campDropRef = useRef<HTMLDivElement>(null);
 
   const currentUserId = session?.user?.id;
+  const currentUserRole = (session?.user as any)?.role;
+  const isOwner = currentUserRole === "OWNER";
   const isViewingOwnProfile = currentUserId === id;
 
   const loadUser = () => {
@@ -161,6 +167,11 @@ export default function UserProfilePage() {
           <div className="flex items-center gap-1.5 mb-1"><Flame className="h-3.5 w-3.5 text-orange-400" /><span className="text-xs text-[var(--text-muted)]">Streak</span></div>
           <p className="text-2xl font-bold text-accent">{user.currentStreak || 0}d</p>
           <p className="text-xs text-[var(--text-muted)]">Best: {user.longestStreak || 0}d</p>
+          {isOwner && !isViewingOwnProfile && (
+            <Button size="sm" variant="outline" className="mt-2 w-full" onClick={() => { setShowStreakRestore(true); setRestoreDays(""); setRestoreReason("Review delayed"); }} icon={<RotateCcw className="h-3 w-3" />}>
+              Restore Streak
+            </Button>
+          )}
         </Card>
       </div>
 
@@ -261,6 +272,74 @@ export default function UserProfilePage() {
               }}
             >
               Permanently Ban
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Restore Streak modal */}
+      <Modal open={showStreakRestore} onClose={() => setShowStreakRestore(false)} title="Restore streak" className="max-w-md">
+        <div className="space-y-4">
+          <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
+            <p className="text-sm text-[var(--text-secondary)]">
+              Current streak: <strong className="text-accent">{user.currentStreak || 0} days</strong>
+            </p>
+            {user.lastActiveDate && (
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                Last active: {formatRelative(user.lastActiveDate)}
+              </p>
+            )}
+          </div>
+          <Input
+            id="restoreDays"
+            label={`Restore to day (max: ${user.longestStreak || 30})`}
+            type="number"
+            min="1"
+            max={user.longestStreak || 30}
+            placeholder="e.g. 14"
+            value={restoreDays}
+            onChange={(e) => setRestoreDays(e.target.value)}
+          />
+          <div>
+            <label htmlFor="restoreReason" className="mb-1 block text-sm font-medium text-[var(--text-secondary)]">Reason</label>
+            <select
+              id="restoreReason"
+              value={restoreReason}
+              onChange={(e) => setRestoreReason(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-accent"
+            >
+              <option value="Review delayed">Review delayed</option>
+              <option value="System error">System error</option>
+              <option value="Owner decision">Owner decision</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setShowStreakRestore(false)}>Cancel</Button>
+            <Button
+              loading={restoring}
+              disabled={!restoreDays || parseInt(restoreDays) < 1 || parseInt(restoreDays) > (user.longestStreak || 30)}
+              onClick={async () => {
+                setRestoring(true);
+                try {
+                  const res = await fetch(`/api/admin/users/${id}/restore-streak`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ days: parseInt(restoreDays), reason: restoreReason }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || "Failed");
+                  toast.success(`Streak restored to ${data.newStreak} days`);
+                  setShowStreakRestore(false);
+                  loadUser();
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to restore streak.");
+                }
+                setRestoring(false);
+              }}
+              icon={<RotateCcw className="h-4 w-4" />}
+            >
+              Restore Streak
             </Button>
           </div>
         </div>
