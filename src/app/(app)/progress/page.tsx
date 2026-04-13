@@ -284,31 +284,25 @@ export default function ProgressPage() {
             </div>
           )}
 
-          {/* Streak grid — day 1 top-left, today at position streakDaysToShow */}
+          {/* Streak grid — day 1 top-left, today bottom-right */}
           <div className="grid grid-cols-10 gap-1 sm:gap-1.5 mb-1">
             {Array.from({ length: streakDaysToShow }, (_, i) => {
-              // Cell i=0 is top-left (oldest day), cell i=streakDaysToShow-1 is bottom-right (today)
-              // streakDayStatuses: [0]=today, [1]=yesterday... so cell i maps to index (streakDaysToShow-1-i)
+              // Cell i=0 (top-left) = oldest day, cell (streakDaysToShow-1) = today
+              // streakDayStatuses: [0]=today, [1]=yesterday...
+              // So cell i reads from index (streakDaysToShow - 1 - i)
               const statusIdx = streakDaysToShow - 1 - i;
               const status = streakDayStatuses[statusIdx] || "empty";
-              const isToday = statusIdx === 0;
-              const dayNumber = i + 1; // display number: 1, 2, 3... streakDaysToShow
+              const isToday = statusIdx === 0; // last cell = today
+              const dayNumber = i + 1; // 1, 2, 3... 30
 
-              // Milestone: streak day N means the Nth consecutive day
-              // statusIdx tells us how many days ago this cell is
-              // streak day number = streak - statusIdx (e.g. if streak=10, today(0)=day 10, yesterday(1)=day 9)
-              const streakDayNum = streak - statusIdx;
-              const milestone = streakDayNum > 0 && status === "confirmed"
-                ? STREAK_MILESTONES.find((m) => m.days === streakDayNum)
-                : null;
+              // Check if this day number is a milestone
+              const milestone = STREAK_MILESTONES.find((m) => m.days === dayNumber);
 
               let bgClass = "";
               let content: React.ReactNode = null;
 
               if (status === "confirmed") {
-                bgClass = milestone
-                  ? "bg-accent border-accent"
-                  : "bg-accent/60 border-accent/60";
+                bgClass = milestone ? "bg-accent border-accent" : "bg-accent/60 border-accent/60";
                 content = milestone
                   ? <span className="text-[10px] sm:text-[11px] font-extrabold text-white">+{milestone.bonus}%</span>
                   : <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />;
@@ -316,14 +310,17 @@ export default function ProgressPage() {
                 bgClass = "border-amber-500/50 bg-amber-500/10";
                 content = <Clock className="h-3 w-3 text-amber-400" />;
               } else {
+                // Empty cell — show milestone hint or day number
                 bgClass = "border-[var(--border-color)] bg-[var(--bg-card)]";
-                content = <span className="text-[11px] text-[var(--text-muted)]">{dayNumber}</span>;
+                content = milestone
+                  ? <span className="text-[10px] sm:text-[11px] font-bold text-accent/50">+{milestone.bonus}%</span>
+                  : <span className="text-[11px] text-[var(--text-muted)]">{dayNumber}</span>;
               }
 
               return (
                 <div
                   key={i}
-                  title={isToday ? "Today" : status === "pending" ? "Waiting for review" : status === "confirmed" ? "Approved" : `Day ${dayNumber}`}
+                  title={isToday ? "Today" : status === "pending" ? "Waiting for review" : status === "confirmed" ? "Approved" : milestone ? `Day ${dayNumber}: +${milestone.bonus}% streak bonus` : `Day ${dayNumber}`}
                   className={`relative flex items-center justify-center h-7 w-7 sm:h-8 sm:w-auto rounded-lg border font-bold transition-all ${bgClass} ${
                     isToday
                       ? `ring-2 ring-accent ring-offset-1 ring-offset-[var(--bg-page)] ${status === "empty" ? "animate-pulse" : ""}`
