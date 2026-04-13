@@ -124,7 +124,8 @@
       "Bash(node -e \"const sharp=require\\('sharp'\\);sharp\\('C:/Users/Game Centar/OneDrive/Desktop/clippers-hq/public/icon-192.png'\\).metadata\\(\\).then\\(m=>console.log\\('icon-192:',JSON.stringify\\({w:m.width,h:m.height,channels:m.channels,hasAlpha:m.hasAlpha}\\)\\)\\)\")",
       "Bash(node:*)",
       "Bash(ls:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(npx skills:*)"
     ]
   }
 }

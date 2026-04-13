@@ -284,33 +284,27 @@ export default function ProgressPage() {
             </div>
           )}
 
-          {/* Streak grid — day 1 top-left, today bottom-right */}
+          {/* Streak progress grid — day 1 = first streak day, counting toward milestones */}
           <div className="grid grid-cols-10 gap-1 sm:gap-1.5 mb-1">
             {Array.from({ length: streakDaysToShow }, (_, i) => {
-              // Cell i=0 (top-left) = oldest day, cell (streakDaysToShow-1) = today
-              // streakDayStatuses: [0]=today, [1]=yesterday...
-              // So cell i reads from index (streakDaysToShow - 1 - i)
-              const statusIdx = streakDaysToShow - 1 - i;
-              const status = streakDayStatuses[statusIdx] || "empty";
-              const isToday = statusIdx === 0; // last cell = today
-              const dayNumber = i + 1; // 1, 2, 3... 30
-
-              // Check if this day number is a milestone
+              const dayNumber = i + 1;
               const milestone = STREAK_MILESTONES.find((m) => m.days === dayNumber);
+              const isCompleted = dayNumber <= streak;
+              const isTodayCell = postedToday
+                ? dayNumber === streak // posted today: today = last completed day
+                : dayNumber === streak + 1; // not posted: today = next day to fill
 
               let bgClass = "";
               let content: React.ReactNode = null;
 
-              if (status === "confirmed") {
+              if (isCompleted) {
+                // Completed streak day
                 bgClass = milestone ? "bg-accent border-accent" : "bg-accent/60 border-accent/60";
                 content = milestone
                   ? <span className="text-[10px] sm:text-[11px] font-extrabold text-white">+{milestone.bonus}%</span>
                   : <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />;
-              } else if (status === "pending") {
-                bgClass = "border-amber-500/50 bg-amber-500/10";
-                content = <Clock className="h-3 w-3 text-amber-400" />;
               } else {
-                // Empty cell — show milestone hint or day number
+                // Upcoming day
                 bgClass = "border-[var(--border-color)] bg-[var(--bg-card)]";
                 content = milestone
                   ? <span className="text-[10px] sm:text-[11px] font-bold text-accent/50">+{milestone.bonus}%</span>
@@ -320,15 +314,15 @@ export default function ProgressPage() {
               return (
                 <div
                   key={i}
-                  title={isToday ? "Today" : status === "pending" ? "Waiting for review" : status === "confirmed" ? "Approved" : milestone ? `Day ${dayNumber}: +${milestone.bonus}% streak bonus` : `Day ${dayNumber}`}
+                  title={isTodayCell ? "Today" : isCompleted ? `Day ${dayNumber} — completed` : milestone ? `Day ${dayNumber}: +${milestone.bonus}% streak bonus` : `Day ${dayNumber}`}
                   className={`relative flex items-center justify-center h-7 w-7 sm:h-8 sm:w-auto rounded-lg border font-bold transition-all ${bgClass} ${
-                    isToday
-                      ? `ring-2 ring-accent ring-offset-1 ring-offset-[var(--bg-page)] ${status === "empty" ? "animate-pulse" : ""}`
+                    isTodayCell
+                      ? `ring-2 ring-accent ring-offset-1 ring-offset-[var(--bg-page)] ${!postedToday ? "animate-pulse" : ""}`
                       : ""
                   }`}
                 >
                   {content}
-                  {isToday && (
+                  {isTodayCell && (
                     <span className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 text-[8px] sm:text-[9px] font-bold text-accent leading-none">
                       TODAY
                     </span>
@@ -340,9 +334,8 @@ export default function ProgressPage() {
 
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1.5 mt-5 mb-2 text-[10px] sm:text-[11px] text-[var(--text-muted)]">
-            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent/60" /> Approved — day locked in</span>
-            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-500/30 border border-amber-500/50" /> Under review — streak safe</span>
-            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--bg-card)] border border-[var(--border-color)]" /> No clip posted</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent/60" /> Completed</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--bg-card)] border border-[var(--border-color)]" /> Upcoming</span>
           </div>
 
           {/* Toggle 30/60 days */}
