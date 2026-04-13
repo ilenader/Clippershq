@@ -108,9 +108,9 @@ export default function AdminCallsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
                     {call.user?.image ? (
-                      <img src={call.user.image} alt="" className="h-10 w-10 rounded-full" />
+                      <img src={call.user.image} alt="" className="h-10 w-10 rounded-full object-cover flex-shrink-0" />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-sm font-bold text-accent">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm font-bold text-accent">
                         {(call.user?.username || "?")[0].toUpperCase()}
                       </div>
                     )}

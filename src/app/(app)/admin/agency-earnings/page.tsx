@@ -124,12 +124,12 @@ export default function AgencyEarningsPage() {
                   onClick={() => setExpandedCampaign(isExpanded ? null : c.id)}
                 >
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">{c.name}</p>
-                      <span className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${c.pricingModel === "CPM_SPLIT" ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"}`}>
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[50vw] sm:max-w-none">{c.name}</p>
+                      <span className={`inline-block flex-shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${c.pricingModel === "CPM_SPLIT" ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"}`}>
                         {c.pricingModel === "CPM_SPLIT" ? "CPM Split" : "Agency Fee"}
                       </span>
-                      <Badge variant={c.status.toLowerCase() as any}>{c.status}</Badge>
+                      <Badge variant={c.status.toLowerCase() as any} className="flex-shrink-0">{c.status}</Badge>
                     </div>
                     <p className="text-xs text-[var(--text-muted)]">
                       {c.platform}
@@ -150,47 +150,82 @@ export default function AgencyEarningsPage() {
                 {/* Per-clip breakdown */}
                 {isExpanded && clips.length > 0 && (
                   <div className="mt-3 border-t border-[var(--border-color)] pt-3 space-y-2">
-                    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] sm:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-4 gap-y-0.5 px-1 text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                    {/* Desktop header */}
+                    <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-4 gap-y-0.5 px-1 text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
                       <span>Account</span>
                       <span className="text-right">Views</span>
                       <span className="text-right">Clipper</span>
-                      <span className="hidden sm:block text-right">Bonus</span>
+                      <span className="text-right">Bonus</span>
                       <span className="text-right">Owner</span>
                       <span className="text-right">Link</span>
                     </div>
                     {clips.map((clip: any, i: number) => (
-                      <div key={clip.clipId || i} className="grid grid-cols-[1fr_auto_auto_auto_auto] sm:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-4 items-center px-1 py-1.5 rounded-lg hover:bg-[var(--bg-card-hover)] transition-colors">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-[var(--text-primary)] truncate">{clip.accountName || "—"}</p>
-                          <p className="text-[11px] text-[var(--text-muted)]">
-                            {clip.date ? new Date(clip.date).toLocaleDateString() : "—"}
-                          </p>
+                      <div key={clip.clipId || i}>
+                        {/* Desktop row */}
+                        <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-4 items-center px-1 py-1.5 rounded-lg hover:bg-[var(--bg-card-hover)] transition-colors">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-[var(--text-primary)] truncate">{clip.accountName || "—"}</p>
+                            <p className="text-[11px] text-[var(--text-muted)]">
+                              {clip.date ? new Date(clip.date).toLocaleDateString() : "—"}
+                            </p>
+                          </div>
+                          <span className="text-sm text-[var(--text-primary)] tabular-nums text-right">{formatNumber(clip.views)}</span>
+                          <span className="text-sm text-accent tabular-nums text-right">{formatCurrency(clip.clipperEarnings)}</span>
+                          <span className="text-sm tabular-nums text-right">
+                            {clip.bonusAmount > 0 ? (
+                              <span className="text-emerald-400">
+                                +{formatCurrency(clip.bonusAmount)}
+                                <span className="text-[10px] text-emerald-400/70 ml-0.5">({clip.bonusPercent}%)</span>
+                              </span>
+                            ) : (
+                              <span className="text-[var(--text-muted)]">—</span>
+                            )}
+                          </span>
+                          <span className="text-sm text-emerald-400 tabular-nums text-right">{formatCurrency(clip.ownerEarnings)}</span>
+                          <span className="text-right">
+                            {clip.clipUrl && (
+                              <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex text-accent hover:text-accent/80">
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                          </span>
                         </div>
-                        <span className="text-sm text-[var(--text-primary)] tabular-nums text-right">{formatNumber(clip.views)}</span>
-                        <span className="text-sm text-accent tabular-nums text-right">
-                          {formatCurrency(clip.clipperEarnings)}
-                          {clip.bonusAmount > 0 && (
-                            <span className="sm:hidden text-[10px] text-emerald-400/80 ml-0.5">+{formatCurrency(clip.bonusAmount)}</span>
-                          )}
-                        </span>
-                        <span className="hidden sm:block text-sm tabular-nums text-right">
-                          {clip.bonusAmount > 0 ? (
-                            <span className="text-emerald-400">
-                              +{formatCurrency(clip.bonusAmount)}
-                              <span className="text-[10px] text-emerald-400/70 ml-0.5">({clip.bonusPercent}%)</span>
-                            </span>
-                          ) : (
-                            <span className="text-[var(--text-muted)]">—</span>
-                          )}
-                        </span>
-                        <span className="text-sm text-emerald-400 tabular-nums text-right">{formatCurrency(clip.ownerEarnings)}</span>
-                        <span className="text-right">
-                          {clip.clipUrl && (
-                            <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex text-accent hover:text-accent/80">
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          )}
-                        </span>
+                        {/* Mobile card */}
+                        <div className="sm:hidden rounded-lg border border-[var(--border-color)]/50 p-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-[var(--text-primary)] truncate">{clip.accountName || "—"}</p>
+                              <p className="text-[10px] text-[var(--text-muted)]">{clip.date ? new Date(clip.date).toLocaleDateString() : "—"}</p>
+                            </div>
+                            {clip.clipUrl && (
+                              <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-accent hover:text-accent/80 flex-shrink-0">
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <p className="text-[10px] text-[var(--text-muted)]">Views</p>
+                              <p className="text-sm text-[var(--text-primary)] tabular-nums">{formatNumber(clip.views)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-[var(--text-muted)]">Clipper</p>
+                              <p className="text-sm text-accent tabular-nums">{formatCurrency(clip.clipperEarnings)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-[var(--text-muted)]">Bonus</p>
+                              {clip.bonusAmount > 0 ? (
+                                <p className="text-sm text-emerald-400 tabular-nums">+{formatCurrency(clip.bonusAmount)} <span className="text-[10px]">({clip.bonusPercent}%)</span></p>
+                              ) : (
+                                <p className="text-sm text-[var(--text-muted)]">—</p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-[var(--text-muted)]">Owner</p>
+                              <p className="text-sm text-emerald-400 tabular-nums">{formatCurrency(clip.ownerEarnings)}</p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>

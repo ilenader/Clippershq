@@ -404,12 +404,12 @@ export default function AdminCampaignsPage() {
                     <CampaignImage src={c.imageUrl} name={c.name} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle>{c.name}</CardTitle>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <CardTitle className="truncate">{c.name}</CardTitle>
                         <CardDescription>{c.platform?.replace(/,\s*/g, " · ")} {c.clientName && `· ${c.clientName}`}</CardDescription>
                       </div>
-                      <Badge variant={c.status.toLowerCase() as any}>{c.status}</Badge>
+                      <Badge variant={c.status.toLowerCase() as any} className="flex-shrink-0">{c.status}</Badge>
                     </div>
                   </div>
                 </div>
