@@ -245,7 +245,7 @@ export default function AdminAnalyticsPage() {
             <svg className={`h-4 w-4 text-[var(--text-muted)] transition-transform ${statusDropOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </button>
           {statusDropOpen && (
-            <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
+            <div className="absolute left-0 top-full z-50 mt-1 min-w-[180px] sm:min-w-[220px] max-w-[85vw] rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
               {statusOptions.map((opt) => (
                 <button
                   key={opt.value}

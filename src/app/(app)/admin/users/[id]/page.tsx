@@ -118,17 +118,17 @@ export default function UserProfilePage() {
       </button>
 
       {/* ── Header ── */}
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-4 sm:gap-5">
         {user.image ? (
-          <img src={user.image} alt="" className="h-16 w-16 rounded-full" />
+          <img src={user.image} alt="" className="h-14 w-14 sm:h-16 sm:w-16 rounded-full flex-shrink-0" />
         ) : (
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/20 text-xl font-bold text-accent">
+          <div className="flex h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 items-center justify-center rounded-full bg-accent/20 text-xl font-bold text-accent">
             {(user.username || "?")[0].toUpperCase()}
           </div>
         )}
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-[var(--text-primary)]">{user.name || user.username}</h1>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">{user.name || user.username}</h1>
             <Badge variant={roleBadge[user.role] as any}>{user.role}</Badge>
             {user.isReferred && (
               <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-400">Referred</span>
@@ -281,7 +281,7 @@ export default function UserProfilePage() {
                 <ChevronDown className={`h-4 w-4 text-[var(--text-muted)] transition-transform ${campDropOpen ? "rotate-180" : ""}`} />
               </button>
               {campDropOpen && (
-                <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] max-h-64 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
+                <div className="absolute right-0 top-full z-50 mt-1 min-w-[180px] sm:min-w-[220px] max-w-[85vw] max-h-64 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
                   <button onClick={() => { setSelectedCampaignId(""); setCampDropOpen(false); }}
                     className={`flex w-full items-center gap-2 px-4 py-2 text-sm cursor-pointer transition-colors ${!selectedCampaignId ? "text-accent bg-accent/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"}`}>
                     <div className={`h-3.5 w-3.5 rounded border ${!selectedCampaignId ? "border-accent bg-accent" : "border-[var(--border-color)]"}`}>
@@ -331,7 +331,7 @@ export default function UserProfilePage() {
       </div>
 
       {/* ── Clips ── */}
-      <div className="grid gap-4 grid-cols-3">
+      <div className="grid gap-4 grid-cols-3 sm:grid-cols-3">
         <Card className="text-center">
           <p className="text-xs text-[var(--text-muted)]">Approved</p>
           <p className="text-2xl font-bold text-emerald-400">{filteredApproved.length}</p>

@@ -59,7 +59,7 @@ export default function AgencyEarningsPage() {
             <svg className={`h-4 w-4 text-[var(--text-muted)] transition-transform ${campaignDropOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </button>
           {campaignDropOpen && (
-            <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] max-h-72 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
+            <div className="absolute right-0 top-full z-50 mt-1 min-w-[180px] sm:min-w-[220px] max-w-[85vw] max-h-72 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
               <button
                 onClick={() => { setSelectedCampaign(""); setCampaignDropOpen(false); }}
                 className={`flex w-full items-center gap-2 px-4 py-2 text-sm transition-colors cursor-pointer ${

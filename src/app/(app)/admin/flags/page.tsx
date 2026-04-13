@@ -70,7 +70,7 @@ export default function AdminFlagsPage() {
             const stat = clip.stats?.[0];
             return (
               <Card key={clip.id} className="bg-red-500/[0.03] border-red-500/15 py-4">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-[15px] font-semibold text-[var(--text-primary)]">
@@ -81,12 +81,12 @@ export default function AdminFlagsPage() {
                     <p className="text-sm text-[var(--text-secondary)]">
                       {clip.clipAccount?.username || clip.user?.username || "Clipper"} · {formatRelative(clip.createdAt)}
                     </p>
-                    <div className="mt-2 flex items-center gap-4">
+                    <div className="mt-2 flex items-center gap-3 sm:gap-4 flex-wrap">
                       <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline">
                         <ExternalLink className="h-3.5 w-3.5" /> View clip
                       </a>
                       {stat && (
-                        <div className="flex gap-4 text-sm">
+                        <div className="flex gap-3 sm:gap-4 text-sm">
                           <span><span className="font-medium text-[var(--text-primary)]">{formatNumber(stat.views)}</span> <span className="text-[var(--text-muted)]">views</span></span>
                           <span><span className="font-medium text-[var(--text-primary)]">{formatNumber(stat.likes)}</span> <span className="text-[var(--text-muted)]">likes</span></span>
                         </div>

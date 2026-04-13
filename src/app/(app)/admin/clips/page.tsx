@@ -307,7 +307,7 @@ export default function AdminClipsPage() {
                   <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-accent/15 bg-accent/5 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10 transition-colors">
                     <ExternalLink className="h-3 w-3" /> Open clip
                   </a>
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-3 sm:gap-4 text-sm flex-wrap">
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.views) : "0"}</span> <span className="text-[var(--text-muted)]">views</span></span>
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.likes) : "0"}</span> <span className="text-[var(--text-muted)]">likes</span></span>
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.comments) : "0"}</span> <span className="text-[var(--text-muted)]">comments</span></span>
@@ -392,7 +392,7 @@ export default function AdminClipsPage() {
               <p className="text-sm text-[var(--text-primary)] font-medium">{overrideClip.clipAccount?.username || "Clip"}</p>
               <p className="text-xs text-[var(--text-muted)]">{overrideClip.campaign?.name} · {formatRelative(overrideClip.createdAt)}</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input id="ov-views" label="Views" type="number" value={overrideForm.views} onChange={(e) => setOverrideForm({ ...overrideForm, views: e.target.value })} />
               <Input id="ov-likes" label="Likes" type="number" value={overrideForm.likes} onChange={(e) => setOverrideForm({ ...overrideForm, likes: e.target.value })} />
               <Input id="ov-comments" label="Comments" type="number" value={overrideForm.comments} onChange={(e) => setOverrideForm({ ...overrideForm, comments: e.target.value })} />

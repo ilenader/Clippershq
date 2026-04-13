@@ -327,7 +327,7 @@ export default function AdminCampaignsPage() {
           {/* Draft campaigns awaiting approval */}
           {filteredCampaigns.filter((c: any) => c.status === "DRAFT").map((c: any) => (
             <Card key={`review-${c.id}`} className="border-amber-500/20">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                 <div className="flex items-start gap-3">
                   <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
                     <CampaignImage src={c.imageUrl} name={c.name} />
@@ -341,7 +341,7 @@ export default function AdminCampaignsPage() {
                     <p className="text-xs text-[var(--text-muted)]">New campaign submitted by admin · {formatDate(c.createdAt)}</p>
                   </div>
                 </div>
-                <div className="flex gap-2 flex-shrink-0">
+                <div className="flex gap-2 flex-shrink-0 flex-wrap">
                   <Button size="sm" onClick={() => openEdit(c)} variant="outline" icon={<Pencil className="h-3 w-3" />}>View</Button>
                   <Button size="sm" onClick={() => reviewCampaign(c.id, true)} icon={<CheckCircle className="h-3 w-3" />}>Approve</Button>
                   <Button size="sm" variant="danger" onClick={() => reviewCampaign(c.id, false)} icon={<XCircle className="h-3 w-3" />}>Reject</Button>
@@ -357,9 +357,9 @@ export default function AdminCampaignsPage() {
             const changedFields = Object.keys(changes);
             return (
               <Card key={`edit-${edit.id}`} className="border-blue-500/20">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <FileEdit className="h-4 w-4 text-blue-400" />
                       <span className="text-sm font-medium text-[var(--text-primary)]">{edit.campaign?.name || "Campaign"}</span>
                       <Badge variant="pending">Edit Request</Badge>
@@ -374,7 +374,7 @@ export default function AdminCampaignsPage() {
                       {changedFields.length > 5 && <span className="text-[11px] text-[var(--text-muted)]">+{changedFields.length - 5} more</span>}
                     </div>
                   </div>
-                  <div className="flex gap-2 flex-shrink-0">
+                  <div className="flex gap-2 flex-shrink-0 flex-wrap">
                     <Button size="sm" variant="outline" onClick={() => setReviewingEdit(edit)} icon={<Pencil className="h-3 w-3" />}>View diff</Button>
                     <Button size="sm" onClick={() => reviewEdit(edit.id, true)} icon={<CheckCircle className="h-3 w-3" />}>Approve</Button>
                     <Button size="sm" variant="danger" onClick={() => reviewEdit(edit.id, false)} icon={<XCircle className="h-3 w-3" />}>Reject</Button>
@@ -446,7 +446,7 @@ export default function AdminCampaignsPage() {
                 )}
                 {/* Actions — only show for campaigns user can manage */}
                 {canManage && (
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-4 flex gap-2 flex-wrap">
                     <Button size="sm" variant="outline" onClick={() => openEdit(c)} icon={<Pencil className="h-3 w-3" />}>
                       {isOwner ? "Edit" : "Request edit"}
                     </Button>
