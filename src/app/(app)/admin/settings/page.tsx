@@ -76,7 +76,7 @@ export default function AdminSettingsPage() {
   // ── Compute overview stats ──
   const levelCounts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   const feeBuckets: Record<string, number> = { "9% (standard)": 0, "4% (referred)": 0 };
-  const streakBuckets: Record<string, number> = { "0": 0, "1-2": 0, "3-6": 0, "7-13": 0, "14-29": 0, "30-59": 0, "60+": 0 };
+  const streakByDay: Record<number, number> = {};
 
   for (const u of users) {
     // Level distribution
@@ -89,14 +89,19 @@ export default function AdminSettingsPage() {
 
     // Streak distribution
     const streak = u.currentStreak || 0;
-    if (streak === 0) streakBuckets["0"]++;
-    else if (streak <= 2) streakBuckets["1-2"]++;
-    else if (streak <= 6) streakBuckets["3-6"]++;
-    else if (streak <= 13) streakBuckets["7-13"]++;
-    else if (streak <= 29) streakBuckets["14-29"]++;
-    else if (streak <= 59) streakBuckets["30-59"]++;
-    else streakBuckets["60+"]++;
+    const dayKey = streak >= 60 ? 60 : streak;
+    streakByDay[dayKey] = (streakByDay[dayKey] || 0) + 1;
   }
+
+  // Build streak rows: always show 0-7, then only days with users, 60 = "60+"
+  const streakRows: { label: string; count: number }[] = [];
+  for (let d = 0; d <= 7; d++) {
+    streakRows.push({ label: d === 0 ? "0" : String(d), count: streakByDay[d] || 0 });
+  }
+  for (let d = 8; d < 60; d++) {
+    if (streakByDay[d]) streakRows.push({ label: String(d), count: streakByDay[d] });
+  }
+  if (streakByDay[60]) streakRows.push({ label: "60+", count: streakByDay[60] });
 
   return (
     <div className="space-y-8">
@@ -116,7 +121,7 @@ export default function AdminSettingsPage() {
           {/* Users by level */}
           <Card>
             <div className="flex items-center gap-2 mb-3">
-              <Star className="h-4 w-4 text-amber-400" />
+              <Star className="h-4 w-4 text-accent" />
               <p className="text-sm font-semibold text-[var(--text-primary)]">Users by Level</p>
             </div>
             <div className="space-y-1.5">
@@ -125,7 +130,7 @@ export default function AdminSettingsPage() {
                   <span className="text-sm text-[var(--text-secondary)]">Level {lvl}</span>
                   <div className="flex items-center gap-2">
                     <div className="w-20 h-2 rounded-full bg-[var(--bg-input)]">
-                      <div className="h-full rounded-full bg-amber-400" style={{ width: `${users.length ? (count / users.length) * 100 : 0}%` }} />
+                      <div className="h-full rounded-full bg-accent" style={{ width: `${users.length ? (count / users.length) * 100 : 0}%` }} />
                     </div>
                     <span className="text-sm font-medium text-[var(--text-primary)] w-8 text-right">{count}</span>
                   </div>
@@ -138,7 +143,7 @@ export default function AdminSettingsPage() {
           {/* Users by payout fee */}
           <Card>
             <div className="flex items-center gap-2 mb-3">
-              <Zap className="h-4 w-4 text-emerald-400" />
+              <Zap className="h-4 w-4 text-accent" />
               <p className="text-sm font-semibold text-[var(--text-primary)]">Users by Payout Fee</p>
             </div>
             <p className="text-xs text-[var(--text-muted)] mb-2">Fixed fees: 9% standard, 4% referred users. No streak-based reduction.</p>
@@ -148,7 +153,7 @@ export default function AdminSettingsPage() {
                   <span className="text-sm text-[var(--text-secondary)]">{fee}</span>
                   <div className="flex items-center gap-2">
                     <div className="w-20 h-2 rounded-full bg-[var(--bg-input)]">
-                      <div className="h-full rounded-full bg-emerald-400" style={{ width: `${users.length ? (count / users.length) * 100 : 0}%` }} />
+                      <div className="h-full rounded-full bg-accent" style={{ width: `${users.length ? (count / users.length) * 100 : 0}%` }} />
                     </div>
                     <span className="text-sm font-medium text-[var(--text-primary)] w-8 text-right">{count}</span>
                   </div>
@@ -157,21 +162,21 @@ export default function AdminSettingsPage() {
             </div>
           </Card>
 
-          {/* Users by streak */}
+          {/* Users by streak — individual days */}
           <Card>
             <div className="flex items-center gap-2 mb-3">
-              <Flame className="h-4 w-4 text-orange-400" />
+              <Flame className="h-4 w-4 text-accent" />
               <p className="text-sm font-semibold text-[var(--text-primary)]">Users by Streak</p>
             </div>
-            <div className="space-y-1.5">
-              {Object.entries(streakBuckets).map(([range, count]) => (
-                <div key={range} className="flex items-center justify-between">
-                  <span className="text-sm text-[var(--text-secondary)]">{range} days</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-20 h-2 rounded-full bg-[var(--bg-input)]">
-                      <div className="h-full rounded-full bg-orange-400" style={{ width: `${users.length ? (count / users.length) * 100 : 0}%` }} />
+            <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+              {streakRows.map((row) => (
+                <div key={row.label} className="flex items-center justify-between">
+                  <span className="text-xs text-[var(--text-secondary)] w-10">{row.label}d</span>
+                  <div className="flex items-center gap-2 flex-1 ml-2">
+                    <div className="flex-1 h-2 rounded-full bg-[var(--bg-input)]">
+                      <div className="h-full rounded-full bg-accent" style={{ width: `${users.length ? (row.count / users.length) * 100 : 0}%` }} />
                     </div>
-                    <span className="text-sm font-medium text-[var(--text-primary)] w-8 text-right">{count}</span>
+                    <span className="text-xs font-medium text-[var(--text-primary)] w-6 text-right tabular-nums">{row.count}</span>
                   </div>
                 </div>
               ))}
@@ -186,7 +191,7 @@ export default function AdminSettingsPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
-            <Crown className="h-5 w-5 text-amber-400" /> Monthly Leaderboard
+            <Crown className="h-5 w-5 text-accent" /> Monthly Leaderboard
           </h2>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={addEntry} icon={<Plus className="h-3.5 w-3.5" />}>Add Entry</Button>

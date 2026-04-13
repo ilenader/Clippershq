@@ -284,21 +284,23 @@ export default function ProgressPage() {
             </div>
           )}
 
-          {/* Streak grid — calendar view (0=today, reversed) */}
+          {/* Streak grid — day 1 top-left, today at position streakDaysToShow */}
           <div className="grid grid-cols-10 gap-1 sm:gap-1.5 mb-1">
             {Array.from({ length: streakDaysToShow }, (_, i) => {
-              // i=0 is today, i=1 is yesterday, etc.
-              // Reverse so oldest is top-left: show (streakDaysToShow-1) first
-              const dayIdx = streakDaysToShow - 1 - i;
-              const status = streakDayStatuses[dayIdx] || "empty";
-              const isToday = dayIdx === 0;
-              const dayNumber = dayIdx + 1;
+              // Cell i=0 is top-left (oldest day), cell i=streakDaysToShow-1 is bottom-right (today)
+              // streakDayStatuses: [0]=today, [1]=yesterday... so cell i maps to index (streakDaysToShow-1-i)
+              const statusIdx = streakDaysToShow - 1 - i;
+              const status = streakDayStatuses[statusIdx] || "empty";
+              const isToday = statusIdx === 0;
+              const dayNumber = i + 1; // display number: 1, 2, 3... streakDaysToShow
 
-              // Milestone check: map dayIdx to streak day number
-              // dayIdx 0 = today = streak day (streak), dayIdx 1 = yesterday = streak day (streak-1)
-              // Only show milestone badges on confirmed days
-              const streakDayNum = streak - dayIdx; // which streak day this represents
-              const milestone = streakDayNum > 0 ? STREAK_MILESTONES.find((m) => m.days === streakDayNum) : null;
+              // Milestone: streak day N means the Nth consecutive day
+              // statusIdx tells us how many days ago this cell is
+              // streak day number = streak - statusIdx (e.g. if streak=10, today(0)=day 10, yesterday(1)=day 9)
+              const streakDayNum = streak - statusIdx;
+              const milestone = streakDayNum > 0 && status === "confirmed"
+                ? STREAK_MILESTONES.find((m) => m.days === streakDayNum)
+                : null;
 
               let bgClass = "";
               let content: React.ReactNode = null;
@@ -314,9 +316,8 @@ export default function ProgressPage() {
                 bgClass = "border-amber-500/50 bg-amber-500/10";
                 content = <Clock className="h-3 w-3 text-amber-400" />;
               } else {
-                // empty
                 bgClass = "border-[var(--border-color)] bg-[var(--bg-card)]";
-                content = <span className="text-[11px] text-[var(--text-muted)]">{dayNumber > 99 ? "" : dayNumber}</span>;
+                content = <span className="text-[11px] text-[var(--text-muted)]">{dayNumber}</span>;
               }
 
               return (
