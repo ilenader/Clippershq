@@ -153,7 +153,45 @@ export async function PATCH(
     if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
     try {
+      // Fetch current campaign for auto-resume check
+      const oldCampaign = await db.campaign.findUnique({
+        where: { id },
+        select: { status: true, budget: true },
+      });
+
       const campaign = await db.campaign.update({ where: { id }, data });
+
+      // Auto-resume: if campaign was PAUSED and budget was increased past spent
+      if (
+        oldCampaign &&
+        oldCampaign.status === "PAUSED" &&
+        data.budget != null &&
+        oldCampaign.budget != null &&
+        data.budget > oldCampaign.budget
+      ) {
+        try {
+          const { getCampaignBudgetStatus } = await import("@/lib/balance");
+          const budgetStatus = await getCampaignBudgetStatus(id);
+          if (budgetStatus && data.budget > budgetStatus.spent) {
+            await db.campaign.update({
+              where: { id },
+              data: { status: "ACTIVE" },
+            });
+            // Reactivate tracking jobs
+            const reactivated = await db.trackingJob.updateMany({
+              where: { campaignId: id, isActive: false },
+              data: { isActive: true },
+            });
+            console.log(`[BUDGET] Campaign ${id} auto-resumed — budget increased from $${oldCampaign.budget} to $${data.budget}, spent: $${budgetStatus.spent}. Reactivated ${reactivated.count} tracking jobs.`);
+            // Re-fetch to return updated status
+            const updated = await db.campaign.findUnique({ where: { id } });
+            return NextResponse.json(updated);
+          }
+        } catch (resumeErr: any) {
+          console.error(`[BUDGET] Auto-resume check failed for campaign ${id}:`, resumeErr?.message);
+        }
+      }
+
       return NextResponse.json(campaign);
     } catch (updateErr: any) {
       console.error(`PATCH campaign ${id} DB error:`, updateErr?.message, "data:", JSON.stringify(data).substring(0, 500));
