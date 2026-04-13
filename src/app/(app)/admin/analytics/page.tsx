@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { SimpleLineChart, SimpleMultiLineChart } from "@/components/ui/simple-chart";
 import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-select";
-import { TrendingUp, Eye, Users, Film, Megaphone, Calendar, Heart, CheckCircle, Clock, DollarSign } from "lucide-react";
+import { TrendingUp, Eye, Users, Film, Megaphone, Heart, CheckCircle, Clock, DollarSign } from "lucide-react";
 import { formatNumber, formatCurrency } from "@/lib/utils";
 
 type MetricKey = "views" | "likes" | "comments" | "shares" | "earnings";
@@ -94,12 +94,6 @@ function buildPlatformViewDist(clips: any[]): { name: string; clips: number; vie
     .sort((a, b) => b.views - a.views);
 }
 
-function isToday(dateStr: string): boolean {
-  const d = new Date(dateStr);
-  const n = new Date();
-  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
-}
-
 const metricOptions = [
   { value: "views", label: "Views" },
   { value: "likes", label: "Likes" },
@@ -126,7 +120,7 @@ export default function AdminAnalyticsPage() {
   const [clipStatusFilter, setClipStatusFilter] = useState("APPROVED");
   const [statusDropOpen, setStatusDropOpen] = useState(false);
   const statusDropRef = useRef<HTMLDivElement>(null);
-  const [timeframeDays, setTimeframeDays] = useState(15);
+  const [timeframeDays, setTimeframeDays] = useState(30);
   const [leftChartMode, setLeftChartMode] = useState<"clips" | "earnings">("clips");
   const [loading, setLoading] = useState(true);
 
@@ -172,7 +166,11 @@ export default function AdminAnalyticsPage() {
     : campaignFilteredClips.filter((c: any) => c.status === clipStatusFilter);
   const filteredClips = filterByTimeframe(statusFilteredClips, timeframeDays);
 
-  const uniqueClippers = new Set(filteredClips.map((c: any) => c.userId).filter(Boolean));
+  // Active clippers: all-time (not filtered by timeframe)
+  const allCampaignFilteredClips = selectedCampaigns.length > 0
+    ? allClips.filter((c: any) => selectedCampaigns.includes(c.campaignId))
+    : allClips;
+  const uniqueClippers = new Set(allCampaignFilteredClips.map((c: any) => c.userId).filter(Boolean));
   const totalViews = filteredClips.reduce((sum: number, c: any) => sum + (c.stats?.[0]?.views || 0), 0);
   const totalLikes = filteredClips.reduce((sum: number, c: any) => sum + (c.stats?.[0]?.likes || 0), 0);
   const activeCampaigns = allCampaigns.filter((c: any) => c.status === "ACTIVE");
@@ -183,12 +181,10 @@ export default function AdminAnalyticsPage() {
   const avgCpm = withCpm.length > 0 ? withCpm.reduce((s: number, c: any) => s + (c.clipperCpm ?? c.cpmRate ?? 0), 0) / withCpm.length : 0;
   const approvedClips = filteredClips.filter((c: any) => c.status === "APPROVED").length;
   const pendingClips = filteredClips.filter((c: any) => c.status === "PENDING").length;
-  // Total campaign spend: use /api/campaigns/spend which includes clipper + owner earnings
-  const relevantCampaignIds = selectedCampaigns.length > 0
-    ? selectedCampaigns
-    : allCampaigns.map((c: any) => c.id);
-  const totalEarnings = relevantCampaignIds.reduce((s: number, cid: string) => s + (spendByCampaign[cid] || 0), 0);
-  const clipsToday = filteredClips.filter((c: any) => c.createdAt && isToday(c.createdAt)).length;
+  // Total earnings: sum of approved clip earnings within timeframe
+  const totalEarnings = filteredClips
+    .filter((c: any) => c.status === "APPROVED")
+    .reduce((s: number, c: any) => s + (c.earnings || 0), 0);
 
   const clipsPerDay = buildDailyChart(filteredClips, timeframeDays);
   const platformDist = buildPlatformDist(allAccounts);
@@ -277,7 +273,6 @@ export default function AdminAnalyticsPage() {
           { label: "Active campaigns", value: activeCampaigns.length, icon: <Megaphone className="h-5 w-5" />, color: "text-accent" },
           { label: "Total clips", value: filteredClips.length, icon: <Film className="h-5 w-5" />, color: "text-accent" },
           { label: "Active clippers", value: uniqueClippers.size, icon: <Users className="h-5 w-5" />, color: "text-accent" },
-          { label: "Clips today", value: clipsToday, icon: <Calendar className="h-5 w-5" />, color: "text-accent" },
           { label: "Approved clips", value: approvedClips, icon: <CheckCircle className="h-5 w-5" />, color: "text-accent" },
           { label: "Pending clips", value: pendingClips, icon: <Clock className="h-5 w-5" />, color: "text-accent" },
           { label: "Total views", value: formatNumber(totalViews), icon: <Eye className="h-5 w-5" />, color: "text-accent" },

@@ -31,7 +31,7 @@ export default function EarningsPage() {
   const [earningsFilters, setEarningsFilters] = useState<EarningsFilterKey[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [campaignOptions, setCampaignOptions] = useState<{ value: string; label: string }[]>([]);
-  const [timeframeDays, setTimeframeDays] = useState(15);
+  const [timeframeDays, setTimeframeDays] = useState(30);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback((campaignIds: string[], buildOptions = false) => {
@@ -87,15 +87,24 @@ export default function EarningsPage() {
 
   const summary: EarningsData = useMemo(() => {
     if (!earnings) return { totalEarned: 0, approvedEarnings: 0, pendingEarnings: 0, paidOut: 0, lockedInPayouts: 0, available: 0 };
+    // Compute earnings from timeframe-filtered clips
+    const approvedInPeriod = timeFilteredClips
+      .filter((c: any) => c.status === "APPROVED")
+      .reduce((s: number, c: any) => s + (c.earnings || 0), 0);
+    const pendingInPeriod = timeFilteredClips
+      .filter((c: any) => c.status === "PENDING")
+      .reduce((s: number, c: any) => s + (c.earnings || 0), 0);
+    const totalInPeriod = approvedInPeriod + pendingInPeriod;
     return {
-      totalEarned: earnings.totalEarned ?? 0,
-      approvedEarnings: earnings.approvedEarnings ?? 0,
-      pendingEarnings: earnings.pendingEarnings ?? 0,
+      totalEarned: Math.round(totalInPeriod * 100) / 100,
+      approvedEarnings: Math.round(approvedInPeriod * 100) / 100,
+      pendingEarnings: Math.round(pendingInPeriod * 100) / 100,
+      // Payouts are all-time (not tied to clip submission date)
       paidOut: earnings.paidOut ?? 0,
       lockedInPayouts: earnings.lockedInPayouts ?? 0,
       available: earnings.available ?? 0,
     };
-  }, [earnings]);
+  }, [earnings, timeFilteredClips]);
 
   if (loading && !earnings) {
     return (
