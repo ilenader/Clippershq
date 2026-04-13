@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
-import { Archive, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, RotateCcw, Trash2, Eye } from "lucide-react";
+import Link from "next/link";
 import { toast } from "@/lib/toast";
 
 export default function ArchivePage() {
@@ -150,6 +151,11 @@ export default function ArchivePage() {
 
                 {/* Actions */}
                 <div className="flex gap-2">
+                  <Link href={`/admin/archive/${c.id}`}>
+                    <Button size="sm" variant="outline" icon={<Eye className="h-3 w-3" />}>
+                      View Details
+                    </Button>
+                  </Link>
                   <Button size="sm" variant="outline" onClick={() => restore(c.id)} icon={<RotateCcw className="h-3 w-3" />}>
                     Restore
                   </Button>
