@@ -61,8 +61,33 @@ export async function loadConfig() {
   };
 }
 
-/** Helper: get UTC day start/end for a Date */
-function dayBounds(d: Date): { start: Date; end: Date } {
+/** Helper: get day start/end for a Date, optionally in a specific timezone */
+function dayBounds(d: Date, timezone?: string | null): { start: Date; end: Date } {
+  if (timezone) {
+    try {
+      // Get the date string in the user's timezone (YYYY-MM-DD)
+      const dateStr = d.toLocaleDateString("en-CA", { timeZone: timezone });
+      // Create midnight in that timezone by parsing as local then adjusting
+      const start = new Date(`${dateStr}T00:00:00`);
+      // Verify the timezone offset is correct by using a more reliable method
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+      }).formatToParts(d);
+      const y = parts.find((p) => p.type === "year")?.value || "2024";
+      const m = parts.find((p) => p.type === "month")?.value || "01";
+      const dd = parts.find((p) => p.type === "day")?.value || "01";
+      const midnightLocal = new Date(`${y}-${m}-${dd}T00:00:00`);
+      // Calculate UTC offset: the difference between UTC midnight and local midnight
+      const utcMidnight = new Date(`${y}-${m}-${dd}T00:00:00Z`);
+      const offset = midnightLocal.getTime() - utcMidnight.getTime();
+      const tzStart = new Date(utcMidnight.getTime() + offset);
+      const tzEnd = new Date(tzStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+      return { start: tzStart, end: tzEnd };
+    } catch {
+      // Fall back to UTC on any error
+    }
+  }
   const start = new Date(d);
   start.setUTCHours(0, 0, 0, 0);
   const end = new Date(d);
@@ -77,8 +102,15 @@ function addDays(d: Date, n: number): Date {
   return r;
 }
 
-/** Helper: same UTC day? */
-function sameDay(a: Date, b: Date): boolean {
+/** Helper: same day? Optionally in a specific timezone */
+function sameDay(a: Date, b: Date, timezone?: string | null): boolean {
+  if (timezone) {
+    try {
+      const aStr = a.toLocaleDateString("en-CA", { timeZone: timezone });
+      const bStr = b.toLocaleDateString("en-CA", { timeZone: timezone });
+      return aStr === bStr;
+    } catch {}
+  }
   return a.getUTCFullYear() === b.getUTCFullYear() &&
     a.getUTCMonth() === b.getUTCMonth() &&
     a.getUTCDate() === b.getUTCDate();
@@ -88,12 +120,12 @@ type DayStatus = "passed" | "failed" | "pending";
 
 /**
  * Evaluate a single day's streak status for a user.
- * Returns: "passed" (approved clip exists), "failed" (no clips or all rejected),
+ * Returns: "passed" (approved clip exists or day is locked), "failed" (no clips or all rejected),
  * "pending" (clips exist but not all reviewed yet).
  */
-async function evaluateDay(userId: string, date: Date): Promise<DayStatus> {
+async function evaluateDay(userId: string, date: Date, timezone?: string | null): Promise<DayStatus> {
   if (!db) return "failed";
-  const { start, end } = dayBounds(date);
+  const { start, end } = dayBounds(date, timezone);
 
   const clips = await db.clip.findMany({
     where: {
@@ -101,10 +133,12 @@ async function evaluateDay(userId: string, date: Date): Promise<DayStatus> {
       createdAt: { gte: start, lte: end },
       isDeleted: false,
     },
-    select: { status: true },
+    select: { status: true, streakDayLocked: true },
   });
 
   if (clips.length === 0) return "failed";
+  // If any clip has streakDayLocked, this day is permanently "passed"
+  if (clips.some((c: any) => c.streakDayLocked)) return "passed";
   if (clips.some((c: any) => c.status === "APPROVED")) return "passed";
   if (clips.every((c: any) => c.status === "REJECTED")) return "failed";
   // Some clips still PENDING or FLAGGED
@@ -125,10 +159,11 @@ export async function updateStreak(userId: string): Promise<void> {
 
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { lastActiveDate: true, currentStreak: true, longestStreak: true },
+    select: { lastActiveDate: true, currentStreak: true, longestStreak: true, timezone: true },
   });
   if (!user) return;
 
+  const tz = user.timezone || null;
   const now = new Date();
   const today = new Date(now);
   today.setUTCHours(0, 0, 0, 0);
@@ -174,7 +209,7 @@ export async function updateStreak(userId: string): Promise<void> {
   cursor.setUTCHours(0, 0, 0, 0);
 
   while (cursor <= latestEvaluable) {
-    const status = await evaluateDay(userId, cursor);
+    const status = await evaluateDay(userId, cursor, tz);
 
     if (status === "passed") {
       if (streakBroken) {
@@ -226,6 +261,13 @@ export async function updateStreak(userId: string): Promise<void> {
 export async function getStreakDayStatuses(userId: string, days: number = 60): Promise<string[]> {
   if (!db) return Array(days).fill("empty");
 
+  // Fetch user timezone
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { timezone: true },
+  });
+  const tz = user?.timezone || null;
+
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 
@@ -237,21 +279,18 @@ export async function getStreakDayStatuses(userId: string, days: number = 60): P
       createdAt: { gte: cutoff },
       isDeleted: false,
     },
-    select: { createdAt: true, status: true },
+    select: { createdAt: true, status: true, streakDayLocked: true },
   });
 
   const result: string[] = [];
   for (let i = 0; i < days; i++) {
     const d = addDays(today, -i);
-    const dayClips = clips.filter((c: any) => {
-      const cd = new Date(c.createdAt);
-      return cd.getUTCFullYear() === d.getUTCFullYear() &&
-        cd.getUTCMonth() === d.getUTCMonth() &&
-        cd.getUTCDate() === d.getUTCDate();
-    });
+    const dayClips = clips.filter((c: any) => sameDay(new Date(c.createdAt), d, tz));
 
     if (dayClips.length === 0) {
       result.push("empty");
+    } else if (dayClips.some((c: any) => c.streakDayLocked)) {
+      result.push("confirmed"); // permanently locked
     } else if (dayClips.some((c: any) => c.status === "APPROVED")) {
       result.push("confirmed");
     } else if (dayClips.every((c: any) => c.status === "REJECTED")) {

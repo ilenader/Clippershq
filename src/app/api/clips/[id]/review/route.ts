@@ -165,6 +165,7 @@ export async function POST(
             baseEarnings: breakdown.baseEarnings,
             bonusPercent: breakdown.bonusPercent,
             bonusAmount: breakdown.bonusAmount,
+            ...(action === "APPROVED" ? { streakDayLocked: true, streakDayLockedAt: new Date() } : {}),
           },
         });
 
@@ -194,6 +195,7 @@ export async function POST(
             rejectionReason: null,
             reviewedById: session.user.id,
             reviewedAt: new Date(),
+            ...(action === "APPROVED" ? { streakDayLocked: true, streakDayLockedAt: new Date() } : {}),
           },
         });
       }
