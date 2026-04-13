@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,11 @@ export default function ArchivePage() {
   const [destroyTarget, setDestroyTarget] = useState<any | null>(null);
   const [destroyConfirm, setDestroyConfirm] = useState("");
   const [destroying, setDestroying] = useState(false);
-  const [checkingClips, setCheckingClips] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const load = () => {
     Promise.all([
@@ -65,22 +69,27 @@ export default function ArchivePage() {
     setDestroying(false);
   };
 
-  const checkClips = async (campaignId: string) => {
-    setCheckingClips(campaignId);
-    try {
-      const res = await fetch("/api/admin/track-all", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campaignIds: [campaignId], includeInactive: true }),
+  const checkClips = (campaignId: string) => {
+    toast.success("Checking clips in the background...");
+    fetch("/api/admin/track-all", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ campaignIds: [campaignId], includeInactive: true }),
+    })
+      .then(async (res) => {
+        let data: any;
+        try { data = await res.json(); } catch { data = null; }
+        if (!mountedRef.current) return;
+        if (!res.ok) {
+          toast.error(data?.error || "Check failed.");
+        } else {
+          toast.success(data?.partial ? "Check started, still processing..." : "Clips checked — refreshing data");
+          load();
+        }
+      })
+      .catch(() => {
+        if (mountedRef.current) toast.error("Failed to check clips.");
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      toast.success("Clips checked — refreshing data");
-      load();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to check clips.");
-    }
-    setCheckingClips(null);
   };
 
   const getCampaignStats = (campaignId: string) => {
@@ -179,8 +188,6 @@ export default function ArchivePage() {
                     size="sm"
                     variant="outline"
                     onClick={() => checkClips(c.id)}
-                    loading={checkingClips === c.id}
-                    disabled={checkingClips !== null}
                     icon={<RefreshCw className="h-3 w-3" />}
                   >
                     Check Clips

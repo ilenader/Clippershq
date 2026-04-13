@@ -6,6 +6,13 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -41,10 +48,42 @@ export async function POST(req: NextRequest) {
       console.log(`[TRACK-ALL] Manual check for ${allowed.length} campaigns`);
       const { runDueTrackingJobs } = await import("@/lib/tracking");
       const start = Date.now();
-      const result = await runDueTrackingJobs({ campaignIds: allowed, source: "manual", includeInactive });
-      const elapsed = Date.now() - start;
 
+      let result;
+      try {
+        result = await withTimeout(
+          runDueTrackingJobs({ campaignIds: allowed, source: "manual", includeInactive }),
+          55_000,
+        );
+      } catch (trackErr: any) {
+        console.error("[TRACK-ALL] runDueTrackingJobs error:", trackErr?.message);
+        return NextResponse.json({
+          success: false,
+          error: "Tracking error: " + (trackErr?.message || "unknown"),
+          checked: 0,
+          errors: 1,
+          campaignsChecked: allowed.length,
+          campaignsBlocked: blocked.length,
+        });
+      }
+
+      if (result === null) {
+        console.log("[TRACK-ALL] Timed out after 55s, still processing in background");
+        return NextResponse.json({
+          success: true,
+          partial: true,
+          message: "Check started, still processing in background",
+          checked: 0,
+          errors: 0,
+          campaignsChecked: allowed.length,
+          campaignsBlocked: blocked.length,
+          elapsedMs: Date.now() - start,
+        });
+      }
+
+      const elapsed = Date.now() - start;
       return NextResponse.json({
+        success: true,
         checked: result.processed,
         errors: result.errors,
         details: result.details.slice(0, 20),
@@ -61,10 +100,34 @@ export async function POST(req: NextRequest) {
     console.log("[TRACK-ALL] Manual check for ALL campaigns");
     const { runDueTrackingJobs } = await import("@/lib/tracking");
     const start = Date.now();
-    const result = await runDueTrackingJobs({ source: "manual" });
-    const elapsed = Date.now() - start;
 
+    let result;
+    try {
+      result = await withTimeout(runDueTrackingJobs({ source: "manual" }), 55_000);
+    } catch (trackErr: any) {
+      console.error("[TRACK-ALL] runDueTrackingJobs error:", trackErr?.message);
+      return NextResponse.json({
+        success: false,
+        error: "Tracking error: " + (trackErr?.message || "unknown"),
+        checked: 0,
+        errors: 1,
+      });
+    }
+
+    if (result === null) {
+      return NextResponse.json({
+        success: true,
+        partial: true,
+        message: "Check started, still processing in background",
+        checked: 0,
+        errors: 0,
+        elapsedMs: Date.now() - start,
+      });
+    }
+
+    const elapsed = Date.now() - start;
     return NextResponse.json({
+      success: true,
       checked: result.processed,
       errors: result.errors,
       details: result.details.slice(0, 20),
@@ -74,6 +137,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("[TRACK-ALL] Fatal error:", err?.message);
-    return NextResponse.json({ error: "Tracking failed: " + (err?.message || "unknown error"), checked: 0, errors: 1 }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Tracking failed: " + (err?.message || "unknown error"), checked: 0, errors: 1 }, { status: 500 });
   }
 }

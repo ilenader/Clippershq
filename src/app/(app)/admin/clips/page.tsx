@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,8 @@ export default function AdminClipsPage() {
   const isOwner = (session?.user as any)?.role === "OWNER";
   const [clips, setClips] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
   const [loading, setLoading] = useState(true);
   const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
   const [filterCampaigns, setFilterCampaigns] = useState<string[]>([]);
@@ -176,33 +178,41 @@ export default function AdminClipsPage() {
     });
   };
 
-  const handleTrackSelected = async () => {
+  const handleTrackSelected = () => {
     if (trackSelected.size === 0) { toast.error("Select at least one campaign."); return; }
-    setTrackingAll(true);
-    setTrackResult(null);
-    try {
-      const res = await fetch("/api/admin/track-all", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campaignIds: Array.from(trackSelected) }),
+    toast.success("Checking clips in the background...");
+    setShowTrackModal(false);
+    fetch("/api/admin/track-all", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ campaignIds: Array.from(trackSelected) }),
+    })
+      .then(async (res) => {
+        let data: any;
+        try { data = await res.json(); } catch { data = null; }
+        if (!mountedRef.current) return;
+        if (!res.ok) {
+          toast.error(data?.error || "Tracking failed.");
+          return;
+        }
+        if (data?.partial) {
+          setTrackResult("Check started, still processing in background...");
+          toast.success("Check started, still processing...");
+        } else {
+          const viewChanges = (data?.details || []).filter((d: string) => /→/.test(d)).length;
+          const msg = `Checked ${data?.checked ?? 0} clips across ${data?.campaignsChecked ?? 0} campaigns. ${viewChanges > 0 ? `${viewChanges} had view changes.` : "No view changes."}`;
+          if (data?.campaignsBlocked > 0) {
+            setTrackResult(`${msg} (${data.campaignsBlocked} campaign(s) were rate-limited)`);
+          } else {
+            setTrackResult(msg);
+          }
+          toast.success(`Tracking complete — ${data?.checked ?? 0} clips checked.`);
+        }
+        load();
+      })
+      .catch(() => {
+        if (mountedRef.current) toast.error("Tracking failed.");
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      const viewChanges = (data.details || []).filter((d: string) => /→/.test(d)).length;
-      const msg = `Checked ${data.checked} clips across ${data.campaignsChecked} campaigns. ${viewChanges > 0 ? `${viewChanges} had view changes.` : "No view changes."} (${data.elapsedMs}ms)`;
-      if (data.campaignsBlocked > 0) {
-        setTrackResult(`${msg} (${data.campaignsBlocked} campaign(s) were rate-limited)`);
-      } else {
-        setTrackResult(msg);
-      }
-      toast.success(`Tracking complete — ${data.checked} clips checked.`);
-      setShowTrackModal(false);
-      load();
-    } catch (err: any) {
-      toast.error(err.message || "Tracking failed.");
-      setTrackResult(null);
-    }
-    setTrackingAll(false);
   };
 
   const rejectionExamples = ["Wrong format", "Wrong sound", "Bad quality", "Duplicate", "Suspicious", "Wrong platform"];
@@ -433,7 +443,7 @@ export default function AdminClipsPage() {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="ghost" onClick={() => setShowTrackModal(false)}>Cancel</Button>
-            <Button onClick={handleTrackSelected} loading={trackingAll} disabled={trackSelected.size === 0} icon={<RotateCcw className="h-4 w-4" />}>
+            <Button onClick={handleTrackSelected} disabled={trackSelected.size === 0} icon={<RotateCcw className="h-4 w-4" />}>
               Check {trackSelected.size} campaign{trackSelected.size !== 1 ? "s" : ""}
             </Button>
           </div>
