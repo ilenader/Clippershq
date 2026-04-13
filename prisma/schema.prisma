@@ -85,6 +85,7 @@ model User {
   referredById  String?
   manualBonusOverride Float?
   isPWAUser     Boolean    @default(false)
+  timezone      String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

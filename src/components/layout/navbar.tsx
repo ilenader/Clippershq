@@ -138,6 +138,22 @@ export function Navbar() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [notifOpen]);
 
+  // Sync browser timezone once per session
+  useEffect(() => {
+    if (!effectiveUser) return;
+    try {
+      if (sessionStorage.getItem("tz_synced")) return;
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (!tz) return;
+      sessionStorage.setItem("tz_synced", "true");
+      fetch("/api/user/timezone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timezone: tz }),
+      }).catch(() => {});
+    } catch {}
+  }, [effectiveUser]);
+
   const handleSignOut = async () => {
     if (isDevMode) {
       await clearDevAuth();
