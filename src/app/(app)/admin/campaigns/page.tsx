@@ -398,16 +398,16 @@ export default function AdminCampaignsPage() {
           {filteredCampaigns.map((c: any) => {
             const canManage = isOwner || canManageCampaign(c);
             return (
-              <Card key={c.id}>
-                <div className="flex items-start gap-4">
-                  <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
+              <Card key={c.id} className="overflow-hidden">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0 overflow-hidden rounded-xl border border-[var(--border-color)]">
                     <CampaignImage src={c.imageUrl} name={c.name} />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <CardTitle className="truncate">{c.name}</CardTitle>
-                        <CardDescription>{c.platform?.replace(/,\s*/g, " · ")} {c.clientName && `· ${c.clientName}`}</CardDescription>
+                        <CardDescription className="truncate">{c.platform?.replace(/,\s*/g, " · ")} {c.clientName && `· ${c.clientName}`}</CardDescription>
                       </div>
                       <Badge variant={c.status.toLowerCase() as any} className="flex-shrink-0">{c.status}</Badge>
                     </div>
@@ -427,7 +427,7 @@ export default function AdminCampaignsPage() {
                     </div>
                   );
                 })()}
-                <div className="mt-3 flex flex-wrap gap-3 text-sm text-[var(--text-muted)]">
+                <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs sm:text-sm text-[var(--text-muted)]">
                   {(c.clipperCpm ?? c.cpmRate) != null && <span>CPM: {formatCurrency(c.clipperCpm ?? c.cpmRate)}</span>}
                   {c.budget != null && <span>Budget: {formatCurrency(c.budget)}</span>}
                   {c.minViews != null && <span>Min: {formatNumber(c.minViews)}</span>}
@@ -446,7 +446,7 @@ export default function AdminCampaignsPage() {
                 )}
                 {/* Actions — only show for campaigns user can manage */}
                 {canManage && (
-                  <div className="mt-4 flex gap-2 flex-wrap">
+                  <div className="mt-4 flex gap-1.5 sm:gap-2 flex-wrap">
                     <Button size="sm" variant="outline" onClick={() => openEdit(c)} icon={<Pencil className="h-3 w-3" />}>
                       {isOwner ? "Edit" : "Request edit"}
                     </Button>
