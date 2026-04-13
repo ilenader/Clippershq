@@ -29,7 +29,8 @@ export async function GET() {
             amount: true, views: true, createdAt: true, clipId: true,
             clip: {
               select: {
-                clipUrl: true, earnings: true, reviewedAt: true, createdAt: true,
+                clipUrl: true, earnings: true, bonusPercent: true, bonusAmount: true,
+                reviewedAt: true, createdAt: true,
                 clipAccount: { select: { username: true, platform: true } },
               },
             },
@@ -55,6 +56,8 @@ export async function GET() {
         accountPlatform: ae.clip?.clipAccount?.platform || null,
         views: ae.views || 0,
         clipperEarnings: Math.round((ae.clip?.earnings || 0) * 100) / 100,
+        bonusPercent: ae.clip?.bonusPercent || 0,
+        bonusAmount: Math.round((ae.clip?.bonusAmount || 0) * 100) / 100,
         ownerEarnings: Math.round((ae.amount || 0) * 100) / 100,
         date: ae.clip?.reviewedAt || ae.clip?.createdAt || ae.createdAt,
       }));

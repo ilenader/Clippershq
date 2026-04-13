@@ -150,15 +150,16 @@ export default function AgencyEarningsPage() {
                 {/* Per-clip breakdown */}
                 {isExpanded && clips.length > 0 && (
                   <div className="mt-3 border-t border-[var(--border-color)] pt-3 space-y-2">
-                    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 gap-y-0.5 px-1 text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] sm:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-4 gap-y-0.5 px-1 text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
                       <span>Account</span>
                       <span className="text-right">Views</span>
                       <span className="text-right">Clipper</span>
+                      <span className="hidden sm:block text-right">Bonus</span>
                       <span className="text-right">Owner</span>
                       <span className="text-right">Link</span>
                     </div>
                     {clips.map((clip: any, i: number) => (
-                      <div key={clip.clipId || i} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 items-center px-1 py-1.5 rounded-lg hover:bg-[var(--bg-card-hover)] transition-colors">
+                      <div key={clip.clipId || i} className="grid grid-cols-[1fr_auto_auto_auto_auto] sm:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-4 items-center px-1 py-1.5 rounded-lg hover:bg-[var(--bg-card-hover)] transition-colors">
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-[var(--text-primary)] truncate">{clip.accountName || "—"}</p>
                           <p className="text-[11px] text-[var(--text-muted)]">
@@ -166,7 +167,22 @@ export default function AgencyEarningsPage() {
                           </p>
                         </div>
                         <span className="text-sm text-[var(--text-primary)] tabular-nums text-right">{formatNumber(clip.views)}</span>
-                        <span className="text-sm text-accent tabular-nums text-right">{formatCurrency(clip.clipperEarnings)}</span>
+                        <span className="text-sm text-accent tabular-nums text-right">
+                          {formatCurrency(clip.clipperEarnings)}
+                          {clip.bonusAmount > 0 && (
+                            <span className="sm:hidden text-[10px] text-emerald-400/80 ml-0.5">+{formatCurrency(clip.bonusAmount)}</span>
+                          )}
+                        </span>
+                        <span className="hidden sm:block text-sm tabular-nums text-right">
+                          {clip.bonusAmount > 0 ? (
+                            <span className="text-emerald-400">
+                              +{formatCurrency(clip.bonusAmount)}
+                              <span className="text-[10px] text-emerald-400/70 ml-0.5">({clip.bonusPercent}%)</span>
+                            </span>
+                          ) : (
+                            <span className="text-[var(--text-muted)]">—</span>
+                          )}
+                        </span>
                         <span className="text-sm text-emerald-400 tabular-nums text-right">{formatCurrency(clip.ownerEarnings)}</span>
                         <span className="text-right">
                           {clip.clipUrl && (
