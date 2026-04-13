@@ -20,6 +20,7 @@ import {
   calculateClipperEarnings,
   calculateOwnerEarnings,
 } from "@/lib/earnings-calc";
+import { getCampaignBudgetStatus } from "@/lib/balance";
 
 export interface GamificationState {
   level: number;
@@ -425,61 +426,162 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
 
   console.log(`[RECALC] Recalculating ${clips.length} unpaid clips for user ${userId} with level ${user.level}`);
 
+  // Group clips by campaign to enforce budget caps
+  const clipsByCampaign: Record<string, typeof clips> = {};
   for (const clip of clips) {
-    const stat = clip.stats[0];
-    if (!stat) continue;
+    if (!clipsByCampaign[clip.campaignId]) clipsByCampaign[clip.campaignId] = [];
+    clipsByCampaign[clip.campaignId].push(clip);
+  }
 
-    oldTotal += clip.earnings || 0;
+  // Pre-fetch budget status for all campaigns
+  const budgetStatusCache: Record<string, Awaited<ReturnType<typeof getCampaignBudgetStatus>>> = {};
+  for (const campaignId of Object.keys(clipsByCampaign)) {
+    budgetStatusCache[campaignId] = await getCampaignBudgetStatus(campaignId);
+  }
 
-    // Skip clips from campaigns that have been fully paid out
-    // (Simple heuristic: skip if campaign has ANY paid payout — more precise would be per-clip tracking)
-    if (paidCampaignIds.has(clip.campaignId)) {
-      newTotal += clip.earnings || 0;
-      continue;
+  for (const [campaignId, campaignClips] of Object.entries(clipsByCampaign)) {
+    const budgetStatus = budgetStatusCache[campaignId];
+
+    // For budget-capped campaigns, calculate total spent by OTHER users' clips first
+    // budgetStatus.spent includes ALL clips for the campaign, not just this user's
+    // We need: otherUsersSpent = budgetStatus.spent - sum(this user's current clip earnings + owner earnings)
+    let thisUserCurrentTotal = 0;
+    let thisUserCurrentOwnerTotal = 0;
+    if (budgetStatus && budgetStatus.budget > 0) {
+      for (const clip of campaignClips) {
+        thisUserCurrentTotal += clip.earnings || 0;
+      }
+      // Get this user's current owner earnings for CPM_SPLIT
+      const isCpmSplitCampaign = (campaignClips[0]?.campaign as any)?.pricingModel === "CPM_SPLIT";
+      if (isCpmSplitCampaign) {
+        try {
+          const ownerEarnings = await db.agencyEarning.findMany({
+            where: { campaignId, clipId: { in: campaignClips.map((c: any) => c.id) } },
+            select: { amount: true },
+          });
+          thisUserCurrentOwnerTotal = ownerEarnings.reduce((s: number, e: any) => s + (e.amount || 0), 0);
+        } catch {}
+      }
     }
 
-    const cpm = clip.campaign.clipperCpm ?? clip.campaign.cpmRate ?? null;
-    const result = calculateClipperEarnings({
-      views: stat.views,
-      clipperCpm: cpm,
-      campaignMinViews: clip.campaign.minViews,
-      campaignMaxPayoutPerClip: clip.campaign.maxPayoutPerClip,
-      clipperLevel: user.level,
-      clipperStreak: user.currentStreak,
-      levelBonuses: config.levelBonuses,
-      streakBonuses: config.streakBonuses,
-      isReferred: !!user.referredById,
-      isPWAUser: user.isPWAUser,
-      manualBonusOverride: user.manualBonusOverride,
-    });
+    // Running total of this user's new earnings for this campaign (to enforce budget)
+    let runningClipperTotal = 0;
+    let runningOwnerTotal = 0;
 
-    if (result.clipperEarnings !== clip.earnings || result.bonusPercent !== clip.bonusPercent) {
-      await db.clip.update({
-        where: { id: clip.id },
-        data: {
-          earnings: result.clipperEarnings,
-          baseEarnings: result.baseEarnings,
-          bonusPercent: result.bonusPercent,
-          bonusAmount: result.bonusAmount,
-        },
+    for (const clip of campaignClips) {
+      const stat = clip.stats[0];
+      if (!stat) continue;
+
+      oldTotal += clip.earnings || 0;
+
+      // Skip clips from campaigns that have been fully paid out
+      if (paidCampaignIds.has(clip.campaignId)) {
+        newTotal += clip.earnings || 0;
+        continue;
+      }
+
+      const cpm = clip.campaign.clipperCpm ?? clip.campaign.cpmRate ?? null;
+      const result = calculateClipperEarnings({
+        views: stat.views,
+        clipperCpm: cpm,
+        campaignMinViews: clip.campaign.minViews,
+        campaignMaxPayoutPerClip: clip.campaign.maxPayoutPerClip,
+        clipperLevel: user.level,
+        clipperStreak: user.currentStreak,
+        levelBonuses: config.levelBonuses,
+        streakBonuses: config.streakBonuses,
+        isReferred: !!user.referredById,
+        isPWAUser: user.isPWAUser,
+        manualBonusOverride: user.manualBonusOverride,
       });
 
-      // Update agency earnings for CPM_SPLIT (proportional to capped clipper earnings)
-      if ((clip.campaign as any).pricingModel === "CPM_SPLIT" && (clip.campaign as any).ownerCpm) {
-        const cCpm = clip.campaign.clipperCpm ?? clip.campaign.cpmRate ?? null;
-        const ownerAmt = calculateOwnerEarnings(stat.views, (clip.campaign as any).ownerCpm, result.baseEarnings, cCpm);
-        if (ownerAmt > 0) {
-          await db.agencyEarning.upsert({
-            where: { clipId: clip.id },
-            create: { campaignId: clip.campaignId, clipId: clip.id, amount: ownerAmt, views: stat.views },
-            update: { amount: ownerAmt, views: stat.views },
-          });
+      let finalClipperEarnings = result.clipperEarnings;
+      let finalBaseEarnings = result.baseEarnings;
+
+      // Calculate owner earnings for CPM_SPLIT
+      const isCpmSplit = (clip.campaign as any).pricingModel === "CPM_SPLIT" && (clip.campaign as any).ownerCpm;
+      const cCpm = clip.campaign.clipperCpm ?? clip.campaign.cpmRate ?? null;
+      let ownerAmt = isCpmSplit
+        ? calculateOwnerEarnings(stat.views, (clip.campaign as any).ownerCpm, result.baseEarnings, cCpm)
+        : 0;
+
+      // Budget cap check
+      if (budgetStatus && budgetStatus.budget > 0) {
+        const otherSpent = budgetStatus.spent - thisUserCurrentTotal - thisUserCurrentOwnerTotal;
+        const budgetForAll = Math.max(budgetStatus.budget - otherSpent, 0);
+        const alreadyUsed = runningClipperTotal + runningOwnerTotal;
+        const remaining = Math.max(budgetForAll - alreadyUsed, 0);
+        const totalForThisClip = finalClipperEarnings + ownerAmt;
+
+        if (remaining <= 0) {
+          // No budget left — keep at 0
+          finalClipperEarnings = 0;
+          finalBaseEarnings = 0;
+          ownerAmt = 0;
+          console.log(`[RECALC-BUDGET] No budget remaining for clip ${clip.id} in campaign ${campaignId}`);
+        } else if (totalForThisClip > remaining) {
+          // Ratio-based cap (same logic as tracking.ts)
+          const clipperCpmVal = (clip.campaign as any).clipperCpm || (clip.campaign as any).cpmRate || 1;
+          const ownerCpmVal = (clip.campaign as any).ownerCpm || 0;
+          const totalCpm = clipperCpmVal + ownerCpmVal;
+          const clipperRatio = clipperCpmVal / totalCpm;
+          const ownerRatio = ownerCpmVal / totalCpm;
+
+          finalClipperEarnings = Math.round(remaining * clipperRatio * 100) / 100;
+          ownerAmt = Math.round(remaining * ownerRatio * 100) / 100;
+          if (finalClipperEarnings + ownerAmt > remaining) {
+            finalClipperEarnings = Math.round((remaining - ownerAmt) * 100) / 100;
+          }
+          finalClipperEarnings = Math.max(finalClipperEarnings, 0);
+          ownerAmt = Math.max(ownerAmt, 0);
+          // Adjust base earnings proportionally
+          if (result.clipperEarnings > 0) {
+            finalBaseEarnings = Math.round(result.baseEarnings * (finalClipperEarnings / result.clipperEarnings) * 100) / 100;
+          }
+
+          console.log(`[RECALC-BUDGET] Ratio-capped clip ${clip.id}: clipper=$${finalClipperEarnings} owner=$${ownerAmt} remaining=$${remaining.toFixed(2)}`);
         }
       }
 
-      clipsUpdated++;
+      runningClipperTotal += finalClipperEarnings;
+      runningOwnerTotal += ownerAmt;
+
+      // Recalculate bonus amounts based on final capped earnings
+      const finalBonusAmount = finalClipperEarnings > 0 ? Math.round((finalClipperEarnings - finalBaseEarnings) * 100) / 100 : 0;
+
+      if (finalClipperEarnings !== clip.earnings || result.bonusPercent !== clip.bonusPercent) {
+        await db.clip.update({
+          where: { id: clip.id },
+          data: {
+            earnings: finalClipperEarnings,
+            baseEarnings: finalBaseEarnings,
+            bonusPercent: result.bonusPercent,
+            bonusAmount: Math.max(finalBonusAmount, 0),
+          },
+        });
+
+        // Update agency earnings for CPM_SPLIT
+        if (isCpmSplit) {
+          if (ownerAmt > 0) {
+            await db.agencyEarning.upsert({
+              where: { clipId: clip.id },
+              create: { campaignId: clip.campaignId, clipId: clip.id, amount: ownerAmt, views: stat.views },
+              update: { amount: ownerAmt, views: stat.views },
+            });
+          } else {
+            // Budget exhausted — zero out owner earnings
+            await db.agencyEarning.upsert({
+              where: { clipId: clip.id },
+              create: { campaignId: clip.campaignId, clipId: clip.id, amount: 0, views: stat.views },
+              update: { amount: 0 },
+            });
+          }
+        }
+
+        clipsUpdated++;
+      }
+      newTotal += finalClipperEarnings;
     }
-    newTotal += result.clipperEarnings;
   }
 
   // Update user totals
