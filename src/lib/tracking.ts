@@ -256,10 +256,17 @@ async function processTrackingJob(
     // ── Earnings recalculation ──
     const freshCampaign = await db.campaign.findUnique({
       where: { id: clip.campaignId },
-      select: { status: true, budget: true },
+      select: { status: true, budget: true, lastBudgetPauseAt: true },
     });
 
     if (clip.status === "APPROVED" && clip.campaign && freshCampaign?.status !== "PAUSED" && freshCampaign?.status !== "ARCHIVED") {
+      // Budget-lock: old clips from before a budget pause keep their earnings
+      const budgetPauseAt = freshCampaign?.lastBudgetPauseAt ? new Date(freshCampaign.lastBudgetPauseAt) : null;
+      if (budgetPauseAt && new Date(clip.createdAt) < budgetPauseAt && (clip.earnings || 0) > 0) {
+        console.log(`[BUDGET-LOCK] Clip ${clip.id} locked at $${clip.earnings} — submitted before budget pause`);
+        // Still update stats below, but skip earnings recalculation
+      } else {
+      // Normal earnings calculation
       const breakdown = recalculateClipEarningsBreakdown({
         stats: [{ views: stats.views }],
         campaign: clip.campaign,
@@ -322,7 +329,7 @@ async function processTrackingJob(
           // Auto-pause BEFORE saving earnings (with $0.01 tolerance)
           const newTotalSpent = otherSpent + newEarnings + newOwnerAmt;
           if (newTotalSpent >= budgetStatus.budget - 0.01) {
-            await db.campaign.update({ where: { id: clip.campaignId }, data: { status: "PAUSED" } });
+            await db.campaign.update({ where: { id: clip.campaignId }, data: { status: "PAUSED", lastBudgetPauseAt: new Date() } });
             console.log(`[BUDGET] Campaign ${clip.campaignId} paused — budget $${budgetStatus.budget} reached (spent: $${newTotalSpent.toFixed(2)})`);
             details.push(`Campaign ${clip.campaignId}: AUTO-PAUSED (budget $${budgetStatus.budget} reached)`);
           }
@@ -390,6 +397,7 @@ async function processTrackingJob(
           broadcastToUser(clip.userId, "earnings_updated", { reason: "tracking" });
         } catch {}
       }
+    } // end budget-lock else
     } else if (clip.status === "APPROVED" && (freshCampaign?.status === "PAUSED" || freshCampaign?.status === "ARCHIVED")) {
       console.log(`[BUDGET-CHECK] Skipping earnings for clip ${clip.id} — campaign is ${freshCampaign?.status}`);
     }
@@ -539,7 +547,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
       if (bs && bs.budget > 0 && bs.spent >= bs.budget - 0.01) {
         const campaign = await db.campaign.findUnique({ where: { id: cId }, select: { status: true } });
         if (campaign && campaign.status === "ACTIVE") {
-          await db.campaign.update({ where: { id: cId }, data: { status: "PAUSED" } });
+          await db.campaign.update({ where: { id: cId }, data: { status: "PAUSED", lastBudgetPauseAt: new Date() } });
           console.log(`[BUDGET] Final sweep: Campaign ${cId} auto-paused — spent $${bs.spent.toFixed(2)} of $${bs.budget}`);
           details.push(`Campaign ${cId}: AUTO-PAUSED in final sweep`);
         }

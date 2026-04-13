@@ -415,7 +415,7 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
     where: { userId, status: "APPROVED", isDeleted: false },
     include: {
       stats: { orderBy: { checkedAt: "desc" }, take: 1 },
-      campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true } },
+      campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true, lastBudgetPauseAt: true } },
     },
   });
 
@@ -477,6 +477,15 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
       // Skip clips from campaigns that have been fully paid out
       if (paidCampaignIds.has(clip.campaignId)) {
         newTotal += clip.earnings || 0;
+        continue;
+      }
+
+      // Budget-lock: old clips from before a budget pause keep their earnings
+      const budgetPauseAt = (clip.campaign as any).lastBudgetPauseAt ? new Date((clip.campaign as any).lastBudgetPauseAt) : null;
+      if (budgetPauseAt && new Date(clip.createdAt) < budgetPauseAt && (clip.earnings || 0) > 0) {
+        console.log(`[RECALC-BUDGET-LOCK] Clip ${clip.id} locked at $${clip.earnings} — submitted before budget pause`);
+        newTotal += clip.earnings || 0;
+        runningClipperTotal += clip.earnings || 0;
         continue;
       }
 

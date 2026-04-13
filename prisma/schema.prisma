@@ -191,9 +191,10 @@ model Campaign {
   startDate       DateTime?
   endDate         DateTime?
   createdById     String?
-  isArchived      Boolean        @default(false)
-  archivedAt      DateTime?
-  archivedById    String?
+  isArchived         Boolean        @default(false)
+  archivedAt         DateTime?
+  archivedById       String?
+  lastBudgetPauseAt  DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
