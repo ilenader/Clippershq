@@ -175,7 +175,7 @@ export async function PATCH(
           if (budgetStatus && data.budget > budgetStatus.spent) {
             await db.campaign.update({
               where: { id },
-              data: { status: "ACTIVE" },
+              data: { status: "ACTIVE", lastBudgetPauseAt: new Date() },
             });
             // Reactivate tracking jobs
             const reactivated = await db.trackingJob.updateMany({
