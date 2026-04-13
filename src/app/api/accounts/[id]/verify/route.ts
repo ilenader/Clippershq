@@ -109,23 +109,74 @@ function logHtmlDiagnostics(html: string, code: string, profileLink: string) {
 }
 
 async function checkInstagramBio(profileLink: string, code: string): Promise<{ found: boolean; error?: string; debug?: string }> {
-  const apiKey = process.env.BROWSERLESS_API_KEY || process.env.BROWSERLESS_TOKEN || "";
-  if (!apiKey) {
-    console.log(`[VERIFY] No BROWSERLESS_API_KEY set — cannot verify Instagram`);
-    return { found: false, error: "Instagram verification is not configured. Ask an admin to verify manually.", debug: "No BROWSERLESS_API_KEY" };
-  }
-
-  const baseUrl = process.env.BROWSERLESS_URL || "https://chrome.browserless.io";
   const username = profileLink.split("/").filter(Boolean).pop() || "";
   console.log(`[VERIFY] ════ INSTAGRAM VERIFY START ════`);
-  console.log(`[VERIFY] Base URL: ${baseUrl}`);
   console.log(`[VERIFY] Profile: ${profileLink}`);
   console.log(`[VERIFY] Username: ${username}`);
   console.log(`[VERIFY] Code: ${code}`);
 
-  // ── ATTEMPT 1: /content endpoint (full rendered HTML) ──
+  // ── ATTEMPT 1: Apify Instagram Profile Scraper (fastest, ~4s) ──
+  const apifyToken = process.env.APIFY_API_KEY || process.env.APIFY_TOKEN || "";
+  if (apifyToken) {
+    try {
+      console.log(`[VERIFY] Trying Apify first for Instagram`);
+      const apifyCtrl = new AbortController();
+      const apifyTimeout = setTimeout(() => apifyCtrl.abort(), 60000);
+
+      const apifyRes = await fetch(
+        `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${apifyToken}`,
+        {
+          method: "POST",
+          signal: apifyCtrl.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            usernames: [username],
+            resultsLimit: 1,
+          }),
+        }
+      );
+      clearTimeout(apifyTimeout);
+
+      if (apifyRes.ok) {
+        const apifyData = await apifyRes.json();
+        const bio = apifyData?.[0]?.biography || apifyData?.[0]?.bio || "";
+        console.log(`[VERIFY] Apify returned bio: "${String(bio).substring(0, 200)}"`);
+
+        const codeUpper = code.trim().toUpperCase();
+        const bioUpper = String(bio).toUpperCase();
+        const foundInBio = bioUpper.includes(codeUpper);
+        console.log(`[VERIFY] Code "${code}" found in bio: ${foundInBio}`);
+
+        if (foundInBio) {
+          console.log(`[VERIFY] ✓ Code found via Apify`);
+          return { found: true };
+        }
+        console.log(`[VERIFY] ✗ Apify: code not found in bio`);
+      } else {
+        const errText = await apifyRes.text().catch(() => "");
+        console.log(`[VERIFY] Apify failed: HTTP ${apifyRes.status} - ${errText.substring(0, 300)}`);
+      }
+    } catch (err: any) {
+      console.log(`[VERIFY] Apify exception: ${err?.name} ${err?.message}`);
+    }
+  } else {
+    console.log(`[VERIFY] No APIFY_API_KEY set — skipping Apify`);
+  }
+
+  // ── Browserless fallback ──
+  const apiKey = process.env.BROWSERLESS_API_KEY || process.env.BROWSERLESS_TOKEN || "";
+  if (!apiKey) {
+    console.log(`[VERIFY] No BROWSERLESS_API_KEY set — no fallback available`);
+    return { found: false, error: "Instagram verification failed. Ask an admin to verify manually.", debug: "Apify failed, no Browserless key" };
+  }
+
+  console.log(`[VERIFY] Apify failed, falling back to Browserless`);
+  const baseUrl = process.env.BROWSERLESS_URL || "https://chrome.browserless.io";
+  console.log(`[VERIFY] Browserless URL: ${baseUrl}`);
+
+  // ── ATTEMPT 2: /content endpoint (full rendered HTML) ──
   try {
-    console.log(`[VERIFY] ── Attempt 1: /content ──`);
+    console.log(`[VERIFY] ── Attempt 2: /content ──`);
     const contentUrl = `${baseUrl}/content?token=${apiKey}`;
     const ctrl1 = new AbortController();
     const t1 = setTimeout(() => ctrl1.abort(), 40000);
@@ -170,9 +221,9 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
     console.log(`[VERIFY] /content exception: ${err?.name} ${err?.message}`);
   }
 
-  // ── ATTEMPT 2: /scrape endpoint (targeted element extraction) ──
+  // ── ATTEMPT 3: /scrape endpoint (targeted element extraction) ──
   try {
-    console.log(`[VERIFY] ── Attempt 2: /scrape ──`);
+    console.log(`[VERIFY] ── Attempt 3: /scrape ──`);
     const scrapeUrl = `${baseUrl}/scrape?token=${apiKey}`;
     const ctrl2 = new AbortController();
     const t2 = setTimeout(() => ctrl2.abort(), 35000);
@@ -214,9 +265,9 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
     console.log(`[VERIFY] /scrape exception: ${err?.name} ${err?.message}`);
   }
 
-  // ── ATTEMPT 3: /function endpoint (custom JS to extract bio) ──
+  // ── ATTEMPT 4: /function endpoint (custom JS to extract bio) ──
   try {
-    console.log(`[VERIFY] ── Attempt 3: /function ──`);
+    console.log(`[VERIFY] ── Attempt 4: /function ──`);
     const fnUrl = `${baseUrl}/function?token=${apiKey}`;
     const ctrl3 = new AbortController();
     const t3 = setTimeout(() => ctrl3.abort(), 35000);
@@ -250,61 +301,11 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
     console.log(`[VERIFY] /function exception: ${err?.name} ${err?.message}`);
   }
 
-  console.log(`[VERIFY] ════ ALL 3 BROWSERLESS METHODS FAILED ════`);
-
-  // ── ATTEMPT 4: Apify Instagram Profile Scraper (fallback) ──
-  const apifyToken = process.env.APIFY_API_KEY || process.env.APIFY_TOKEN || "";
-  if (apifyToken) {
-    try {
-      console.log(`[VERIFY] Instagram: trying Apify...`);
-      const apifyCtrl = new AbortController();
-      const apifyTimeout = setTimeout(() => apifyCtrl.abort(), 60000);
-
-      const apifyRes = await fetch(
-        `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${apifyToken}`,
-        {
-          method: "POST",
-          signal: apifyCtrl.signal,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            usernames: [username],
-            resultsLimit: 1,
-          }),
-        }
-      );
-      clearTimeout(apifyTimeout);
-
-      if (apifyRes.ok) {
-        const apifyData = await apifyRes.json();
-        const bio = apifyData?.[0]?.biography || apifyData?.[0]?.bio || "";
-        console.log(`[VERIFY] Apify returned bio: "${String(bio).substring(0, 200)}"`);
-
-        const codeUpper = code.trim().toUpperCase();
-        const bioUpper = String(bio).toUpperCase();
-        const foundInBio = bioUpper.includes(codeUpper);
-        console.log(`[VERIFY] Code "${code}" found in bio: ${foundInBio}`);
-
-        if (foundInBio) {
-          console.log(`[VERIFY] ✓ Code found via Apify`);
-          return { found: true };
-        }
-        console.log(`[VERIFY] ✗ Apify: code not found in bio`);
-      } else {
-        const errText = await apifyRes.text().catch(() => "");
-        console.log(`[VERIFY] Apify failed: HTTP ${apifyRes.status} - ${errText.substring(0, 300)}`);
-      }
-    } catch (err: any) {
-      console.log(`[VERIFY] Apify exception: ${err?.name} ${err?.message}`);
-    }
-  } else {
-    console.log(`[VERIFY] No APIFY_API_KEY set — skipping Apify fallback`);
-  }
-
   console.log(`[VERIFY] ════ ALL METHODS FAILED ════`);
   return {
     found: false,
     error: "Instagram verification failed. Please ask an admin to verify manually.",
-    debug: "All Browserless + Apify methods failed",
+    debug: "All Apify + Browserless methods failed",
   };
 }
 
