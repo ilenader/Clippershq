@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { Award, Flame, Zap, Trophy, Users, Crown, TrendingUp, ChevronRight, ChevronDown, Clock } from "lucide-react";
+import { Award, Flame, Zap, Trophy, Users, Crown, TrendingUp, ChevronRight, ChevronDown, Clock, Check } from "lucide-react";
 
 const LEVEL_TABLE = [
   { level: 0, earn: 0, bonus: 0, label: "$0", name: "Starter" },
@@ -25,6 +25,22 @@ const STREAK_MILESTONES = [
   { days: 90, bonus: 10 },
 ];
 
+function getCountdown(timezone: string | null): { hours: number; minutes: number } {
+  try {
+    const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, hour: "numeric", minute: "numeric", hour12: false,
+    }).formatToParts(now);
+    const h = parseInt(parts.find((p) => p.type === "hour")?.value || "0");
+    const m = parseInt(parts.find((p) => p.type === "minute")?.value || "0");
+    const minutesLeft = (23 - h) * 60 + (59 - m);
+    return { hours: Math.floor(minutesLeft / 60), minutes: minutesLeft % 60 };
+  } catch {
+    return { hours: 0, minutes: 0 };
+  }
+}
+
 export default function ProgressPage() {
   const { data: session } = useSession();
   const router = useRouter();
@@ -40,6 +56,7 @@ export default function ProgressPage() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFull60, setShowFull60] = useState(false);
+  const [countdown, setCountdown] = useState({ hours: 0, minutes: 0 });
 
   useEffect(() => {
     Promise.all([
@@ -50,6 +67,15 @@ export default function ProgressPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  // Countdown timer — update every minute
+  useEffect(() => {
+    if (!gam) return;
+    const tz = gam.userTimezone || null;
+    setCountdown(getCountdown(tz));
+    const interval = setInterval(() => setCountdown(getCountdown(tz)), 60_000);
+    return () => clearInterval(interval);
+  }, [gam]);
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-color)] border-t-accent" /></div>;
@@ -63,6 +89,8 @@ export default function ProgressPage() {
   const earningsToNext = gam?.earningsToNextLevel || 0;
   const streakReward = gam?.streakReward;
   const nextStreakReward = gam?.nextStreakReward;
+  const streakDayStatuses: string[] = gam?.streakDayStatuses || [];
+  const pendingStreakDays = gam?.pendingStreakDays || 0;
 
   const currentLevelData = LEVEL_TABLE[level] || LEVEL_TABLE[0];
   const nextLevelData = LEVEL_TABLE[level + 1];
@@ -71,6 +99,10 @@ export default function ProgressPage() {
     : 100;
 
   const streakDaysToShow = showFull60 ? 60 : 30;
+
+  // Today's status (index 0)
+  const todayStatus = streakDayStatuses[0] || "empty";
+  const postedToday = todayStatus === "confirmed" || todayStatus === "pending";
 
   return (
     <div className="space-y-8">
@@ -197,59 +229,88 @@ export default function ProgressPage() {
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">{streak}-Day Streak</h2>
             {streakReward && <span className="rounded-full bg-accent/10 border border-accent/20 px-2.5 py-0.5 text-xs font-bold text-accent">+{streakReward.bonusPercent}%</span>}
           </div>
+
+          {/* Countdown timer */}
+          <div className="mb-4 rounded-xl border border-[var(--border-color)] px-4 py-3 text-center">
+            {postedToday ? (
+              <p className="text-sm font-medium text-emerald-400">
+                <Check className="h-4 w-4 inline-block mr-1 -mt-0.5" />
+                {todayStatus === "confirmed" ? "You've posted today — streak safe!" : "Clip submitted — waiting for review"}
+              </p>
+            ) : (
+              <p className="text-sm font-medium text-accent">
+                <Clock className="h-4 w-4 inline-block mr-1 -mt-0.5" />
+                {countdown.hours}h {countdown.minutes}m left to post today
+              </p>
+            )}
+          </div>
+
           <p className="text-sm text-[var(--text-secondary)] mb-2">
             You need at least <strong className="text-[var(--text-primary)]">1 approved clip per day</strong> to keep your streak. Rejected or flagged clips do <strong className="text-[var(--text-primary)]">not</strong> count.
-          </p>
-          <p className="text-sm text-accent mb-2">
-            No botted or invalid clips. Miss a day and your streak resets.
           </p>
           <p className="text-xs text-[var(--text-muted)] mb-4">
             Clips have a 48-hour grace period for review before the day is counted.
           </p>
 
-          {/* Streak grid — 30 days default, expandable to 60 */}
-          <div className="grid grid-cols-10 gap-1 sm:gap-1.5 mb-2">
+          {/* Streak grid — calendar view (0=today, reversed) */}
+          <div className="grid grid-cols-10 gap-1 sm:gap-1.5 mb-1">
             {Array.from({ length: streakDaysToShow }, (_, i) => {
-              const day = i + 1;
-              const milestone = STREAK_MILESTONES.find((m) => m.days === day);
-              const isCompleted = day <= streak;
-              const isCurrent = day === streak + 1;
+              // i=0 is today, i=1 is yesterday, etc.
+              // Reverse so oldest is top-left: show (streakDaysToShow-1) first
+              const dayIdx = streakDaysToShow - 1 - i;
+              const status = streakDayStatuses[dayIdx] || "empty";
+              const isToday = dayIdx === 0;
+              const dayNumber = dayIdx + 1;
 
-              // Check if this day has pending clips (within 48h grace)
-              // streakDayStatuses is indexed 0=today, so day N from streak start
-              // needs mapping: streak grid day 1 = streak start, but statuses are recent days
-              // For the pending indicator we check the RECENT days (last 2-3)
-              const daysAgo = streak + 1 - day; // how many days ago is this grid cell
-              // We only show pending for cells that represent recent days (today, yesterday, 2 days ago)
-              const dayStatusIdx = i < 3 ? (streakDaysToShow - 1 - i) : -1; // not used for old days
-              // Simpler: check if this is one of the days right after the streak
-              const recentDayIdx = day - streak - 1; // 0 = first day after streak, 1 = second, etc.
-              const streakDayStatuses: string[] = gam?.streakDayStatuses || [];
-              const isPending = recentDayIdx >= 0 && recentDayIdx < 3 &&
-                streakDayStatuses.length > recentDayIdx &&
-                streakDayStatuses[recentDayIdx] === "pending";
+              // Milestone check: map dayIdx to streak day number
+              // dayIdx 0 = today = streak day (streak), dayIdx 1 = yesterday = streak day (streak-1)
+              // Only show milestone badges on confirmed days
+              const streakDayNum = streak - dayIdx; // which streak day this represents
+              const milestone = streakDayNum > 0 ? STREAK_MILESTONES.find((m) => m.days === streakDayNum) : null;
+
+              let bgClass = "";
+              let content: React.ReactNode = null;
+
+              if (status === "confirmed") {
+                bgClass = milestone
+                  ? "bg-accent border-accent"
+                  : "bg-accent/60 border-accent/60";
+                content = milestone
+                  ? <span className="text-[10px] sm:text-[11px] font-extrabold text-white">+{milestone.bonus}%</span>
+                  : <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />;
+              } else if (status === "pending") {
+                bgClass = "border-amber-500/50 bg-amber-500/10";
+                content = <Clock className="h-3 w-3 text-amber-400" />;
+              } else {
+                // empty
+                bgClass = "border-[var(--border-color)] bg-[var(--bg-card)]";
+                content = <span className="text-[11px] text-[var(--text-muted)]">{dayNumber > 99 ? "" : dayNumber}</span>;
+              }
 
               return (
-                <div key={day} title={isPending ? "Waiting for review (48h grace period)" : undefined}
-                  className={`flex items-center justify-center h-8 w-8 sm:h-9 sm:w-auto rounded-lg border font-bold transition-all ${
-                  isCompleted
-                    ? milestone ? "bg-accent border-accent" : "bg-accent/60 border-accent/60"
-                    : isPending ? "border-yellow-500/50 bg-yellow-500/10"
-                    : isCurrent ? "border-accent/50 bg-accent/10"
-                    : "border-[var(--border-color)]"
-                }`}>
-                  {milestone ? (
-                    <span className={`text-[10px] sm:text-[11px] font-extrabold ${isCompleted ? "text-white" : "text-accent"}`}>+{milestone.bonus}%</span>
-                  ) : isPending ? (
-                    <Clock className="h-3 w-3 text-yellow-400" />
-                  ) : (
-                    <span className={`text-xs sm:text-[13px] font-semibold ${isCompleted ? "text-white" : isCurrent ? "text-accent font-bold" : "text-[var(--text-primary)]"}`}>
-                      {isCompleted ? "✓" : day}
+                <div
+                  key={i}
+                  title={isToday ? "Today" : status === "pending" ? "Waiting for review" : status === "confirmed" ? "Approved" : `Day ${dayNumber}`}
+                  className={`relative flex items-center justify-center h-7 w-7 sm:h-8 sm:w-auto rounded-lg border font-bold transition-all ${bgClass} ${
+                    isToday ? "ring-2 ring-accent ring-offset-1 ring-offset-[var(--bg-page)]" : ""
+                  }`}
+                >
+                  {content}
+                  {isToday && (
+                    <span className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 text-[8px] sm:text-[9px] font-bold text-accent leading-none">
+                      TODAY
                     </span>
                   )}
                 </div>
               );
             })}
+          </div>
+
+          {/* Legend */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-5 mb-2 text-[10px] sm:text-[11px] text-[var(--text-muted)]">
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent/60" /> Approved</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-500/30 border border-amber-500/50" /> Pending review</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--bg-card)] border border-[var(--border-color)]" /> No clip</span>
           </div>
 
           {/* Toggle 30/60 days */}
@@ -262,20 +323,15 @@ export default function ProgressPage() {
           </button>
 
           {/* Milestone summary */}
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {STREAK_MILESTONES.map((m) => (
               <div key={m.days} className={`rounded-xl border px-2 py-2 text-center ${streak >= m.days ? "border-accent/30 bg-accent/10" : "border-[var(--border-color)]"}`}>
-                <p className="text-base font-bold text-[var(--text-primary)]">{m.days}d</p>
+                <p className="text-sm sm:text-base font-bold text-[var(--text-primary)]">{m.days}d</p>
                 <p className="text-xs font-bold text-accent">+{m.bonus}%</p>
               </div>
             ))}
           </div>
 
-          {streak > 0 && (
-            <div className="mt-4 rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-center">
-              <p className="text-sm text-accent font-medium">Post today to keep your streak alive!</p>
-            </div>
-          )}
           {nextStreakReward && streak < nextStreakReward.days && (
             <p className="text-sm text-[var(--text-secondary)] mt-3 text-center">
               <strong className="text-accent">{nextStreakReward.days - streak}</strong> more day{nextStreakReward.days - streak !== 1 ? "s" : ""} to unlock <strong className="text-accent">+{nextStreakReward.bonusPercent}%</strong>

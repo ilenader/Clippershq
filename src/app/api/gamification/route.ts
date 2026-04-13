@@ -48,7 +48,16 @@ export async function GET(req: NextRequest) {
   const state = await getGamificationState(session.user.id);
   // Include day-by-day statuses for the streak grid (0=today, 1=yesterday, etc.)
   const streakDayStatuses = await getStreakDayStatuses(session.user.id, 60);
-  return NextResponse.json({ ...(state || {}), streakDayStatuses });
+  // Include user timezone for countdown timer
+  let userTimezone: string | null = null;
+  try {
+    const { db } = await import("@/lib/db");
+    if (db) {
+      const u = await db.user.findUnique({ where: { id: session.user.id }, select: { timezone: true } });
+      userTimezone = u?.timezone || null;
+    }
+  } catch {}
+  return NextResponse.json({ ...(state || {}), streakDayStatuses, userTimezone });
 }
 
 /** POST — owner updates gamification config */
