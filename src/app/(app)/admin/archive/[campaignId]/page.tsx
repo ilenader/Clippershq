@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
-import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Users, Eye, Film, ThumbsUp, DollarSign, BarChart3, XCircle, MessageCircle } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Users, Eye, Film, ThumbsUp, DollarSign, BarChart3, XCircle, MessageCircle, RefreshCw } from "lucide-react";
+import { toast } from "@/lib/toast";
 
 interface ClipData {
   clipId: string;
@@ -48,8 +49,9 @@ export default function ArchiveCampaignPage() {
   const [expandedClippers, setExpandedClippers] = useState<Set<string>>(new Set());
   const [showDesc, setShowDesc] = useState(false);
   const [showReqs, setShowReqs] = useState(false);
+  const [checkingClips, setCheckingClips] = useState(false);
 
-  useEffect(() => {
+  const loadData = () => {
     fetch(`/api/admin/archive/${campaignId}`)
       .then((r) => {
         if (!r.ok) throw new Error(r.status === 403 ? "Forbidden" : "Not found");
@@ -58,7 +60,27 @@ export default function ArchiveCampaignPage() {
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [campaignId]);
+  };
+
+  useEffect(() => { loadData(); }, [campaignId]);
+
+  const checkClips = async () => {
+    setCheckingClips(true);
+    try {
+      const res = await fetch("/api/admin/track-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaignIds: [campaignId], includeInactive: true }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Failed");
+      toast.success("Clips checked — refreshing data");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to check clips.");
+    }
+    setCheckingClips(false);
+  };
 
   const toggleClipper = (userId: string) => {
     setExpandedClippers((prev) => {
@@ -110,7 +132,17 @@ export default function ArchiveCampaignPage() {
               {campaign.platform?.replace(/,\s*/g, " · ")}
             </p>
           </div>
-          <div className="flex gap-2 flex-shrink-0">
+          <div className="flex flex-wrap gap-2 flex-shrink-0 items-center">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={checkClips}
+              loading={checkingClips}
+              disabled={checkingClips}
+              icon={<RefreshCw className="h-3 w-3" />}
+            >
+              Check Clips
+            </Button>
             <Badge variant={isCpmSplit ? "verified" : "completed"}>
               {isCpmSplit ? "CPM Split" : "Agency Fee"}
             </Badge>

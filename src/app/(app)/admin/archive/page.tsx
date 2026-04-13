@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
-import { Archive, RotateCcw, Trash2, Eye } from "lucide-react";
+import { Archive, RotateCcw, Trash2, Eye, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { toast } from "@/lib/toast";
 
@@ -19,6 +19,7 @@ export default function ArchivePage() {
   const [destroyTarget, setDestroyTarget] = useState<any | null>(null);
   const [destroyConfirm, setDestroyConfirm] = useState("");
   const [destroying, setDestroying] = useState(false);
+  const [checkingClips, setCheckingClips] = useState<string | null>(null);
 
   const load = () => {
     Promise.all([
@@ -62,6 +63,24 @@ export default function ArchivePage() {
       toast.error(err.message || "Failed to delete.");
     }
     setDestroying(false);
+  };
+
+  const checkClips = async (campaignId: string) => {
+    setCheckingClips(campaignId);
+    try {
+      const res = await fetch("/api/admin/track-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaignIds: [campaignId], includeInactive: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      toast.success("Clips checked — refreshing data");
+      load();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to check clips.");
+    }
+    setCheckingClips(null);
   };
 
   const getCampaignStats = (campaignId: string) => {
@@ -150,12 +169,22 @@ export default function ArchivePage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Link href={`/admin/archive/${c.id}`}>
                     <Button size="sm" variant="outline" icon={<Eye className="h-3 w-3" />}>
                       View Details
                     </Button>
                   </Link>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => checkClips(c.id)}
+                    loading={checkingClips === c.id}
+                    disabled={checkingClips !== null}
+                    icon={<RefreshCw className="h-3 w-3" />}
+                  >
+                    Check Clips
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => restore(c.id)} icon={<RotateCcw className="h-3 w-3" />}>
                     Restore
                   </Button>

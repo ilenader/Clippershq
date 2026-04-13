@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
     try { body = await req.json(); } catch {}
 
     const campaignIds: string[] = Array.isArray(body.campaignIds) ? body.campaignIds : [];
+    const includeInactive: boolean = body.includeInactive === true;
 
     const { checkRateLimit, rateLimitResponse } = await import("@/lib/rate-limit");
 
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
       console.log(`[TRACK-ALL] Manual check for ${allowed.length} campaigns`);
       const { runDueTrackingJobs } = await import("@/lib/tracking");
       const start = Date.now();
-      const result = await runDueTrackingJobs({ campaignIds: allowed, source: "manual" });
+      const result = await runDueTrackingJobs({ campaignIds: allowed, source: "manual", includeInactive });
       const elapsed = Date.now() - start;
 
       return NextResponse.json({

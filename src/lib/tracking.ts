@@ -436,7 +436,7 @@ async function processTrackingJob(
  * @param options.campaignIds - If provided, only check clips from these campaigns (ignores nextCheckAt)
  * @param options.source - "cron" or "manual" — manual checks don't change the next scheduled cron time
  */
-export async function runDueTrackingJobs(options?: { campaignIds?: string[]; source?: "cron" | "manual" }): Promise<{ processed: number; errors: number; details: string[] }> {
+export async function runDueTrackingJobs(options?: { campaignIds?: string[]; source?: "cron" | "manual"; includeInactive?: boolean }): Promise<{ processed: number; errors: number; details: string[] }> {
   if (!db) return { processed: 0, errors: 0, details: ["DB unavailable"] };
 
   const source = options?.source || "cron";
@@ -450,7 +450,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
   const processedCampaignIds = new Set<string>();
 
   try {
-    const where: any = { isActive: true };
+    const where: any = options?.includeInactive ? {} : { isActive: true };
     if (campaignIds && campaignIds.length > 0) {
       where.campaignId = { in: campaignIds };
     } else {
