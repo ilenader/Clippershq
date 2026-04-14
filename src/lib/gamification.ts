@@ -530,7 +530,9 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
             select: { amount: true },
           });
           thisUserCurrentOwnerTotal = ownerEarnings.reduce((s: number, e: any) => s + (e.amount || 0), 0);
-        } catch {}
+        } catch (aeErr: any) {
+          console.error(`[RECALC] Agency earnings fetch failed for campaign ${campaignId}:`, aeErr?.message);
+        }
       }
     }
 

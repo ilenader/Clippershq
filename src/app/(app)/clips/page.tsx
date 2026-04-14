@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
@@ -84,14 +84,19 @@ export default function ClipsPage() {
   useEffect(() => { load(); }, [load]);
   useAutoRefresh(load, 60000); // Fallback polling (SSE handles instant updates)
 
-  // SSE real-time: refresh when clip status or earnings change
+  // SSE real-time: refresh when clip status or earnings change (debounced)
+  const sseDebounceRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
-    const handler = () => { load(); };
+    const handler = () => {
+      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
+      sseDebounceRef.current = setTimeout(() => load(), 500);
+    };
     window.addEventListener("sse:clip_updated", handler);
     window.addEventListener("sse:earnings_updated", handler);
     return () => {
       window.removeEventListener("sse:clip_updated", handler);
       window.removeEventListener("sse:earnings_updated", handler);
+      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
     };
   }, [load]);
 

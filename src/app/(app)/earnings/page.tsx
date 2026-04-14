@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
@@ -65,14 +65,19 @@ export default function EarningsPage() {
   }, [fetchData]);
   useAutoRefresh(useCallback(() => fetchData(selectedCampaigns), [fetchData, selectedCampaigns]), 120000); // Fallback polling
 
-  // SSE real-time: refresh when earnings change
+  // SSE real-time: refresh when earnings change (debounced)
+  const sseDebounceRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
-    const handler = () => { fetchData(selectedCampaigns); };
+    const handler = () => {
+      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
+      sseDebounceRef.current = setTimeout(() => fetchData(selectedCampaigns), 500);
+    };
     window.addEventListener("sse:earnings_updated", handler);
     window.addEventListener("sse:clip_updated", handler);
     return () => {
       window.removeEventListener("sse:earnings_updated", handler);
       window.removeEventListener("sse:clip_updated", handler);
+      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
     };
   }, [fetchData, selectedCampaigns]);
 

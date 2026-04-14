@@ -261,13 +261,13 @@ async function processTrackingJob(
 
     if (clip.status === "APPROVED" && clip.campaign && freshCampaign?.status !== "PAUSED" && freshCampaign?.status !== "ARCHIVED") {
       // Budget-lock: old clips from before a budget pause keep their earnings
+      const oldEarnings = clip.earnings || 0;
       const budgetPauseAt = freshCampaign?.lastBudgetPauseAt ? new Date(freshCampaign.lastBudgetPauseAt) : null;
-      if (budgetPauseAt && new Date(clip.createdAt) < budgetPauseAt && (clip.earnings || 0) > 0) {
+      if (budgetPauseAt && new Date(clip.createdAt) < budgetPauseAt && oldEarnings > 0) {
         console.log(`[BUDGET-LOCK] Clip ${clip.id} locked at $${clip.earnings} — submitted before budget pause`);
         // Still update stats below, but skip earnings recalculation
       } else {
       // Normal earnings calculation
-      const oldEarnings = clip.earnings || 0;
       const breakdown = recalculateClipEarningsBreakdown({
         stats: [{ views: stats.views }],
         campaign: clip.campaign,

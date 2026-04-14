@@ -43,6 +43,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "File too large. Max 5MB." }, { status: 400 });
     }
 
+    // Validate magic bytes
+    const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+    const isJpeg = bytes[0] === 0xFF && bytes[1] === 0xD8;
+    const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
+    const isGif = bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46;
+    const isWebp = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46; // RIFF header (WebP)
+    if (!isJpeg && !isPng && !isGif && !isWebp) {
+      return NextResponse.json({ error: "Invalid file content. Only JPEG, PNG, WebP, or GIF images allowed." }, { status: 400 });
+    }
+
     // Generate unique filename
     const ext = file.name.split(".").pop() || "jpg";
     const filename = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;

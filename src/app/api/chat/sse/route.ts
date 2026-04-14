@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { registerSSEClient, unregisterSSEClient } from "@/lib/sse-broadcast";
 import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,9 @@ export async function GET(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Register with SSE broadcast system
+      registerSSEClient(userId, controller);
+
       // Send initial connection event
       controller.enqueue(encoder.encode("event: connected\ndata: ok\n\n"));
 
@@ -68,7 +72,7 @@ export async function GET(req: NextRequest) {
 
       // Check immediately, then every 2 seconds
       await checkUnread();
-      const interval = setInterval(checkUnread, 2000);
+      const interval = setInterval(checkUnread, 5000);
 
       // Keep connection alive with heartbeat every 15s
       const heartbeat = setInterval(() => {
@@ -85,6 +89,7 @@ export async function GET(req: NextRequest) {
         closed = true;
         clearInterval(interval);
         clearInterval(heartbeat);
+        unregisterSSEClient(userId, controller);
         try { controller.close(); } catch {}
       });
     },
