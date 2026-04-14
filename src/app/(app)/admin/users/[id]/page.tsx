@@ -169,7 +169,7 @@ export default function UserProfilePage() {
         <Card>
           <div className="flex items-center gap-1.5 mb-1"><Flame className="h-3.5 w-3.5 text-orange-400" /><span className="text-xs text-[var(--text-muted)]">Streak</span></div>
           <p className="text-2xl font-bold text-accent">{user.currentStreak || 0}d</p>
-          <p className="text-xs text-[var(--text-muted)]">Best: {user.longestStreak || 0}d</p>
+          <p className="text-xs text-[var(--text-muted)]">Best: {user.longestStreak || 0}d{user.previousStreak > 0 && ` · Previous: ${user.previousStreak}d`}</p>
           {isOwner && !isViewingOwnProfile && (
             <Button size="sm" variant="outline" className="mt-2 w-full" onClick={() => { setShowStreakRestore(true); setRestoreDays(""); setRestoreReason("Review delayed"); }} icon={<RotateCcw className="h-3 w-3" />}>
               Restore Streak

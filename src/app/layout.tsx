@@ -15,10 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://clipershq.com"),
-  title: {
-    default: "Clippers HQ — Content Clipping Agency for Creators & Brands",
-    template: "%s — Clippers HQ",
-  },
+  title: "Clippers HQ",
   description: "Professional content clipping agency. We extract, edit, and distribute your best moments across TikTok, Instagram Reels, and YouTube Shorts. Trusted by streamers and creators.",
   keywords: "content clipping agency, clip management, gaming clips, streamer clips, short-form content, TikTok clipping, content repurposing",
   openGraph: {

@@ -253,6 +253,10 @@ export async function updateStreak(userId: string): Promise<void> {
       lastPassedDate = new Date(cursor);
     } else if (status === "failed") {
       streakBroken = true;
+      // Save the streak before resetting
+      if (currentStreak > 0) {
+        try { await db.user.update({ where: { id: userId }, data: { previousStreak: currentStreak } }); } catch {}
+      }
       currentStreak = 0;
     } else {
       // "pending" — stop evaluating, wait for reviews (don't break streak)

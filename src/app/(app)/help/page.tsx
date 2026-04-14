@@ -154,15 +154,15 @@ export default function HelpPage() {
       icon: <XCircle className="h-5 w-5 text-accent flex-shrink-0" />,
       title: "What if my clip gets rejected?",
       content: (
-        <>
+        <div className="space-y-4">
           <p><strong className="font-bold text-[var(--text-primary)]">Don't panic.</strong> You can submit another clip the same day. Check why it was rejected:</p>
-          <div className="space-y-2 my-3">
-            <p className="flex items-center gap-2"><span className="text-accent font-bold">✓</span> Did you follow the <strong className="font-bold text-[var(--text-primary)]">campaign requirements</strong>?</p>
-            <p className="flex items-center gap-2"><span className="text-accent font-bold">✓</span> Was the video <strong className="font-bold text-[var(--text-primary)]">high quality</strong>?</p>
-            <p className="flex items-center gap-2"><span className="text-accent font-bold">✓</span> Was it posted on the <strong className="font-bold text-[var(--text-primary)]">right platform</strong>?</p>
+          <div className="space-y-3">
+            <p className="pl-4 border-l-2 border-accent/30">Did you follow the <strong className="font-bold text-[var(--text-primary)]">campaign requirements</strong>?</p>
+            <p className="pl-4 border-l-2 border-accent/30">Was the video <strong className="font-bold text-[var(--text-primary)]">high quality</strong>?</p>
+            <p className="pl-4 border-l-2 border-accent/30">Was it posted on the <strong className="font-bold text-[var(--text-primary)]">right platform</strong>?</p>
           </div>
           <p>If <strong className="text-accent font-bold">3 or more</strong> clips get rejected in a row, you'll get a <strong className="font-bold text-[var(--text-primary)]">warning</strong>. Make sure you read the campaign requirements carefully before posting.</p>
-        </>
+        </div>
       ),
     },
     {
@@ -198,10 +198,10 @@ export default function HelpPage() {
       title: "How to avoid rejections",
       content: (
         <div className="space-y-3">
-          <p className="pl-4 border-l-2 border-red-500/30">Read the campaign requirements <strong className="font-bold text-[var(--text-primary)]">CAREFULLY</strong> before making your clip.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Read the campaign requirements <strong className="font-bold text-[var(--text-primary)]">CAREFULLY</strong> before making your clip.</p>
           <p className="pl-4 border-l-2 border-accent/30">Make sure your clip matches the <strong className="font-bold text-[var(--text-primary)]">brand's style</strong> and message.</p>
           <p className="pl-4 border-l-2 border-accent/30">Don't use <strong className="font-bold text-[var(--text-primary)]">copyrighted music</strong> unless the campaign says it's okay.</p>
-          <p className="pl-4 border-l-2 border-red-500/30">Don't use <strong className="font-bold text-[var(--text-primary)]">bots</strong> or <strong className="font-bold text-[var(--text-primary)]">fake engagement</strong> — we detect it automatically.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Don't use <strong className="font-bold text-[var(--text-primary)]">bots</strong> or <strong className="font-bold text-[var(--text-primary)]">fake engagement</strong> — we detect it automatically.</p>
           <p className="pl-4 border-l-2 border-accent/30">Don't submit clips older than <strong className="text-accent font-bold">2 hours</strong>.</p>
           <p className="pl-4 border-l-2 border-accent/30">Don't submit the <strong className="font-bold text-[var(--text-primary)]">same clip</strong> to multiple campaigns.</p>
           <p className="pl-4 border-l-2 border-accent/30">Check your <strong className="font-bold text-[var(--text-primary)]">clip URL</strong> is correct before submitting.</p>
