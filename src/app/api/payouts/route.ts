@@ -91,6 +91,22 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await db.$transaction(async (tx: any) => {
+      // Duplicate check: reject if a REQUESTED payout exists for this user+campaign in the last 10 seconds
+      const tenSecondsAgo = new Date(Date.now() - 10_000);
+      const recentDuplicate = await tx.payoutRequest.findFirst({
+        where: {
+          userId,
+          campaignId,
+          status: "REQUESTED",
+          createdAt: { gte: tenSecondsAgo },
+        },
+        select: { id: true },
+      });
+      if (recentDuplicate) {
+        console.log(`[PAYOUT] Duplicate request blocked for user ${userId}`);
+        throw new Error("DUPLICATE_PAYOUT");
+      }
+
       // Fetch all approved clips and all payouts for this user
       const clips = await tx.clip.findMany({
         where: { userId, isDeleted: false, status: "APPROVED" },
@@ -139,10 +155,14 @@ export async function POST(req: NextRequest) {
       });
     }, {
       timeout: 15000,
+      isolationLevel: "Serializable" as any,
     });
 
     return NextResponse.json(result, { status: 201 });
   } catch (err: any) {
+    if (err.message === "DUPLICATE_PAYOUT") {
+      return NextResponse.json({ error: "A payout request was just submitted. Please wait before trying again." }, { status: 409 });
+    }
     if (err.message?.includes("Insufficient balance")) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }

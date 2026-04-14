@@ -22,6 +22,11 @@ export async function GET() {
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
 
+  const role = (session.user as any).role;
+  if (role === "CLIPPER") {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
   if (!db) return NextResponse.json({});
 
   try {

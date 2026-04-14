@@ -22,8 +22,22 @@ export async function GET(
 
   try {
     const campaign = await db.campaign.findUnique({ where: { id } });
-    if (campaign) return NextResponse.json(campaign);
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!campaign) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const role = (session.user as any).role;
+
+    // CLIPPERs cannot see DRAFT campaigns
+    if (role === "CLIPPER" && campaign.status === "DRAFT") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // CLIPPERs: strip sensitive owner/agency fields
+    if (role === "CLIPPER") {
+      const { ownerCpm, agencyFee, clientName, aiKnowledge, bannedContent, captionRules, hashtagRules, ...publicFields } = campaign as any;
+      return NextResponse.json(publicFields);
+    }
+
+    return NextResponse.json(campaign);
   } catch {
     return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
   }
