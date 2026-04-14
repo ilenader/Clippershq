@@ -160,39 +160,6 @@ export default function EarningsPage() {
         <EarningsChart clips={timeFilteredClips} filters={earningsFilters} days={timeframeDays} />
       </div>
 
-      {/* Earnings by Clip */}
-      <div>
-        <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Earnings by clip</h2>
-        {clipsWithEarnings.length === 0 ? (
-          <EmptyState
-            icon={<DollarSign className="h-10 w-10" />}
-            title="No earnings yet"
-            description="Your earnings will appear here once clips are approved and tracked."
-          />
-        ) : (
-          <div className="space-y-2">
-            {clipsWithEarnings.map((clip: any) => (
-              <Card key={clip.id} className="flex items-center gap-3 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">{clip.campaign?.name}</p>
-                  <p className="text-xs text-[var(--text-muted)] truncate">
-                    {clip.clipAccount?.username} · {formatRelative(clip.createdAt)}
-                  </p>
-                </div>
-                {clip.clipUrl && (
-                  <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline whitespace-nowrap flex-shrink-0">
-                    <ExternalLink className="h-3 w-3" /> Open clip
-                  </a>
-                )}
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-semibold text-emerald-400">{formatCurrency(clip.earnings)}</p>
-                  <Badge variant={clip.status.toLowerCase() as any} className="mt-1">{clip.status}</Badge>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

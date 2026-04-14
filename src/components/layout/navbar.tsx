@@ -233,14 +233,6 @@ export function Navbar() {
           )}
         </div>
 
-        <button
-          onClick={toggleTheme}
-          className="rounded-xl p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all cursor-pointer"
-          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-        >
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
-
         {effectiveUser && (
           <div className="relative" ref={menuRef}>
             <button

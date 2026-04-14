@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Wallet, Plus, Info, Phone } from "lucide-react";
+import { Wallet, Plus, Info, Phone, Check, X } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatRelative } from "@/lib/utils";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
@@ -432,7 +432,7 @@ export default function PayoutsPage() {
                 if (!call) return null;
                 if (call.status === "PENDING") return (
                   <div className="mt-3 rounded-lg border border-accent/20 bg-accent/5 px-4 py-3">
-                    <p className="text-sm text-accent font-medium mb-2">📞 A verification call is required for this payout.</p>
+                    <p className="text-sm text-accent font-medium mb-2"><Phone className="h-4 w-4 text-accent inline-block -mt-0.5 mr-1" /> A verification call is required for this payout.</p>
                     <Button size="sm" onClick={() => { setCallModal(payout.id); setCallDiscord(payout.discordUsername || ""); }} icon={<Phone className="h-3.5 w-3.5" />}>
                       Select Call Time
                     </Button>
@@ -442,13 +442,13 @@ export default function PayoutsPage() {
                   const dt = call.scheduledAt ? new Date(call.scheduledAt).toLocaleString("en-US", { timeZone: "Europe/Belgrade", weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
                   return (
                     <div className="mt-3 rounded-lg border border-accent/20 bg-accent/5 px-4 py-3">
-                      <p className="text-sm text-accent font-medium">📞 Call scheduled for {dt} (team time)</p>
+                      <p className="text-sm text-accent font-medium"><Phone className="h-4 w-4 text-accent inline-block -mt-0.5 mr-1" /> Call scheduled for {dt} (team time)</p>
                       <p className="text-xs text-[var(--text-muted)] mt-1">Discord: {call.discordUsername} — Make sure you're available!</p>
                     </div>
                   );
                 }
-                if (call.status === "COMPLETED") return <p className="mt-2 text-xs text-emerald-400">✅ Verification call completed</p>;
-                if (call.status === "MISSED") return <p className="mt-2 text-xs text-red-400">❌ You missed the verification call</p>;
+                if (call.status === "COMPLETED") return <p className="mt-2 text-xs text-emerald-400"><Check className="h-4 w-4 text-emerald-400 inline-block -mt-0.5 mr-1" /> Verification call completed</p>;
+                if (call.status === "MISSED") return <p className="mt-2 text-xs text-red-400"><X className="h-4 w-4 text-red-400 inline-block -mt-0.5 mr-1" /> You missed the verification call</p>;
                 return null;
               })()}
             </Card>

@@ -173,10 +173,10 @@ export default function DashboardPage() {
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Star className="h-3.5 w-3.5 text-accent" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Level</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Level</span>
           </div>
           <p className="text-xl font-bold text-[var(--text-primary)]">Level {g?.level ?? 0}</p>
-          <p className="text-xs text-[var(--text-muted)]">{levelName} · +{g?.levelBonus ?? 0}%</p>
+          <p className="text-sm text-[var(--text-muted)]">{levelName} · +{g?.levelBonus ?? 0}%</p>
           {g?.earningsToNextLevel > 0 && (
             <div className="mt-2">
               <div className="h-1.5 bg-[var(--bg-input)] rounded-full overflow-hidden">
@@ -191,19 +191,19 @@ export default function DashboardPage() {
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Flame className="h-3.5 w-3.5 text-accent" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Streak</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Streak</span>
           </div>
           <div className="flex items-baseline gap-1.5">
             <p className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{g?.currentStreak ?? 0}</p>
             <span className="text-xs text-[var(--text-muted)]">days</span>
           </div>
           {g?.streakBonusPercent > 0 && (
-            <p className="text-xs text-accent font-medium">+{g.streakBonusPercent}% bonus</p>
+            <p className="text-sm text-accent font-medium">+{g.streakBonusPercent}% bonus</p>
           )}
           {postedToday ? (
-            <p className="text-xs text-emerald-400 mt-0.5">✓ Posted today</p>
+            <p className="text-sm text-emerald-400 mt-0.5">✓ Posted today</p>
           ) : (
-            <p className="text-xs text-accent mt-0.5">
+            <p className="text-sm text-accent mt-0.5">
               <Clock className="h-3 w-3 inline-block -mt-0.5 mr-0.5" />Post to keep streak
             </p>
           )}
@@ -213,14 +213,14 @@ export default function DashboardPage() {
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Megaphone className="h-3.5 w-3.5 text-accent" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Campaigns</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Campaigns</span>
           </div>
           <p className="text-xl font-bold text-[var(--text-primary)]">{campaigns.length}</p>
           {campaignsNeedClips > 0 && (
-            <p className="text-xs text-accent">{campaignsNeedClips} need clips</p>
+            <p className="text-sm text-accent">{campaignsNeedClips} need clips</p>
           )}
           {campaignsNeedClips === 0 && campaigns.length > 0 && (
-            <p className="text-xs text-emerald-400">✓ All posted</p>
+            <p className="text-sm text-emerald-400">✓ All posted</p>
           )}
         </div>
 
@@ -228,11 +228,11 @@ export default function DashboardPage() {
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <DollarSign className="h-3.5 w-3.5 text-accent" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Available</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Available</span>
           </div>
           <p className="text-xl font-bold text-accent tabular-nums">{formatCurrency(available)}</p>
           {lockedInPayouts > 0 && (
-            <p className="text-xs text-amber-400">{formatCurrency(lockedInPayouts)} pending</p>
+            <p className="text-sm text-amber-400">{formatCurrency(lockedInPayouts)} pending</p>
           )}
         </div>
       </div>
@@ -247,42 +247,6 @@ export default function DashboardPage() {
         Submit a Clip
       </Link>
 
-      {/* ── Active Campaigns List ── */}
-      {campaigns.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">Active campaigns</p>
-            <Link href="/campaigns" className="text-xs text-accent">See all</Link>
-          </div>
-          <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] divide-y divide-[var(--border-color)] overflow-hidden">
-            {campaigns.map((camp: any) => {
-              const posted = campaignsPostedToday.has(camp.id);
-              return (
-                <Link
-                  key={camp.id}
-                  href="/clips"
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-card-hover)] transition-colors"
-                >
-                  <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                    <Megaphone className="h-4 w-4 text-accent" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">{camp.name}</p>
-                    <p className="text-xs text-[var(--text-muted)]">{camp.platform}</p>
-                  </div>
-                  {posted ? (
-                    <span className="text-xs text-emerald-400 font-medium flex-shrink-0">✓ Posted</span>
-                  ) : (
-                    <span className="flex items-center gap-0.5 text-xs text-accent font-medium flex-shrink-0">
-                      Post <ChevronRight className="h-3 w-3" />
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
