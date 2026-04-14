@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
 
       // Fetch all approved clips and all payouts for this user
       const clips = await tx.clip.findMany({
-        where: { userId, isDeleted: false, status: "APPROVED" },
+        where: { userId, isDeleted: false, status: "APPROVED", videoUnavailable: false },
         select: { earnings: true, campaignId: true },
       });
 

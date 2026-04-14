@@ -302,6 +302,9 @@ model Clip {
   feePercentAtApproval Float?
   streakDayLocked      Boolean    @default(false)
   streakDayLockedAt    DateTime?
+  videoUnavailable     Boolean    @default(false)
+  videoUnavailableSince DateTime?
+  savedEarnings        Float?
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 

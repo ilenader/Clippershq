@@ -269,6 +269,15 @@ export default function AdminClipsPage() {
                   "border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)]"
                 }`}
               >
+                {/* Video unavailable banner */}
+                {clip.videoUnavailable && (
+                  <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold text-amber-400">Video not found — manual review needed</p>
+                      {clip.videoUnavailableSince && <p className="text-[10px] text-amber-400/70">Since {new Date(clip.videoUnavailableSince).toLocaleDateString()}</p>}
+                    </div>
+                  </div>
+                )}
                 {/* Top row: account + campaign + status + fraud */}
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center gap-3 min-w-0">

@@ -33,6 +33,7 @@ export async function GET() {
       where: {
         status: "APPROVED",
         isDeleted: false,
+        videoUnavailable: false,
         campaign: { isArchived: false },
       },
       _sum: { earnings: true },

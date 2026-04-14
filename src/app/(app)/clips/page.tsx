@@ -199,6 +199,12 @@ export default function ClipsPage() {
             const stat = clip.stats?.[0];
             return (
               <div key={clip.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 hover:bg-[var(--bg-card-hover)] transition-colors">
+                {/* Video unavailable warning */}
+                {clip.videoUnavailable && (
+                  <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                    <p className="text-xs font-medium text-amber-400">This video appears to be unavailable. Earnings are paused until the video is accessible again.</p>
+                  </div>
+                )}
                 {/* Top: account + campaign + status */}
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>

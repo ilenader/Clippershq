@@ -107,7 +107,7 @@ export async function getCampaignBudgetStatus(campaignId: string): Promise<{
     if (!campaign || campaign.budget == null) return null;
 
     const earningsAgg = await db.clip.aggregate({
-      where: { campaignId, isDeleted: false, status: "APPROVED" },
+      where: { campaignId, isDeleted: false, status: "APPROVED", videoUnavailable: false },
       _sum: { earnings: true },
     });
     let spent = round2(earningsAgg._sum.earnings ?? 0);

@@ -187,8 +187,8 @@ async function processTrackingJob(
   source: string,
   details: string[],
 ): Promise<{ success: boolean; detail?: string; error?: string }> {
+  const clip = job.clip;
   try {
-    const clip = job.clip;
     if (!clip) {
       await db.trackingJob.update({ where: { id: job.id }, data: { isActive: false } });
       console.log(`[TRACKING] Deactivated job for clip ${job.clipId} (missing clip)`);
@@ -209,6 +209,16 @@ async function processTrackingJob(
     const prevViews = prevStat?.views ?? 0;
 
     console.log(`[TRACKING] Clip ${clip.id}: ${prevViews} → ${stats.views} views (${source})`);
+
+    // Video restoration: if clip was flagged unavailable but stats are now valid
+    if ((clip as any).videoUnavailable && stats.views > 0) {
+      const savedE = (clip as any).savedEarnings ?? 0;
+      await db.clip.update({
+        where: { id: clip.id },
+        data: { videoUnavailable: false, videoUnavailableSince: null, earnings: savedE, savedEarnings: null },
+      });
+      console.log(`[TRACKING] Video restored for clip ${clip.id} — earnings unfrozen ($${savedE})`);
+    }
 
     // Save new snapshot
     await db.clipStat.create({
@@ -437,6 +447,42 @@ async function processTrackingJob(
   } catch (err: any) {
     console.error(`[TRACKING] Error on job ${job.id}:`, err.message);
     details.push(`Error on job ${job.id}: ${err.message}`);
+
+    // Detect video unavailability (deleted/private/removed)
+    const isUnavailable = /not found|no results|private|removed|unavailable/i.test(err.message);
+    if (isUnavailable && clip.status === "APPROVED") {
+      try {
+        const clipData = await db.clip.findUnique({ where: { id: clip.id }, select: { videoUnavailable: true, earnings: true } });
+        if (clipData && !clipData.videoUnavailable) {
+          // First detection — flag and freeze earnings
+          await db.clip.update({
+            where: { id: clip.id },
+            data: { videoUnavailable: true, videoUnavailableSince: new Date(), savedEarnings: clipData.earnings, earnings: 0 },
+          });
+          try { await db.agencyEarning.delete({ where: { clipId: clip.id } }); } catch {}
+          // Slow tracking to daily
+          await db.trackingJob.update({
+            where: { id: job.id },
+            data: { nextCheckAt: new Date(Date.now() + 1440 * 60 * 1000), lastCheckedAt: new Date(), checkIntervalMin: 1440 },
+          }).catch(() => {});
+          // Notify all owners
+          try {
+            const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true } });
+            const campName = (await db.campaign.findUnique({ where: { id: clip.campaignId }, select: { name: true } }))?.name || "campaign";
+            for (const owner of owners) {
+              const { createNotification } = await import("@/lib/notifications");
+              createNotification(owner.id, "CLIP_FLAGGED", "Video unavailable", `Video unavailable for clip in ${campName} — manual review needed. URL: ${clip.clipUrl}`).catch(() => {});
+            }
+          } catch {}
+          console.log(`[TRACKING] Video unavailable for clip ${clip.id} — earnings frozen, slow-tracking enabled`);
+          details.push(`Clip ${clip.id}: VIDEO UNAVAILABLE — earnings frozen`);
+          return { success: true, detail: "video-unavailable" };
+        }
+      } catch (unavErr: any) {
+        console.error(`[TRACKING] Video unavailability check failed:`, unavErr?.message);
+      }
+    }
+
     // Retry in 30 min on error
     await db.trackingJob.update({
       where: { id: job.id },
@@ -479,7 +525,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
         clip: {
           select: {
             id: true, userId: true, clipUrl: true, status: true, earnings: true,
-            campaignId: true, createdAt: true, isOwnerOverride: true,
+            campaignId: true, createdAt: true, isOwnerOverride: true, videoUnavailable: true, savedEarnings: true,
             campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true } },
             user: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true } },
           },
