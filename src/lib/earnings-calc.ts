@@ -317,7 +317,10 @@ export function calculateOwnerEarnings(
     return round2(clipperGrossEarnings * (ownerCpm / clipperCpm));
   }
 
-  // Fallback: raw views × ownerCpm (no cap context available)
+  // Fallback: raw views × ownerCpm (no cap context available).
+  // This path only runs for display/reference when clipperGrossEarnings is not provided.
+  // Actual earnings calculation always passes clipperGrossEarnings, so maxPayoutPerClip
+  // is enforced through the proportional path above.
   return round2((views / 1000) * ownerCpm);
 }
 

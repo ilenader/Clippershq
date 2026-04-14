@@ -1,6 +1,5 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
-import { getGamificationState } from "@/lib/gamification";
 import { calculatePayoutBreakdown } from "@/lib/payout-calc";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
@@ -81,10 +80,10 @@ export async function POST(req: NextRequest) {
   }
   const roundedAmount = Math.round(amount * 100) / 100;
 
-  // Get the user's current fee and bonus from gamification state
-  const gamState = await getGamificationState(userId);
-  const feePercent = gamState?.platformFeePercent ?? 9;
-  const bonusPercent = gamState?.bonusPercent ?? 0;
+  // Get fee directly — avoid heavy getGamificationState which triggers streak/earnings recalculation
+  const payoutUser = await db.user.findUnique({ where: { id: userId }, select: { referredById: true, bonusPercentage: true } });
+  const feePercent = payoutUser?.referredById ? 4 : 9;
+  const bonusPercent = payoutUser?.bonusPercentage ?? 0;
 
   // Compute the payout breakdown
   const breakdown = calculatePayoutBreakdown(roundedAmount, feePercent, bonusPercent);

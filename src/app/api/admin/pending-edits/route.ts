@@ -58,6 +58,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "campaignId and changes required" }, { status: 400 });
   }
 
+  // Validate that changes only contain allowed fields
+  const SAFE_EDIT_FIELDS = [
+    "name", "description", "requirements", "examples", "soundLink", "assetLink",
+    "imageUrl", "bannedContent", "captionRules", "hashtagRules",
+    "videoLengthMin", "videoLengthMax", "budget", "minViews",
+    "maxPayoutPerClip", "maxClipsPerUserPerDay", "clipperCpm", "ownerCpm", "agencyFee",
+  ];
+  const changesObj = typeof body.changes === "string" ? JSON.parse(body.changes) : body.changes;
+  const invalidFields = Object.keys(changesObj).filter((k: string) => !SAFE_EDIT_FIELDS.includes(k));
+  if (invalidFields.length > 0) {
+    return NextResponse.json({ error: "Invalid fields: " + invalidFields.join(", ") }, { status: 400 });
+  }
+
   // Verify admin has access to this campaign (creator, assigned, or team)
   try {
     const campaign = await db.campaign.findUnique({ where: { id: body.campaignId } });

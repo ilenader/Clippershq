@@ -6,6 +6,7 @@ import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 // ─── Auto-reply map for common clipper questions ────────────
 const AUTO_REPLIES: { match: string[]; reply: string }[] = [
@@ -114,6 +115,7 @@ export async function GET(
         sender: { select: { id: true, name: true, username: true, image: true, role: true } },
       },
       orderBy: { createdAt: "asc" },
+      take: 200,
     });
     return NextResponse.json(messages);
   } catch (err: any) {
