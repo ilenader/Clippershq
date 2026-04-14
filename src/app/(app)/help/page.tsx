@@ -155,13 +155,13 @@ export default function HelpPage() {
       title: "What if my clip gets rejected?",
       content: (
         <>
-          <p>Don't panic. You can submit another clip the same day. Check why it was rejected:</p>
-          <ul className="space-y-1 list-none">
-            <li>Did you follow the campaign requirements?</li>
-            <li>Was the video high quality?</li>
-            <li>Was it posted on the right platform?</li>
-          </ul>
-          <p className="mt-2">If 3 or more clips get rejected in a row, you'll get a warning. Make sure you read the campaign requirements carefully before posting.</p>
+          <p><strong className="font-bold text-[var(--text-primary)]">Don't panic.</strong> You can submit another clip the same day. Check why it was rejected:</p>
+          <div className="space-y-2 my-3">
+            <p className="flex items-center gap-2"><span className="text-accent font-bold">✓</span> Did you follow the <strong className="font-bold text-[var(--text-primary)]">campaign requirements</strong>?</p>
+            <p className="flex items-center gap-2"><span className="text-accent font-bold">✓</span> Was the video <strong className="font-bold text-[var(--text-primary)]">high quality</strong>?</p>
+            <p className="flex items-center gap-2"><span className="text-accent font-bold">✓</span> Was it posted on the <strong className="font-bold text-[var(--text-primary)]">right platform</strong>?</p>
+          </div>
+          <p>If <strong className="text-accent font-bold">3 or more</strong> clips get rejected in a row, you'll get a <strong className="font-bold text-[var(--text-primary)]">warning</strong>. Make sure you read the campaign requirements carefully before posting.</p>
         </>
       ),
     },
@@ -169,43 +169,43 @@ export default function HelpPage() {
       icon: <TrendingUp className="h-5 w-5 text-accent flex-shrink-0" />,
       title: "Tips for earning more",
       content: (
-        <ul className="space-y-2 list-none">
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Join multiple campaigns to maximize earnings</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Post consistently to build your streak bonus</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Follow campaign requirements exactly — rejected clips waste your time</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Higher view counts = more money</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Refer friends — you earn 5% of their earnings forever, and they get a reduced 4% fee</li>
-        </ul>
+        <div className="space-y-3">
+          <p className="pl-4 border-l-2 border-accent/30">Join <strong className="font-bold text-[var(--text-primary)]">multiple campaigns</strong> to maximize your earnings potential.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Post <strong className="font-bold text-[var(--text-primary)]">consistently</strong> every day to build your <strong className="font-bold text-[var(--text-primary)]">streak bonus</strong>.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Follow campaign requirements <strong className="font-bold text-[var(--text-primary)]">exactly</strong> — rejected clips waste your time.</p>
+          <p className="pl-4 border-l-2 border-accent/30"><strong className="font-bold text-[var(--text-primary)]">Higher view counts</strong> = more money. Focus on making engaging content.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Refer friends — you earn <strong className="text-accent font-bold">5%</strong> of their earnings <strong className="font-bold text-[var(--text-primary)]">forever</strong>, and they get a reduced <strong className="text-accent font-bold">4%</strong> fee.</p>
+        </div>
       ),
     },
     {
       icon: <Eye className="h-5 w-5 text-accent flex-shrink-0" />,
       title: "How to get more views",
       content: (
-        <ul className="space-y-2 list-none">
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Post consistently — the algorithm rewards daily posting</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Use trending sounds and hashtags</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Hook viewers in the first 1-2 seconds</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Keep clips short — 15-30 seconds performs best</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Post at peak hours — usually 6-9 PM in your target audience's timezone</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Engage with comments on your clips</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Check our Discord channel <strong className="text-[var(--text-primary)]">#how-to-hit-usa</strong> for detailed guides on reaching US audiences</li>
-        </ul>
+        <div className="space-y-3">
+          <p className="pl-4 border-l-2 border-accent/30">Post <strong className="font-bold text-[var(--text-primary)]">consistently</strong> — the algorithm rewards <strong className="font-bold text-[var(--text-primary)]">daily posting</strong>.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Use <strong className="font-bold text-[var(--text-primary)]">trending sounds</strong> and <strong className="font-bold text-[var(--text-primary)]">hashtags</strong> to reach more people.</p>
+          <p className="pl-4 border-l-2 border-accent/30"><strong className="font-bold text-[var(--text-primary)]">Hook viewers</strong> in the first <strong className="text-accent font-bold">1-2 seconds</strong>. If they scroll past, you lose them.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Keep clips <strong className="font-bold text-[var(--text-primary)]">short</strong> — <strong className="text-accent font-bold">15-30 seconds</strong> performs best on all platforms.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Post at <strong className="font-bold text-[var(--text-primary)]">peak hours</strong> — usually <strong className="text-accent font-bold">6-9 PM</strong> in your target audience's timezone.</p>
+          <p className="pl-4 border-l-2 border-accent/30"><strong className="font-bold text-[var(--text-primary)]">Engage with comments</strong> on your clips — it boosts the algorithm.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Check our Discord channel <strong className="font-bold text-[var(--text-primary)]">#how-to-hit-usa</strong> for detailed guides on reaching <strong className="font-bold text-[var(--text-primary)]">US audiences</strong>.</p>
+        </div>
       ),
     },
     {
       icon: <ShieldCheck className="h-5 w-5 text-accent flex-shrink-0" />,
       title: "How to avoid rejections",
       content: (
-        <ul className="space-y-2 list-none">
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Read the campaign requirements <strong className="text-[var(--text-primary)]">CAREFULLY</strong> before making your clip</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Make sure your clip matches the brand's style and message</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Don't use copyrighted music unless the campaign says it's okay</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Don't use bots or fake engagement — we detect it automatically</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Don't submit clips older than 2 hours</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Don't submit the same clip to multiple campaigns</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Check your clip URL is correct before submitting</li>
-        </ul>
+        <div className="space-y-3">
+          <p className="pl-4 border-l-2 border-red-500/30">Read the campaign requirements <strong className="font-bold text-[var(--text-primary)]">CAREFULLY</strong> before making your clip.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Make sure your clip matches the <strong className="font-bold text-[var(--text-primary)]">brand's style</strong> and message.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Don't use <strong className="font-bold text-[var(--text-primary)]">copyrighted music</strong> unless the campaign says it's okay.</p>
+          <p className="pl-4 border-l-2 border-red-500/30">Don't use <strong className="font-bold text-[var(--text-primary)]">bots</strong> or <strong className="font-bold text-[var(--text-primary)]">fake engagement</strong> — we detect it automatically.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Don't submit clips older than <strong className="text-accent font-bold">2 hours</strong>.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Don't submit the <strong className="font-bold text-[var(--text-primary)]">same clip</strong> to multiple campaigns.</p>
+          <p className="pl-4 border-l-2 border-accent/30">Check your <strong className="font-bold text-[var(--text-primary)]">clip URL</strong> is correct before submitting.</p>
+        </div>
       ),
     },
     {
@@ -213,11 +213,13 @@ export default function HelpPage() {
       title: "Discord community",
       content: (
         <>
-          <p>Join our Discord server for support, tips, and community.</p>
-          <div className="mt-2 space-y-1">
-            <p>Channels: <strong className="text-[var(--text-primary)]">#announcements</strong>, <strong className="text-[var(--text-primary)]">#video-ideas</strong>, <strong className="text-[var(--text-primary)]">#how-to-hit-usa</strong>, <strong className="text-[var(--text-primary)]">#sounds-to-use</strong>, <strong className="text-[var(--text-primary)]">#editing-course</strong>, <strong className="text-[var(--text-primary)]">#payouts</strong>, <strong className="text-[var(--text-primary)]">#tickets</strong></p>
-            <p>Open a support ticket if you have any issues.</p>
+          <p>Join our <strong className="font-bold text-[var(--text-primary)]">Discord server</strong> for support, tips, and community.</p>
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {["#announcements", "#video-ideas", "#how-to-hit-usa", "#sounds-to-use", "#editing-course", "#payouts", "#tickets"].map((ch) => (
+              <span key={ch} className="rounded-lg border border-[var(--border-color)] px-2 py-1.5 text-center font-medium text-[var(--text-primary)]">{ch}</span>
+            ))}
           </div>
+          <p className="mt-3">Open a <strong className="font-bold text-[var(--text-primary)]">support ticket</strong> if you have any issues.</p>
           <a href="https://discord.gg/JtKkbGWN" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 mt-3 rounded-lg bg-accent/10 border border-accent/20 px-4 py-2 font-medium text-accent hover:bg-accent/20 transition-colors">
             <MessageCircle className="h-4 w-4" /> Join Discord
           </a>
@@ -228,15 +230,13 @@ export default function HelpPage() {
       icon: <Users className="h-5 w-5 text-accent flex-shrink-0" />,
       title: "Referral program",
       content: (
-        <>
-          <ul className="space-y-2 list-none">
-            <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> Share your referral link from the <strong className="text-[var(--text-primary)]">Referrals</strong> page</li>
-            <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> When someone signs up through your link, you earn <strong className="text-accent">5%</strong> of their approved earnings forever</li>
-            <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> They get a reduced platform fee: <strong className="text-accent">4%</strong> instead of 9%</li>
-            <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> No limit on referrals — invite as many friends as you want</li>
-            <li className="flex items-start gap-2"><span className="text-accent mt-1">•</span> The more active clippers you refer, the more passive income you earn</li>
-          </ul>
-        </>
+        <div className="space-y-3">
+          <p className="pl-4 border-l-2 border-accent/30">Share your referral link from the <strong className="font-bold text-[var(--text-primary)]">Referrals</strong> page.</p>
+          <p className="pl-4 border-l-2 border-accent/30">When someone signs up through your link, you earn <strong className="text-accent font-bold">5%</strong> of their <strong className="font-bold text-[var(--text-primary)]">approved earnings forever</strong>.</p>
+          <p className="pl-4 border-l-2 border-accent/30">They get a reduced platform fee: <strong className="text-accent font-bold">4%</strong> instead of <strong className="text-accent font-bold">9%</strong>.</p>
+          <p className="pl-4 border-l-2 border-accent/30"><strong className="font-bold text-[var(--text-primary)]">No limit</strong> on referrals — invite as many friends as you want.</p>
+          <p className="pl-4 border-l-2 border-accent/30">The more <strong className="font-bold text-[var(--text-primary)]">active clippers</strong> you refer, the more <strong className="font-bold text-[var(--text-primary)]">passive income</strong> you earn.</p>
+        </div>
       ),
     },
   ];
