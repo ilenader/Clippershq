@@ -12,6 +12,7 @@ import { Menu, X, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PWAInstallPopup } from "@/components/pwa-install-popup";
 import { useIsPWA } from "@/hooks/use-pwa";
+import { SplashScreen } from "@/components/splash-screen";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -20,6 +21,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isPWA = useIsPWA();
+  const [showSplash, setShowSplash] = useState(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("splash_shown")) return false;
+    return true;
+  });
+  const [splashFading, setSplashFading] = useState(false);
+
+  useEffect(() => {
+    if (showSplash) {
+      sessionStorage.setItem("splash_shown", "true");
+      setTimeout(() => setSplashFading(true), 1000);
+      setTimeout(() => setShowSplash(false), 1300);
+    }
+  }, [showSplash]);
 
   // Close mobile nav on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
@@ -190,6 +204,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (showSplash) return <SplashScreen fading={splashFading} />;
+
   return (
     <div className="flex h-screen bg-[var(--bg-primary)] transition-theme">
       {/* Desktop sidebar */}
@@ -238,7 +254,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="hidden lg:block">
           <Navbar />
         </div>
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6"><div key={pathname} className="animate-fadeIn">{children}</div></main>
       </div>
       <ChatWidget userId={effectiveSession.user.id} role={effectiveRole} />
       {!isPWA && <PWAInstallPopup />}
