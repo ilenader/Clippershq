@@ -43,8 +43,9 @@ export async function GET() {
       spendMap[row.campaignId] = Math.round((row._sum.earnings || 0) * 100) / 100;
     }
 
-    // OWNER/ADMIN: also include agency/owner earnings in spend totals
-    if (role === "OWNER" || role === "ADMIN") {
+    // Include agency/owner earnings in spend totals for all roles
+    // (total spent should match the budget progress bar for everyone)
+    {
       try {
         const agencyResult = await db.agencyEarning.groupBy({
           by: ["campaignId"],
