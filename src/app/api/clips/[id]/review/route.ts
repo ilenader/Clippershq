@@ -12,6 +12,8 @@ import { checkBanStatus } from "@/lib/check-ban";
 import { broadcastToUser } from "@/lib/sse-broadcast";
 import { NextRequest, NextResponse } from "next/server";
 
+export const maxDuration = 30;
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

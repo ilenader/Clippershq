@@ -51,8 +51,14 @@ export async function POST(req: NextRequest) {
     const existing = await db.clip.findFirst({ where: { clipUrl, campaignId } });
     if (existing) return NextResponse.json({ error: "This clip URL already exists in this campaign." }, { status: 400 });
 
-    // Determine user and account
+    // Determine user and account — validate target user
     const targetUserId = userId || session.user.id;
+    if (userId && userId !== session.user.id) {
+      const targetUser = await db.user.findUnique({ where: { id: userId }, select: { role: true, status: true } });
+      if (!targetUser || targetUser.role !== "CLIPPER" || targetUser.status === "BANNED") {
+        return NextResponse.json({ error: "Invalid target user. Must be an active CLIPPER." }, { status: 400 });
+      }
+    }
 
     let targetAccountId = clipAccountId;
     if (!targetAccountId) {

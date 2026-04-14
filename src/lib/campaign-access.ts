@@ -44,8 +44,10 @@ export async function getUserCampaignIds(userId: string, role: string): Promise<
       for (const tc of teamCampaigns) ids.add(tc.campaignId);
     }
 
-    return [...ids];
-  } catch {
+    const result = [...ids];
+    return Array.isArray(result) ? result : [];
+  } catch (err: any) {
+    console.error(`[CAMPAIGN-ACCESS] Failed for user ${userId}:`, err?.message);
     return [];
   }
 }

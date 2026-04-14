@@ -48,9 +48,13 @@ export async function loadConfig() {
     try {
       const rows = await db.gamificationConfig.findMany();
       for (const row of rows) {
-        try { configs[row.key] = JSON.parse(row.value); } catch {}
+        try { configs[row.key] = JSON.parse(row.value); } catch (parseErr: any) {
+          console.warn(`[GAMIFICATION] Failed to parse config "${row.key}":`, parseErr?.message);
+        }
       }
-    } catch {}
+    } catch (loadErr: any) {
+      console.warn("[GAMIFICATION] Config load failed, using defaults:", loadErr?.message);
+    }
   }
   return {
     levelThresholds: configs.level_thresholds || DEFAULT_LEVEL_THRESHOLDS,
@@ -222,7 +226,10 @@ export async function updateStreak(userId: string): Promise<void> {
         return;
       }
     }
-  } catch {}
+  } catch (err: any) {
+    console.error(`[STREAK] Freeze check failed for user ${userId}:`, err?.message);
+    return; // Safe default: keep streak frozen on error
+  }
 
   let currentStreak = user.currentStreak;
   let lastPassedDate = user.lastActiveDate ? new Date(user.lastActiveDate) : null;

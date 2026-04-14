@@ -21,6 +21,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Dev-only endpoint" }, { status: 403 });
   }
 
+  // Require OWNER session even in dev/preview
+  const { getSession } = await import("@/lib/get-session");
+  const session = await getSession();
+  if (!session?.user || (session.user as any).role !== "OWNER") {
+    return NextResponse.json({ error: "Owner authentication required" }, { status: 403 });
+  }
+
   if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 
   const force = req.nextUrl.searchParams.get("force") === "1";
