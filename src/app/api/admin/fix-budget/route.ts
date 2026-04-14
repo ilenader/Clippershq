@@ -185,6 +185,35 @@ export async function POST() {
     }
   }
 
+  // Third pass: check ALL paused campaigns with budget (not just over-budget ones)
+  try {
+    const pausedCampaigns = await db.campaign.findMany({
+      where: { status: "PAUSED", lastBudgetPauseAt: { not: null }, budget: { gt: 0 } },
+      select: { id: true, name: true, budget: true, pricingModel: true },
+    });
+    for (const pc of pausedCampaigns) {
+      // Skip if already resumed in the second pass
+      if (report.some((r: any) => r.campaignId === pc.id)) continue;
+      const eAgg = await db.clip.aggregate({
+        where: { campaignId: pc.id, isDeleted: false, status: "APPROVED" },
+        _sum: { earnings: true },
+      });
+      let spent = Math.round((eAgg._sum.earnings ?? 0) * 100) / 100;
+      if (pc.pricingModel === "CPM_SPLIT") {
+        const oAgg = await db.agencyEarning.aggregate({ where: { campaignId: pc.id }, _sum: { amount: true } });
+        spent = Math.round((spent + (oAgg._sum.amount ?? 0)) * 100) / 100;
+      }
+      if (spent < pc.budget!) {
+        await db.campaign.update({ where: { id: pc.id }, data: { status: "ACTIVE", lastBudgetPauseAt: null } });
+        await db.trackingJob.updateMany({ where: { campaignId: pc.id, isActive: false }, data: { isActive: true } });
+        campaignsResumed++;
+        console.log(`[FIX-BUDGET] Campaign ${pc.name} resumed — $${(pc.budget! - spent).toFixed(2)} available of $${pc.budget} budget`);
+      }
+    }
+  } catch (err: any) {
+    console.error("[FIX-BUDGET] Third pass error:", err?.message);
+  }
+
   return NextResponse.json({
     success: true,
     campaignsChecked: campaigns.length,
