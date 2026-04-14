@@ -48,30 +48,96 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading, isAuthenticated, isDevMode, router]);
 
-  // Swipe-to-open sidebar on mobile
-  const swipeRef = useRef({ startX: 0, startY: 0, tracking: false });
+  // Progressive swipe-to-open sidebar on mobile
+  const sidebarPanelRef = useRef<HTMLDivElement>(null);
+  const backdropElRef = useRef<HTMLDivElement>(null);
+  const SIDEBAR_W = 256; // w-64 = 256px
+  const swipeRef = useRef({ startX: 0, startY: 0, lastX: 0, tracking: false, decided: false });
+
   useEffect(() => {
     const onTouchStart = (e: TouchEvent) => {
       if (window.innerWidth >= 1024) return;
-      const touch = e.touches[0];
-      if ((touch.clientX > 15 && touch.clientX < 60) || mobileOpen) {
-        swipeRef.current = { startX: touch.clientX, startY: touch.clientY, tracking: true };
+      const x = e.touches[0].clientX;
+      if (x < 80 || mobileOpen) {
+        swipeRef.current = { startX: x, startY: e.touches[0].clientY, lastX: x, tracking: true, decided: false };
       }
     };
+
     const onTouchMove = (e: TouchEvent) => {
-      if (!swipeRef.current.tracking) return;
-      const touch = e.touches[0];
-      const diffX = touch.clientX - swipeRef.current.startX;
-      const diffY = touch.clientY - swipeRef.current.startY;
-      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-        if (diffX > 0 && !mobileOpen) setMobileOpen(true);
-        if (diffX < 0 && mobileOpen) setMobileOpen(false);
-        swipeRef.current.tracking = false;
+      const s = swipeRef.current;
+      if (!s.tracking) return;
+      const x = e.touches[0].clientX;
+      const diffX = x - s.startX;
+      const diffY = e.touches[0].clientY - s.startY;
+      s.lastX = x;
+
+      // Decide direction on first significant move
+      if (!s.decided && (Math.abs(diffX) > 10 || Math.abs(diffY) > 10)) {
+        if (Math.abs(diffY) > Math.abs(diffX)) { s.tracking = false; return; } // vertical scroll
+        s.decided = true;
+      }
+      if (!s.decided) return;
+
+      e.preventDefault(); // override browser back gesture
+
+      const panel = sidebarPanelRef.current;
+      const backdrop = backdropElRef.current;
+      if (!panel) return;
+
+      if (!mobileOpen) {
+        // Opening: follow finger from left
+        const offset = Math.max(-SIDEBAR_W, Math.min(0, -SIDEBAR_W + diffX));
+        panel.style.transition = "none";
+        panel.style.transform = `translateX(${offset}px)`;
+        if (backdrop) {
+          const p = Math.max(0, Math.min(1, diffX / SIDEBAR_W));
+          backdrop.style.transition = "none";
+          backdrop.style.opacity = `${p * 0.5}`;
+          backdrop.style.pointerEvents = p > 0.05 ? "auto" : "none";
+        }
+      } else {
+        // Closing: follow finger left
+        const offset = Math.min(0, Math.max(-SIDEBAR_W, diffX));
+        panel.style.transition = "none";
+        panel.style.transform = `translateX(${offset}px)`;
+        if (backdrop) {
+          const p = Math.max(0, 1 + diffX / SIDEBAR_W);
+          backdrop.style.transition = "none";
+          backdrop.style.opacity = `${p * 0.5}`;
+        }
       }
     };
-    const onTouchEnd = () => { swipeRef.current.tracking = false; };
+
+    const onTouchEnd = () => {
+      const s = swipeRef.current;
+      if (!s.tracking || !s.decided) { s.tracking = false; return; }
+      s.tracking = false;
+      const diff = s.lastX - s.startX;
+      const panel = sidebarPanelRef.current;
+      const backdrop = backdropElRef.current;
+      if (!panel) return;
+
+      panel.style.transition = "transform 300ms ease-out";
+      if (backdrop) backdrop.style.transition = "opacity 300ms ease-out";
+
+      if (!mobileOpen && diff > SIDEBAR_W * 0.35) {
+        setMobileOpen(true);
+      } else if (mobileOpen && diff < -(SIDEBAR_W * 0.35)) {
+        setMobileOpen(false);
+      } else {
+        // Snap back
+        if (mobileOpen) {
+          panel.style.transform = "translateX(0)";
+          if (backdrop) { backdrop.style.opacity = "0.5"; backdrop.style.pointerEvents = "auto"; }
+        } else {
+          panel.style.transform = "translateX(-100%)";
+          if (backdrop) { backdrop.style.opacity = "0"; backdrop.style.pointerEvents = "none"; }
+        }
+      }
+    };
+
     document.addEventListener("touchstart", onTouchStart, { passive: true });
-    document.addEventListener("touchmove", onTouchMove, { passive: true });
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
     document.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
       document.removeEventListener("touchstart", onTouchStart);
@@ -126,9 +192,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Mobile overlay + sidebar with slide transition */}
-      <div className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-300 ${mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}>
-        <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-        <div className={`relative z-10 h-full w-64 transition-transform duration-300 ease-out ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <div className="fixed inset-0 z-50 lg:hidden" style={{ pointerEvents: mobileOpen ? "auto" : "none" }}>
+        <div
+          ref={backdropElRef}
+          className="absolute inset-0 bg-black transition-opacity duration-300"
+          style={{ opacity: mobileOpen ? 0.5 : 0, pointerEvents: mobileOpen ? "auto" : "none" }}
+          onClick={() => setMobileOpen(false)}
+        />
+        <div
+          ref={sidebarPanelRef}
+          className="relative z-10 h-full w-64 transition-transform duration-300 ease-out"
+          style={{ transform: mobileOpen ? "translateX(0)" : "translateX(-100%)" }}
+        >
           <Sidebar role={effectiveRole} />
           <button
             onClick={() => setMobileOpen(false)}
