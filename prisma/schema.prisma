@@ -109,6 +109,7 @@ model User {
   notifications    Notification[]
   scheduledCalls   ScheduledCall[]
 
+  @@index([role])
   @@map("users")
 }
 
@@ -297,9 +298,10 @@ model Clip {
   fraudScore      Int        @default(0)
   fraudReasons    String?    @db.Text // JSON array of reason strings
   fraudCheckedAt  DateTime?
-  isOwnerOverride   Boolean    @default(false)
-  streakDayLocked   Boolean    @default(false)
-  streakDayLockedAt DateTime?
+  isOwnerOverride      Boolean    @default(false)
+  feePercentAtApproval Float?
+  streakDayLocked      Boolean    @default(false)
+  streakDayLockedAt    DateTime?
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
@@ -312,7 +314,9 @@ model Clip {
 
   @@unique([clipUrl, campaignId])
   @@index([userId])
+  @@index([userId, createdAt])
   @@index([campaignId])
+  @@index([campaignId, status, isDeleted])
   @@index([status])
   @@map("clips")
 }
@@ -350,6 +354,7 @@ model ClipStat {
   clip Clip @relation(fields: [clipId], references: [id], onDelete: Cascade)
 
   @@index([clipId])
+  @@index([clipId, checkedAt])
   @@map("clip_stats")
 }
 
@@ -591,7 +596,7 @@ model Notification {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, isRead])
+  @@index([userId, isRead, createdAt])
   @@index([createdAt])
   @@map("notifications")
 }

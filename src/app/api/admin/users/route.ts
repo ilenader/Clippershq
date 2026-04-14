@@ -21,6 +21,7 @@ export async function GET() {
   try {
     const users = await db.user.findMany({
       orderBy: { createdAt: "desc" },
+      take: 500,
       select: {
         id: true,
         username: true,

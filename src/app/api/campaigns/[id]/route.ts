@@ -259,6 +259,15 @@ export async function DELETE(
       });
       console.log(`[ARCHIVE] Deactivated ${deactivated.count} tracking jobs for campaign:`, id);
 
+      // Void all pending payouts for this campaign
+      const voided = await db.payoutRequest.updateMany({
+        where: { campaignId: id, status: { in: ["REQUESTED", "UNDER_REVIEW", "APPROVED"] } },
+        data: { status: "VOIDED", rejectionReason: "Campaign archived" },
+      });
+      if (voided.count > 0) {
+        console.log(`[ARCHIVE] Voided ${voided.count} pending payouts for campaign ${id}`);
+      }
+
       return NextResponse.json({ success: true, message: "Campaign archived" });
     } catch (err: any) {
       console.error("Archive failed:", err?.message);

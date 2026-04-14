@@ -158,6 +158,7 @@ export async function POST(
             }
 
             // Save status + earnings atomically
+            const isReferred = !!clipWithData.user?.referredById;
             await tx.clip.update({
               where: { id },
               data: {
@@ -169,6 +170,7 @@ export async function POST(
                 baseEarnings: breakdown.baseEarnings,
                 bonusPercent: breakdown.bonusPercent,
                 bonusAmount: breakdown.bonusAmount,
+                feePercentAtApproval: isReferred ? 4 : 9,
                 streakDayLocked: true,
                 streakDayLockedAt: new Date(),
               },

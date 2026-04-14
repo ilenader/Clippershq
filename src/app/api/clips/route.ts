@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
         stats: { orderBy: { checkedAt: "desc" }, take: 3 },
       },
       orderBy: { createdAt: "desc" },
+      take: 500,
     });
     return NextResponse.json(clips);
   } catch (err: any) {
