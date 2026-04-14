@@ -1,185 +1,196 @@
 "use client";
 
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { HelpCircle, Film, Megaphone, UserCircle, DollarSign, Wallet, Shield, AlertTriangle, Star, Flame, Users } from "lucide-react";
+import { HelpCircle, ChevronDown, Rocket, Film, DollarSign, Flame, Star, Wallet, XCircle, TrendingUp } from "lucide-react";
 
-const sections = [
-  {
-    icon: <Megaphone className="h-5 w-5 text-accent" />,
-    title: "How campaigns work",
-    content: [
-      "Campaigns are created by the agency for specific brands or products.",
-      "Each campaign has requirements, platforms (TikTok, Instagram, YouTube), and payout rules.",
-      "Browse active campaigns, join the ones that match your content style, and start submitting clips.",
-      "Paused campaigns do not accept new clip submissions.",
-    ],
-  },
-  {
-    icon: <UserCircle className="h-5 w-5 text-accent" />,
-    title: "Adding your accounts",
-    content: [
-      "Before submitting clips, verify your social media account (TikTok, Instagram, or YouTube).",
-      "Go to Accounts → Add Account → select your platform and enter your username + profile link.",
-      "You'll receive a short verification code. Place it in your bio, then click Verify.",
-      "Once verified, your account is approved and ready for clip submissions.",
-    ],
-  },
-  {
-    icon: <Film className="h-5 w-5 text-accent" />,
-    title: "Submitting clips",
-    content: [
-      "Go to Clips → Submit Clip → choose a campaign and your verified account.",
-      "Paste the URL of your clip (TikTok video link, Instagram Reel, etc.).",
-      "Your clip URL must match your account platform — TikTok account = TikTok links only.",
-      "You must submit within 2 hours after posting. Older clips cannot be uploaded.",
-      "Each campaign has a daily clip limit (usually 3 per day). Check before submitting.",
-      "Your clip will be reviewed within 24–48 hours. Approved clips start earning based on views.",
-      "Note: YouTube clip tracking is not yet available — TikTok and Instagram clips are tracked automatically.",
-    ],
-  },
-  {
-    icon: <DollarSign className="h-5 w-5 text-accent" />,
-    title: "How earnings work",
-    content: [
-      "Earnings = (views ÷ 1,000) × Clipper CPM rate. Each campaign sets its own CPM.",
-      "Your clip must reach the campaign's minimum view threshold before it earns anything.",
-      "Once past the threshold, earnings are calculated on all views, up to the max payout per clip.",
-      "Level and streak bonuses increase your earnings (see below). Bonuses come from the campaign budget.",
-      "Each campaign has its own separate balance. View your balances on the Earnings page.",
-    ],
-  },
-  {
-    icon: <Wallet className="h-5 w-5 text-accent" />,
-    title: "Requesting payouts",
-    content: [
-      "Go to Payouts to see your available balance per campaign.",
-      "Minimum payout is $10 per campaign. Each campaign must reach $10 independently.",
-      "Select a campaign, enter the amount, your wallet address (crypto), and Discord username.",
-      "Platform fee: 9% standard, or 4% if you were referred by another user.",
-      "Status flow: Requested → Under Review → Approved → Paid.",
-      "Once requested, that amount is locked and cannot be withdrawn again until processed.",
-    ],
-  },
-  {
-    icon: <Star className="h-5 w-5 text-accent" />,
-    title: "Levels & bonuses",
-    content: [
-      "Everyone starts at Level 0. As your total lifetime earnings grow, you permanently unlock higher levels.",
-      "Level 0: $0 (0%) → Level 1: $300 (+3%) → Level 2: $1,000 (+6%) → Level 3: $2,500 (+10%) → Level 4: $8,000 (+15%) → Level 5: $20,000 (+20%).",
-      "Levels are permanent. They never go down, even if you take a break.",
-      "Your level bonus increases your earnings from the campaign budget. Higher level = more money per clip.",
-    ],
-  },
-  {
-    icon: <Flame className="h-5 w-5 text-accent" />,
-    title: "Streaks & daily activity",
-    content: [
-      "Post at least 1 approved clip per day to build your streak. Rejected or flagged clips do NOT count.",
-      "Milestones: 3 days (+2%), 7 days (+4%), 14 days (+5%), 30 days (+7%), 60 days (+9%).",
-      "Streak bonuses are temporary — they reset if you miss a day. But your level bonus stays forever.",
-      "Only real, approved clips count. No botted or invalid clips.",
-      "Check the Progress page for a visual 30-day streak grid (expandable to 60 days).",
-    ],
-  },
-  {
-    icon: <Users className="h-5 w-5 text-accent" />,
-    title: "Referrals & invites",
-    content: [
-      "Every clipper gets a personal referral link on the Progress page.",
-      "When someone signs up through your link, you earn 5% of their approved earnings, forever.",
-      "Referred users also benefit: they get a reduced platform fee of 4% instead of 9%.",
-      "There's no limit on referrals. The more people you invite, the more passive income you earn.",
-    ],
-  },
-  {
-    icon: <Shield className="h-5 w-5 text-accent" />,
-    title: "Trust & verification",
-    content: [
-      "Every clipper has a trust score that affects review priority.",
-      "Approved clips increase your trust. Rejected or flagged clips decrease it.",
-      "Always submit real, original content. Never use bots or fake engagement.",
-      "Suspicious engagement patterns are automatically detected and flagged for review.",
-    ],
-  },
-  {
-    icon: <AlertTriangle className="h-5 w-5 text-accent" />,
-    title: "Rules & policies",
-    content: [
-      "Each campaign has specific content requirements. Read them carefully before submitting.",
-      "Clips with bought views, fake engagement, or bot activity will be flagged and rejected.",
-      "Repeated violations will result in a permanent account ban.",
-      "If you have questions or disputes, open a Discord support ticket via the link in the sidebar.",
-    ],
-  },
-];
+interface HelpSection {
+  icon: React.ReactNode;
+  title: string;
+  content: React.ReactNode;
+}
 
-const faqs = [
-  {
-    q: "What do the bonus percentages mean?",
-    a: "Your bonus % is added on top of your base earnings. For example, if you earned $1,000 and have a +10% bonus, you get $1,100 instead of $1,000. Your total bonus = level bonus + streak bonus.",
-  },
-  {
-    q: "Can I lose my level?",
-    a: "No. Your level is permanent. Once you reach Level 2, you stay at Level 2 forever, even if you stop posting. Only streak bonuses reset if you miss a day.",
-  },
-  {
-    q: "What counts as an active day for my streak?",
-    a: "You need at least 1 approved clip that day. Rejected or flagged clips do not count toward your streak.",
-  },
-  {
-    q: "How do referrals work?",
-    a: "Share your personal link from the Progress page. When someone signs up through it, you earn 5% of their approved earnings forever. They also get a reduced 4% platform fee (instead of 9%).",
-  },
-  {
-    q: "What's the platform fee?",
-    a: "9% for standard users, 4% for referred users. This fee is deducted from your payout when you request a withdrawal.",
-  },
-  {
-    q: "Which platforms are supported?",
-    a: "TikTok and Instagram clips are tracked automatically with real view counts. YouTube accounts can be added but clip tracking is not yet available.",
-  },
-];
+function Collapsible({ icon, title, content, defaultOpen }: HelpSection & { defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen || false);
+  return (
+    <Card className="overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-3 w-full text-left cursor-pointer"
+      >
+        {icon}
+        <h2 className="text-[15px] sm:text-[16px] font-semibold text-[var(--text-primary)] flex-1">{title}</h2>
+        <ChevronDown className={`h-4 w-4 text-[var(--text-muted)] transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="mt-4 text-sm text-[var(--text-secondary)] space-y-3">
+          {content}
+        </div>
+      )}
+    </Card>
+  );
+}
 
 export default function HelpPage() {
+  const sections: (HelpSection & { defaultOpen?: boolean })[] = [
+    {
+      icon: <HelpCircle className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "What is Clippers HQ?",
+      defaultOpen: true,
+      content: (
+        <>
+          <p>Clippers HQ connects you with brands who want short videos on TikTok, Instagram Reels, and YouTube Shorts.</p>
+          <p>You make clips. You earn money. The more views your clips get, the more you earn.</p>
+        </>
+      ),
+    },
+    {
+      icon: <Rocket className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "How do I start?",
+      content: (
+        <ol className="space-y-2 list-none">
+          <li className="flex gap-2"><span className="text-accent font-bold">1.</span> Connect your social media accounts (TikTok, Instagram, YouTube)</li>
+          <li className="flex gap-2"><span className="text-accent font-bold">2.</span> Join a campaign that interests you</li>
+          <li className="flex gap-2"><span className="text-accent font-bold">3.</span> Follow the campaign requirements</li>
+          <li className="flex gap-2"><span className="text-accent font-bold">4.</span> Post your clip on your social media</li>
+          <li className="flex gap-2"><span className="text-accent font-bold">5.</span> Submit the clip URL on the platform</li>
+          <li className="flex gap-2"><span className="text-accent font-bold">6.</span> Wait for approval — once approved, you start earning</li>
+        </ol>
+      ),
+    },
+    {
+      icon: <DollarSign className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "How do I earn money?",
+      content: (
+        <>
+          <p>You earn based on views. Each campaign has a <strong className="text-[var(--text-primary)]">CPM rate</strong> (cost per 1,000 views).</p>
+          <p>Example: if CPM is <strong className="text-accent">$1.00</strong> and your clip gets <strong className="text-accent">50,000 views</strong>, you earn <strong className="text-accent">$50</strong>.</p>
+          <p>Your earnings update automatically as your clip gets more views. We check your views regularly.</p>
+        </>
+      ),
+    },
+    {
+      icon: <Flame className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "What are streaks?",
+      content: (
+        <>
+          <p>Post at least 1 clip every day to build a streak. Streaks give you <strong className="text-[var(--text-primary)]">bonus earnings</strong> on top of everything you make.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 my-2">
+            {[
+              { days: 3, bonus: 1 }, { days: 7, bonus: 2 }, { days: 14, bonus: 3 },
+              { days: 30, bonus: 5 }, { days: 60, bonus: 7 }, { days: 90, bonus: 10 },
+            ].map((m) => (
+              <div key={m.days} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-center">
+                <p className="text-sm font-bold text-[var(--text-primary)]">{m.days} days</p>
+                <p className="text-xs font-bold text-accent">+{m.bonus}%</p>
+              </div>
+            ))}
+          </div>
+          <p>The bonus applies to <strong className="text-accent">ALL</strong> your earnings across ALL campaigns.</p>
+          <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-3 space-y-1.5 text-xs">
+            <p className="font-medium text-[var(--text-primary)]">Important:</p>
+            <ul className="space-y-1 list-none">
+              <li>You have 24 hours (your local time) to post each day</li>
+              <li>When you submit a clip, your streak is safe while we review it</li>
+              <li>If we reject your clip, you can submit another one before the day ends</li>
+              <li>If all your clips for a day are rejected and the day is over, your streak resets</li>
+              <li>If none of your campaigns are active, your streak freezes automatically — no penalty</li>
+              <li className="text-accent font-medium">Tip: Submit 2-3 clips per day to be safe</li>
+            </ul>
+          </div>
+        </>
+      ),
+    },
+    {
+      icon: <Star className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "What are levels?",
+      content: (
+        <>
+          <p>The more you earn, the higher your level. Each level gives you a <strong className="text-[var(--text-primary)]">permanent bonus</strong> that never resets, even if you take a break.</p>
+          <div className="space-y-1.5 my-2">
+            {[
+              { level: 0, name: "Starter", earn: "$0", bonus: "—" },
+              { level: 1, name: "Rising", earn: "$300", bonus: "+3%" },
+              { level: 2, name: "Proven", earn: "$1,000", bonus: "+6%" },
+              { level: 3, name: "Expert", earn: "$2,500", bonus: "+10%" },
+              { level: 4, name: "Elite", earn: "$8,000", bonus: "+15%" },
+              { level: 5, name: "Legend", earn: "$20,000", bonus: "+20%" },
+            ].map((l) => (
+              <div key={l.level} className="flex items-center justify-between rounded-lg border border-[var(--border-color)] px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded bg-accent/20 text-xs font-bold text-accent">{l.level}</span>
+                  <span className="text-sm text-[var(--text-primary)] font-medium">{l.name}</span>
+                  <span className="text-xs text-[var(--text-muted)]">{l.earn} earned</span>
+                </div>
+                <span className="text-sm font-bold text-accent">{l.bonus}</span>
+              </div>
+            ))}
+          </div>
+          <p>Level bonuses <strong className="text-[var(--text-primary)]">stack</strong> with streak bonuses. Example: Level 2 (+6%) + 30-day streak (+5%) = <strong className="text-accent">+11%</strong> on all earnings.</p>
+        </>
+      ),
+    },
+    {
+      icon: <Wallet className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "How do payouts work?",
+      content: (
+        <>
+          <ol className="space-y-2 list-none">
+            <li className="flex gap-2"><span className="text-accent font-bold">1.</span> Go to the Payouts page</li>
+            <li className="flex gap-2"><span className="text-accent font-bold">2.</span> Pick a campaign and enter the amount you want</li>
+            <li className="flex gap-2"><span className="text-accent font-bold">3.</span> Enter your wallet address and Discord username</li>
+            <li className="flex gap-2"><span className="text-accent font-bold">4.</span> Click "Request Payout"</li>
+            <li className="flex gap-2"><span className="text-accent font-bold">5.</span> We review and process your payout</li>
+          </ol>
+          <p className="mt-2">Minimum payout: <strong className="text-accent">$10</strong> per campaign.</p>
+          <p>Platform fee: <strong className="text-[var(--text-primary)]">9%</strong> standard, or <strong className="text-accent">4%</strong> if you were referred by another clipper.</p>
+        </>
+      ),
+    },
+    {
+      icon: <XCircle className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "What if my clip gets rejected?",
+      content: (
+        <>
+          <p>Don't panic. You can submit another clip the same day. Check why it was rejected:</p>
+          <ul className="space-y-1 list-none text-xs">
+            <li>Did you follow the campaign requirements?</li>
+            <li>Was the video high quality?</li>
+            <li>Was it posted on the right platform?</li>
+          </ul>
+          <p className="mt-2">If 3 or more clips get rejected in a row, you'll get a warning. Make sure you read the campaign requirements carefully before posting.</p>
+        </>
+      ),
+    },
+    {
+      icon: <TrendingUp className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "Tips for earning more",
+      content: (
+        <ul className="space-y-2 list-none">
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Join multiple campaigns to maximize earnings</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Post consistently to build your streak bonus</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Follow campaign requirements exactly — rejected clips waste your time</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Higher view counts = more money</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Refer friends — you earn 5% of their earnings forever, and they get a reduced 4% fee</li>
+        </ul>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
-      <div className="text-center">
+    <div className="space-y-4 max-w-3xl mx-auto">
+      <div className="text-center mb-6">
         <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-accent/10 mb-3">
           <HelpCircle className="h-6 w-6 text-accent" />
         </div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Help & Tutorial</h1>
-        <p className="text-[15px] text-[var(--text-secondary)] mt-1">Everything you need to know about using Clippers HQ.</p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Help Center</h1>
+        <p className="text-[15px] text-[var(--text-secondary)] mt-1">Everything you need to know. Click a section to expand.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-3">
         {sections.map((section) => (
-          <Card key={section.title}>
-            <div className="flex items-center gap-3 mb-3">
-              {section.icon}
-              <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">{section.title}</h2>
-            </div>
-            <ul className="space-y-2">
-              {section.content.map((line, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
-                  <span className="text-accent mt-1.5 text-[8px]">●</span>
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </Card>
+          <Collapsible key={section.title} {...section} />
         ))}
-      </div>
-
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)] text-center">Frequently Asked Questions</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {faqs.map((faq, i) => (
-            <Card key={i}>
-              <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">{faq.q}</p>
-              <p className="text-sm text-[var(--text-secondary)]">{faq.a}</p>
-            </Card>
-          ))}
-        </div>
       </div>
     </div>
   );
