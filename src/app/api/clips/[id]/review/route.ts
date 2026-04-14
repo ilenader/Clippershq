@@ -217,6 +217,31 @@ export async function POST(
         broadcastToUser(clip.userId, "earnings_updated", { reason: action.toLowerCase() });
       } catch {}
 
+      // Ensure tracking job exists for approved clip
+      try {
+        const existingJob = await db.trackingJob.findFirst({ where: { clipId: id } });
+        if (!existingJob) {
+          await db.trackingJob.create({
+            data: {
+              clipId: id,
+              campaignId: clip.campaignId,
+              nextCheckAt: new Date(),
+              checkIntervalMin: 60,
+              isActive: true,
+            },
+          });
+          console.log("[TRACKING] Created missing tracking job for clip:", id);
+        } else if (!existingJob.isActive) {
+          await db.trackingJob.update({
+            where: { id: existingJob.id },
+            data: { isActive: true, nextCheckAt: new Date() },
+          });
+          console.log("[TRACKING] Reactivated tracking job for clip:", id);
+        }
+      } catch (tjErr: any) {
+        console.error("[TRACKING] Failed to ensure tracking job for clip:", id, tjErr?.message);
+      }
+
       // Notify clipper (in-app + email)
       createNotification(clip.userId, "CLIP_APPROVED", "Clip approved!", "Your clip has been approved and earnings have been calculated.").catch(() => {});
       if (clip.user?.email) {
