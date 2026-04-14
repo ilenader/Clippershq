@@ -40,7 +40,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center gap-2 font-medium whitespace-nowrap transition-all duration-150",
+          "relative overflow-hidden inline-flex items-center justify-center gap-2 font-medium whitespace-nowrap transition-all duration-150",
           "active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed",
           "cursor-pointer",
           variantStyles[variant],
@@ -49,7 +49,19 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         )}
         disabled={disabled || loading}
         {...props}
-        onClick={(e) => { hapticLight(); props.onClick?.(e); }}
+        onClick={(e) => {
+          hapticLight();
+          const rect = e.currentTarget.getBoundingClientRect();
+          const size = Math.max(rect.width, rect.height);
+          const span = document.createElement("span");
+          span.className = "ripple-effect";
+          span.style.width = span.style.height = size + "px";
+          span.style.left = (e.clientX - rect.left - size / 2) + "px";
+          span.style.top = (e.clientY - rect.top - size / 2) + "px";
+          e.currentTarget.appendChild(span);
+          setTimeout(() => span.remove(), 500);
+          props.onClick?.(e);
+        }}
       >
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
         {children}
