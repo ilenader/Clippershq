@@ -1,9 +1,9 @@
 export function hapticLight() {
-  if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(5);
+  try { navigator?.vibrate?.(5); } catch {}
 }
 export function hapticMedium() {
-  if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(15);
+  try { navigator?.vibrate?.(15); } catch {}
 }
 export function hapticHeavy() {
-  if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([10, 30, 10]);
+  try { navigator?.vibrate?.([10, 30, 10]); } catch {}
 }
