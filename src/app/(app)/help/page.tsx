@@ -48,14 +48,17 @@ export default function HelpPage() {
       icon: <Rocket className="h-5 w-5 text-accent flex-shrink-0" />,
       title: "How do I start?",
       content: (
+        <>
         <ol className="space-y-2 list-none">
           <li className="flex gap-2"><span className="text-accent font-bold">1.</span> Connect your social media accounts (TikTok, Instagram, YouTube)</li>
           <li className="flex gap-2"><span className="text-accent font-bold">2.</span> Join a campaign that interests you</li>
           <li className="flex gap-2"><span className="text-accent font-bold">3.</span> Follow the campaign requirements</li>
           <li className="flex gap-2"><span className="text-accent font-bold">4.</span> Post your clip on your social media</li>
-          <li className="flex gap-2"><span className="text-accent font-bold">5.</span> Submit the clip URL on the platform</li>
+          <li className="flex gap-2"><span className="text-accent font-bold">5.</span> Submit the clip URL on the platform (within 2 hours of posting)</li>
           <li className="flex gap-2"><span className="text-accent font-bold">6.</span> Wait for approval — once approved, you start earning</li>
         </ol>
+        <p className="text-xs text-[var(--text-muted)] mt-2">Note: You must submit your clip within 2 hours of posting it. Older clips cannot be uploaded.</p>
+        </>
       ),
     },
     {
@@ -109,12 +112,12 @@ export default function HelpPage() {
           <p>The more you earn, the higher your level. Each level gives you a <strong className="text-[var(--text-primary)]">permanent bonus</strong> that never resets, even if you take a break.</p>
           <div className="space-y-1.5 my-2">
             {[
-              { level: 0, name: "Starter", earn: "$0", bonus: "—" },
-              { level: 1, name: "Rising", earn: "$300", bonus: "+3%" },
-              { level: 2, name: "Proven", earn: "$1,000", bonus: "+6%" },
-              { level: 3, name: "Expert", earn: "$2,500", bonus: "+10%" },
-              { level: 4, name: "Elite", earn: "$8,000", bonus: "+15%" },
-              { level: 5, name: "Legend", earn: "$20,000", bonus: "+20%" },
+              { level: 0, name: "Rookie", earn: "$0", bonus: "—" },
+              { level: 1, name: "Clipper", earn: "$300", bonus: "+3%" },
+              { level: 2, name: "Creator", earn: "$1,000", bonus: "+6%" },
+              { level: 3, name: "Influencer", earn: "$2,500", bonus: "+10%" },
+              { level: 4, name: "Viral", earn: "$8,000", bonus: "+15%" },
+              { level: 5, name: "Icon", earn: "$20,000", bonus: "+20%" },
             ].map((l) => (
               <div key={l.level} className="flex items-center justify-between rounded-lg border border-[var(--border-color)] px-3 py-2">
                 <div className="flex items-center gap-2">

@@ -8,12 +8,12 @@ import { formatCurrency } from "@/lib/utils";
 import { Award, Flame, Zap, Trophy, Users, Crown, TrendingUp, ChevronRight, ChevronDown, Clock, Check } from "lucide-react";
 
 const LEVEL_TABLE = [
-  { level: 0, earn: 0, bonus: 0, label: "$0", name: "Starter" },
-  { level: 1, earn: 300, bonus: 3, label: "$300", name: "Rising" },
-  { level: 2, earn: 1000, bonus: 6, label: "$1K", name: "Proven" },
-  { level: 3, earn: 2500, bonus: 10, label: "$2.5K", name: "Expert" },
-  { level: 4, earn: 8000, bonus: 15, label: "$8K", name: "Elite" },
-  { level: 5, earn: 20000, bonus: 20, label: "$20K", name: "Legend" },
+  { level: 0, earn: 0, bonus: 0, label: "$0", name: "Rookie" },
+  { level: 1, earn: 300, bonus: 3, label: "$300", name: "Clipper" },
+  { level: 2, earn: 1000, bonus: 6, label: "$1K", name: "Creator" },
+  { level: 3, earn: 2500, bonus: 10, label: "$2.5K", name: "Influencer" },
+  { level: 4, earn: 8000, bonus: 15, label: "$8K", name: "Viral" },
+  { level: 5, earn: 20000, bonus: 20, label: "$20K", name: "Icon" },
 ];
 
 const STREAK_MILESTONES = [
