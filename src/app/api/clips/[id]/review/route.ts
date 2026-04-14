@@ -106,7 +106,7 @@ export async function POST(
             if (campaignBudget && campaignBudget > 0) {
               // Inline budget status using tx
               const earningsAgg = await tx.clip.aggregate({
-                where: { campaignId: clip.campaignId, isDeleted: false, status: "APPROVED" },
+                where: { campaignId: clip.campaignId, isDeleted: false, status: "APPROVED", videoUnavailable: false },
                 _sum: { earnings: true },
               });
               let spent = Math.round((earningsAgg._sum.earnings ?? 0) * 100) / 100;
@@ -367,7 +367,7 @@ export async function POST(
         });
         if (undoCampaign?.status === "PAUSED" && undoCampaign.lastBudgetPauseAt && undoCampaign.budget && undoCampaign.budget > 0) {
           const eAgg = await db.clip.aggregate({
-            where: { campaignId: clip.campaignId, isDeleted: false, status: "APPROVED" },
+            where: { campaignId: clip.campaignId, isDeleted: false, status: "APPROVED", videoUnavailable: false },
             _sum: { earnings: true },
           });
           let spent = Math.round((eAgg._sum.earnings ?? 0) * 100) / 100;
@@ -404,7 +404,7 @@ export async function POST(
     if (userRole_ !== "OWNER" && userRole_ !== "ADMIN" && !clip.isOwnerOverride) {
       try {
         const earningsAgg = await db.clip.aggregate({
-          where: { userId: clip.userId, status: "APPROVED", isOwnerOverride: false },
+          where: { userId: clip.userId, status: "APPROVED", isOwnerOverride: false, videoUnavailable: false },
           _sum: { earnings: true },
         });
         const newTotalEarnings = earningsAgg._sum.earnings ?? 0;

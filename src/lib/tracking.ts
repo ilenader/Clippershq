@@ -301,7 +301,7 @@ async function processTrackingJob(
           });
           if (txCampaign?.budget && txCampaign.budget > 0) {
             const earningsAgg = await tx.clip.aggregate({
-              where: { campaignId: clip.campaignId, isDeleted: false, status: "APPROVED" },
+              where: { campaignId: clip.campaignId, isDeleted: false, status: "APPROVED", videoUnavailable: false },
               _sum: { earnings: true },
             });
             let spent = Math.round((earningsAgg._sum.earnings ?? 0) * 100) / 100;
@@ -389,7 +389,7 @@ async function processTrackingJob(
       // Sync user stats/level
       if (earningsChanged && clip.userId && !clip.isOwnerOverride) {
         const allClips = await db.clip.findMany({
-          where: { userId: clip.userId, status: "APPROVED", isOwnerOverride: false },
+          where: { userId: clip.userId, status: "APPROVED", isOwnerOverride: false, videoUnavailable: false },
           select: { earnings: true },
         });
         const allStatSnapshots = await db.clipStat.findMany({
@@ -450,7 +450,7 @@ async function processTrackingJob(
 
     // Detect video unavailability (deleted/private/removed)
     const isUnavailable = /not found|no results|private|removed|unavailable/i.test(err.message);
-    if (isUnavailable && clip.status === "APPROVED") {
+    if (isUnavailable && clip?.status === "APPROVED") {
       try {
         const clipData = await db.clip.findUnique({ where: { id: clip.id }, select: { videoUnavailable: true, earnings: true } });
         if (clipData && !clipData.videoUnavailable) {

@@ -392,7 +392,7 @@ export async function getGamificationState(userId: string): Promise<Gamification
   let totalEarnings = user.totalEarnings;
   try {
     const earningsAgg = await db.clip.aggregate({
-      where: { userId, status: "APPROVED" },
+      where: { userId, status: "APPROVED", videoUnavailable: false },
       _sum: { earnings: true },
     });
     const realTotal = earningsAgg._sum.earnings ?? 0;
@@ -482,7 +482,7 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
 
   // Get all APPROVED clips
   const clips = await db.clip.findMany({
-    where: { userId, status: "APPROVED", isDeleted: false },
+    where: { userId, status: "APPROVED", isDeleted: false, videoUnavailable: false },
     include: {
       stats: { orderBy: { checkedAt: "desc" }, take: 1 },
       campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true, lastBudgetPauseAt: true } },
