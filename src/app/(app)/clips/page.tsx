@@ -100,8 +100,8 @@ export default function ClipsPage() {
     };
   }, [load]);
 
-  // Compute remaining daily submissions per campaign
-  const getDailyRemaining = (campaignId: string): { remaining: number; limit: number } => {
+  // Compute remaining daily submissions per campaign (memoized)
+  const getDailyRemaining = useCallback((campaignId: string): { remaining: number; limit: number } => {
     const campaign = campaigns.find((c: any) => c.id === campaignId);
     const limit = campaign?.maxClipsPerUserPerDay ?? 3;
     const startOfDay = new Date();
@@ -110,7 +110,7 @@ export default function ClipsPage() {
       (c: any) => c.campaignId === campaignId && new Date(c.createdAt) >= startOfDay && !c.isDeleted
     ).length;
     return { remaining: Math.max(0, limit - todayCount), limit };
-  };
+  }, [clips, campaigns]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

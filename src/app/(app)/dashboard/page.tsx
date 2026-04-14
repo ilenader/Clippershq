@@ -21,6 +21,10 @@ function Tooltip({ text }: { text: string }) {
   const [show, setShow] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+
   const handleTap = () => {
     setShow(true);
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -74,17 +78,14 @@ export default function DashboardPage() {
   const [hasJoinedCampaign, setHasJoinedCampaign] = useState(false);
   const [checklistLoaded, setChecklistLoaded] = useState(false);
 
-  // Fetch gamification state
-  useEffect(() => {
-    fetch("/api/gamification").then((r) => r.json()).then(setGamification).catch(() => {});
-  }, []);
-
-  // Fetch checklist data (accounts + campaign joins)
+  // Fetch gamification + checklist data in one batch
   useEffect(() => {
     Promise.all([
+      fetch("/api/gamification").then((r) => r.json()).catch(() => null),
       fetch("/api/accounts/mine").then((r) => r.json()).catch(() => []),
       fetch("/api/campaign-accounts").then((r) => r.json()).catch(() => []),
-    ]).then(([accounts, joins]) => {
+    ]).then(([gamData, accounts, joins]) => {
+      if (gamData) setGamification(gamData);
       setHasAccounts(Array.isArray(accounts) && accounts.length > 0);
       setHasJoinedCampaign(Array.isArray(joins) && joins.length > 0);
       setChecklistLoaded(true);

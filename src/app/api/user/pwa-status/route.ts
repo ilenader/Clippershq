@@ -37,7 +37,9 @@ export async function POST() {
     try {
       const { recalculateUnpaidEarnings } = await import("@/lib/gamification");
       await recalculateUnpaidEarnings(session.user.id);
-    } catch {}
+    } catch (err: any) {
+      console.error("[PWA] Earnings recalculation failed:", err?.message);
+    }
   }
 
   return NextResponse.json({ ok: true, isPWAUser: true });

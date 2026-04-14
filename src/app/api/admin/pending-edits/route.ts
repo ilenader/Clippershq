@@ -65,7 +65,10 @@ export async function POST(req: NextRequest) {
     "videoLengthMin", "videoLengthMax", "budget", "minViews",
     "maxPayoutPerClip", "maxClipsPerUserPerDay", "clipperCpm", "ownerCpm", "agencyFee",
   ];
-  const changesObj = typeof body.changes === "string" ? JSON.parse(body.changes) : body.changes;
+  let changesObj;
+  try { changesObj = typeof body.changes === "string" ? JSON.parse(body.changes) : body.changes; } catch {
+    return NextResponse.json({ error: "Invalid changes JSON" }, { status: 400 });
+  }
   const invalidFields = Object.keys(changesObj).filter((k: string) => !SAFE_EDIT_FIELDS.includes(k));
   if (invalidFields.length > 0) {
     return NextResponse.json({ error: "Invalid fields: " + invalidFields.join(", ") }, { status: 400 });

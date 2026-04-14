@@ -135,6 +135,7 @@ export async function generateChatbotResponse(
   }
 
   try {
+    // TODO: Migrate to @anthropic-ai/sdk package for better error handling and retries
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {

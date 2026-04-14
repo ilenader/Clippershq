@@ -14,6 +14,8 @@ import { NextRequest, NextResponse } from "next/server";
  * Fallback: Admin can manually verify via the review endpoint
  */
 
+const APIFY_IG_PROFILE_ACTOR = process.env.APIFY_IG_PROFILE_ACTOR || "apify~instagram-profile-scraper";
+
 /**
  * Detect platform from profile URL.
  */
@@ -124,7 +126,7 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
       const apifyTimeout = setTimeout(() => apifyCtrl.abort(), 60000);
 
       const apifyRes = await fetch(
-        `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${apifyToken}`,
+        `https://api.apify.com/v2/acts/${APIFY_IG_PROFILE_ACTOR}/run-sync-get-dataset-items?token=${apifyToken}`,
         {
           method: "POST",
           signal: apifyCtrl.signal,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -25,6 +25,8 @@ export default function ReferralsPage() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => { return () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }; }, []);
 
   useEffect(() => {
     Promise.all([
@@ -44,7 +46,8 @@ export default function ReferralsPage() {
     navigator.clipboard.writeText(`${window.location.origin}/login?ref=${ref.referralCode}`);
     setCopied(true);
     toast.success("Referral link copied!");
-    setTimeout(() => setCopied(false), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   if (loading) {

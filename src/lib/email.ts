@@ -16,7 +16,11 @@ interface EmailParams {
 
 async function sendEmail(params: EmailParams): Promise<boolean> {
   const apiKey = process.env.EMAIL_API_KEY || "";
-  const from = process.env.EMAIL_FROM || "Clippers HQ <onboarding@resend.dev>";
+  const from = process.env.EMAIL_FROM;
+  if (!from) {
+    console.error("[EMAIL] EMAIL_FROM not set — skipping email");
+    return false;
+  }
 
   if (!apiKey) {
     console.log(`[EMAIL PREVIEW] To: ${params.to} | Subject: ${params.subject}`);

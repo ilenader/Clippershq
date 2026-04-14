@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,8 @@ export default function AdminCallsPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [acting, setActing] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => { return () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }; }, []);
 
   const load = () => {
     fetch("/api/calls")
@@ -50,7 +52,8 @@ export default function AdminCallsPage() {
     navigator.clipboard.writeText(username);
     setCopied(callId);
     toast.success("Discord username copied!");
-    setTimeout(() => setCopied(null), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(null), 2000);
   };
 
   const now = Date.now();
