@@ -12,15 +12,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <ThemeProvider>
           {children}
           <Toaster
-            position="top-center"
+            position="top-right"
             toastOptions={{
               style: {
                 background: "var(--bg-card)",
                 color: "var(--text-primary)",
                 border: "1px solid var(--border-color)",
-                borderRadius: "12px",
               },
-              duration: 3000,
             }}
           />
         </ThemeProvider>
