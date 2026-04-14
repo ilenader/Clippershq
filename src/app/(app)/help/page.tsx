@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { HelpCircle, ChevronDown, Rocket, Film, DollarSign, Flame, Star, Wallet, XCircle, TrendingUp } from "lucide-react";
+import { HelpCircle, ChevronDown, Rocket, Film, DollarSign, Flame, Star, Wallet, XCircle, TrendingUp, Eye, ShieldCheck, MessageCircle, Users } from "lucide-react";
 
 interface HelpSection {
   icon: React.ReactNode;
@@ -176,6 +176,67 @@ export default function HelpPage() {
           <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Higher view counts = more money</li>
           <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Refer friends — you earn 5% of their earnings forever, and they get a reduced 4% fee</li>
         </ul>
+      ),
+    },
+    {
+      icon: <Eye className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "How to get more views",
+      content: (
+        <ul className="space-y-2 list-none">
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Post consistently — the algorithm rewards daily posting</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Use trending sounds and hashtags</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Hook viewers in the first 1-2 seconds</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Keep clips short — 15-30 seconds performs best</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Post at peak hours — usually 6-9 PM in your target audience's timezone</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Engage with comments on your clips</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Check our Discord channel <strong className="text-[var(--text-primary)]">#how-to-hit-usa</strong> for detailed guides on reaching US audiences</li>
+        </ul>
+      ),
+    },
+    {
+      icon: <ShieldCheck className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "How to avoid rejections",
+      content: (
+        <ul className="space-y-2 list-none">
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Read the campaign requirements <strong className="text-[var(--text-primary)]">CAREFULLY</strong> before making your clip</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Make sure your clip matches the brand's style and message</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Don't use copyrighted music unless the campaign says it's okay</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Don't use bots or fake engagement — we detect it automatically</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Don't submit clips older than 2 hours</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Don't submit the same clip to multiple campaigns</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Check your clip URL is correct before submitting</li>
+        </ul>
+      ),
+    },
+    {
+      icon: <MessageCircle className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "Discord community",
+      content: (
+        <>
+          <p>Join our Discord server for support, tips, and community.</p>
+          <div className="mt-2 space-y-1 text-xs">
+            <p>Channels: <strong className="text-[var(--text-primary)]">#announcements</strong>, <strong className="text-[var(--text-primary)]">#video-ideas</strong>, <strong className="text-[var(--text-primary)]">#how-to-hit-usa</strong>, <strong className="text-[var(--text-primary)]">#sounds-to-use</strong>, <strong className="text-[var(--text-primary)]">#editing-course</strong>, <strong className="text-[var(--text-primary)]">#payouts</strong>, <strong className="text-[var(--text-primary)]">#tickets</strong></p>
+            <p>Open a support ticket if you have any issues.</p>
+          </div>
+          <a href="https://discord.gg/JtKkbGWN" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 mt-3 rounded-lg bg-accent/10 border border-accent/20 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/20 transition-colors">
+            <MessageCircle className="h-4 w-4" /> Join Discord
+          </a>
+        </>
+      ),
+    },
+    {
+      icon: <Users className="h-5 w-5 text-accent flex-shrink-0" />,
+      title: "Referral program",
+      content: (
+        <>
+          <ul className="space-y-2 list-none">
+            <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> Share your referral link from the <strong className="text-[var(--text-primary)]">Referrals</strong> page</li>
+            <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> When someone signs up through your link, you earn <strong className="text-accent">5%</strong> of their approved earnings forever</li>
+            <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> They get a reduced platform fee: <strong className="text-accent">4%</strong> instead of 9%</li>
+            <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> No limit on referrals — invite as many friends as you want</li>
+            <li className="flex items-start gap-2"><span className="text-accent mt-0.5">-</span> The more active clippers you refer, the more passive income you earn</li>
+          </ul>
+        </>
       ),
     },
   ];

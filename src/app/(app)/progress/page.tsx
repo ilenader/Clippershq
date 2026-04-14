@@ -55,7 +55,7 @@ export default function ProgressPage() {
   const [gam, setGam] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showFull60, setShowFull60] = useState(false);
+  const [showFull90, setShowFull90] = useState(false);
   const [showStreakHelp, setShowStreakHelp] = useState(false);
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0 });
 
@@ -99,7 +99,7 @@ export default function ProgressPage() {
     ? Math.min(((totalEarnings - currentLevelData.earn) / (nextLevelData.earn - currentLevelData.earn)) * 100, 100)
     : 100;
 
-  const streakDaysToShow = showFull60 ? 60 : 30;
+  const streakDaysToShow = showFull90 ? 90 : 60;
 
   // Today's status (index 0)
   const todayStatus = streakDayStatuses[0] || "empty";
@@ -339,11 +339,11 @@ export default function ProgressPage() {
 
           {/* Toggle 30/60 days */}
           <button
-            onClick={() => setShowFull60(!showFull60)}
+            onClick={() => setShowFull90(!showFull90)}
             className="flex items-center gap-1 text-xs text-accent hover:underline cursor-pointer mb-4"
           >
-            <ChevronDown className={`h-3 w-3 transition-transform ${showFull60 ? "rotate-180" : ""}`} />
-            {showFull60 ? "Show 30 days" : "Show 60 days"}
+            <ChevronDown className={`h-3 w-3 transition-transform ${showFull90 ? "rotate-180" : ""}`} />
+            {showFull90 ? "Show 60 days" : "Show 90 days"}
           </button>
 
           {/* Milestone summary */}
@@ -407,9 +407,9 @@ export default function ProgressPage() {
         <div className="space-y-4">
           {[
             { icon: <Award className="h-5 w-5 text-accent" />, title: "Earn more → Level up → Permanent bonus", body: <>Your level is based on total lifetime earnings. Each level gives a permanent bonus that <strong>never resets</strong>. Reach Level 5 at $20,000 for <strong className="text-accent">+20%</strong>.</> },
-            { icon: <Flame className="h-5 w-5 text-accent" />, title: "Post daily → Build streak → Extra bonus", body: <>Get at least 1 approved clip every day. A 60-day streak gives <strong className="text-accent">+9%</strong> bonus on top of your level bonus. Miss a day and the streak bonus resets.</> },
+            { icon: <Flame className="h-5 w-5 text-accent" />, title: "Post daily → Build streak → Extra bonus", body: <>Get at least 1 approved clip every day. A 90-day streak gives <strong className="text-accent">+10%</strong> bonus on top of your level bonus. Miss a day and the streak bonus resets.</> },
             { icon: <Users className="h-5 w-5 text-accent" />, title: "Invite friends → Passive income", body: <>Share your referral link. You earn <strong className="text-accent">5%</strong> of every referred user's approved earnings, forever.</> },
-            { icon: <Zap className="h-5 w-5 text-accent" />, title: "Stay consistent → Maximize earnings", body: <>Level + streak combined can reach up to <strong className="text-accent">+25%</strong> or more. On a $1,000 payout, that's <strong className="text-accent">$250 extra</strong>. Stay consistent and keep climbing.</> },
+            { icon: <Zap className="h-5 w-5 text-accent" />, title: "Stay consistent → Maximize earnings", body: <>Level + streak + PWA bonus combined can reach up to <strong className="text-accent">+32%</strong>. On a $1,000 payout, that's <strong className="text-accent">$320 extra</strong>. Stay consistent and keep climbing.</> },
           ].map((item, i) => (
             <div key={i} className="flex items-start gap-3">
               <div className="mt-0.5 flex-shrink-0">{item.icon}</div>
