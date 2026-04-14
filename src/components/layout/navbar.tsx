@@ -3,6 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useDevAuth } from "@/components/dev-auth-provider";
 import { useTheme } from "@/components/theme-provider";
+import { hapticLight } from "@/lib/haptics";
 import { Sun, Moon, LogOut, ChevronDown, ArrowRightLeft, Bell } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -187,7 +188,7 @@ export function Navbar() {
       <div className="flex items-center gap-1 lg:gap-2">
         {/* Notification bell */}
         <div className="relative">
-          <button ref={bellBtnRef} onClick={() => { setNotifOpen(!notifOpen); if (!notifOpen) fetchNotifList(); }}
+          <button ref={bellBtnRef} onClick={() => { hapticLight(); setNotifOpen(!notifOpen); if (!notifOpen) fetchNotifList(); }}
             className="relative rounded-xl p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all cursor-pointer">
             <Bell className="h-4 w-4" />
             {notifCount > 0 && (

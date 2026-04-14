@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
 import { Loader2 } from "lucide-react";
+import { hapticLight } from "@/lib/haptics";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "outline";
 type ButtonSize = "sm" | "md" | "lg";
@@ -48,6 +49,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         )}
         disabled={disabled || loading}
         {...props}
+        onClick={(e) => { hapticLight(); props.onClick?.(e); }}
       >
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
         {children}

@@ -3,6 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useDevAuth } from "@/components/dev-auth-provider";
 import { useRouter, usePathname } from "next/navigation";
+import { hapticMedium } from "@/lib/haptics";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Sidebar } from "./sidebar";
 import { Navbar } from "./navbar";
@@ -124,8 +125,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       if (backdrop) backdrop.style.transition = "opacity 300ms ease-out";
 
       if (!mobileOpen && diff > SIDEBAR_W * 0.35) {
+        hapticMedium();
         setMobileOpen(true);
       } else if (mobileOpen && diff < -(SIDEBAR_W * 0.35)) {
+        hapticMedium();
         setMobileOpen(false);
       } else {
         // Snap back
