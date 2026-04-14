@@ -1,8 +1,9 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { EarningsChart } from "@/components/earnings/EarningsChart";
@@ -11,19 +12,58 @@ import { formatCurrency, formatRelative } from "@/lib/utils";
 import { type EarningsFilterKey } from "@/lib/earnings";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-select";
-import { Film, DollarSign, ExternalLink, Flame, Star, Rocket, Check, UserCircle, Megaphone } from "lucide-react";
+import { Film, DollarSign, TrendingUp, ExternalLink, Flame, Star, Zap, Info, Rocket, Check, UserCircle, Megaphone } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
+// ── Tooltip component ──
+function Tooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+
+  const handleTap = () => {
+    setShow(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setShow(false), 3000);
+  };
+
+  return (
+    <span className="relative inline-flex items-center ml-1">
+      <button
+        type="button"
+        className="inline-flex items-center justify-center h-[14px] w-[14px] rounded-full text-[var(--text-muted)] hover:text-accent transition-colors cursor-pointer"
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        onClick={handleTap}
+      >
+        <Info className="h-[14px] w-[14px]" />
+      </button>
+      {show && (
+        <span className="absolute bottom-full mb-2 w-48 sm:w-56 rounded-lg bg-[#1a1a1d] border border-[var(--border-color)] px-3 py-2 text-xs text-white shadow-lg z-50 pointer-events-none right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
 
 export default function DashboardPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const userRole = (session?.user as any)?.role;
 
+  // Role isolation: non-clippers should use /admin dashboard
   useEffect(() => {
-    if (session && userRole && userRole !== "CLIPPER") router.replace("/admin");
+    if (session && userRole && userRole !== "CLIPPER") {
+      router.replace("/admin");
+    }
   }, [session, userRole, router]);
 
+  const [stats, setStats] = useState({ myClips: 0, totalEarnings: 0, pendingClips: 0 });
   const [allClips, setAllClips] = useState<any[]>([]);
   const [recentClips, setRecentClips] = useState<any[]>([]);
   const [earningsFilters, setEarningsFilters] = useState<EarningsFilterKey[]>([]);
@@ -36,10 +76,12 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [gamification, setGamification] = useState<any>(null);
 
+  // Getting Started checklist state
   const [hasAccounts, setHasAccounts] = useState(false);
   const [hasJoinedCampaign, setHasJoinedCampaign] = useState(false);
   const [checklistLoaded, setChecklistLoaded] = useState(false);
 
+  // Fetch gamification + checklist data in one batch
   useEffect(() => {
     Promise.all([
       fetch("/api/gamification").then((r) => r.json()).catch(() => null),
@@ -64,6 +106,11 @@ export default function DashboardPage() {
         const clipsArr = Array.isArray(clipsData) ? clipsData : [];
         setAllClips(clipsArr);
         setRecentClips(clipsArr.slice(0, 5));
+        setStats({
+          myClips: clipsArr.length,
+          totalEarnings: earningsData.approvedEarnings || 0,
+          pendingClips: clipsArr.filter((c: any) => c.status === "PENDING").length,
+        });
         if (buildOptions) {
           const map = new Map<string, string>();
           for (const c of clipsArr) {
@@ -86,6 +133,7 @@ export default function DashboardPage() {
 
   const timeFilteredClips = filterByTimeframe(allClips, timeframeDays);
 
+  // Getting Started checklist
   const hasClips = allClips.length > 0;
   const checklistSteps = [
     { done: hasAccounts, label: "Add your social media account", href: "/accounts", icon: <UserCircle className="h-4 w-4" /> },
@@ -95,120 +143,171 @@ export default function DashboardPage() {
   const completedCount = checklistSteps.filter((s) => s.done).length;
   const allComplete = completedCount === 3;
 
-  if (loading && allClips.length === 0) {
+  if (loading && allClips.length === 0 && stats.myClips === 0) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-accent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-color)] border-t-accent" />
       </div>
     );
   }
 
-  const filteredEarnings = timeFilteredClips.filter((c: any) => c.status === "APPROVED").reduce((s: number, c: any) => s + (c.earnings || 0), 0);
-  const g = gamification;
-  const levelNames = ["Rookie", "Clipper", "Creator", "Influencer", "Viral", "Icon"];
-  const levelName = g ? (levelNames[g.level] || "") : "";
-  const levelProgress = g?.nextLevelAt > 0 ? Math.min((g.totalEarnings / g.nextLevelAt) * 100, 100) : 100;
-
   return (
-    <div className="space-y-4">
-
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-          {session?.user?.name?.split(" ")[0] || "Clipper"}
-        </h1>
+    <div className="space-y-8">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+            Welcome back, {session?.user?.name?.split(" ")[0] || "Clipper"}
+          </h1>
+          <p className="text-[15px] text-[var(--text-secondary)]">
+            Here&apos;s what&apos;s happening with your clips.
+          </p>
+        </div>
         {campaignOptions.length > 0 && (
-          <MultiDropdown label="Campaign" options={campaignOptions} values={selectedCampaigns} onChange={handleCampaignChange} allLabel="All campaigns" />
+          <MultiDropdown
+            label="Campaign"
+            options={campaignOptions}
+            values={selectedCampaigns}
+            onChange={handleCampaignChange}
+            allLabel="All campaigns"
+          />
         )}
       </div>
 
-      {/* ── Getting Started ── */}
+      {/* ── Getting Started Checklist ── */}
       {checklistLoaded && !allComplete && (
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 border-l-2 border-l-accent">
-          <div className="flex items-center gap-2 mb-3">
-            <Rocket className="h-4 w-4 text-accent" />
-            <span className="text-sm font-semibold text-white flex-1">Getting Started</span>
-            <span className="text-[11px] text-white/30">{completedCount}/3</span>
-          </div>
-          <div className="space-y-2">
-            {checklistSteps.map((step, i) => (
-              <div key={i} className="flex items-center gap-2.5">
-                {step.done ? (
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-accent flex-shrink-0"><Check className="h-3 w-3 text-white" /></div>
-                ) : (
-                  <div className="h-5 w-5 rounded-full border border-white/10 flex-shrink-0" />
-                )}
-                {step.done ? (
-                  <span className="text-xs text-white/25 line-through">{step.label}</span>
-                ) : (
-                  <Link href={step.href} className="text-xs text-accent font-medium flex items-center gap-1">{step.icon} {step.label}</Link>
-                )}
-              </div>
-            ))}
+        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] overflow-hidden">
+          <div className="border-l-4 border-accent p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Rocket className="h-5 w-5 text-accent" />
+              <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Getting Started</h2>
+              <span className="ml-auto text-xs text-[var(--text-muted)]">{completedCount} of 3 complete</span>
+            </div>
+            <p className="text-sm text-[var(--text-muted)] mb-4">Complete these steps to start earning</p>
+            <div className="space-y-3">
+              {checklistSteps.map((step, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  {step.done ? (
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-accent flex-shrink-0">
+                      <Check className="h-3.5 w-3.5 text-white" />
+                    </div>
+                  ) : (
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-[var(--border-color)] flex-shrink-0" />
+                  )}
+                  {step.done ? (
+                    <span className="text-sm text-[var(--text-muted)] line-through">{step.label}</span>
+                  ) : (
+                    <Link href={step.href} className="text-sm text-accent hover:underline font-medium flex items-center gap-1.5">
+                      {step.icon} {step.label}
+                    </Link>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── Hero: Earnings ── */}
-      <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-5 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">Total Earnings</p>
-        <p className="text-4xl sm:text-5xl font-bold text-accent tabular-nums tracking-tight">{formatCurrency(filteredEarnings)}</p>
-        {g && g.bonusPercent > 0 && (
-          <p className="text-sm text-white/50 mt-2">
-            <span className="text-accent font-semibold">+{g.bonusPercent}%</span> bonus active
-            <span className="text-white/25 ml-2">({g.levelBonus || 0}% level + {g.streakBonusPercent || 0}% streak{g.isPWAUser ? ` + ${g.pwaBonusPercent || 0}% app` : ""})</span>
-          </p>
-        )}
+      {/* Stats */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[
+          { label: "Clips", value: timeFilteredClips.length, icon: <Film className="h-4 w-4" />, color: "text-accent", tip: "Total clips you've submitted across all campaigns." },
+          { label: "Pending", value: timeFilteredClips.filter((c: any) => c.status === "PENDING").length, icon: <TrendingUp className="h-4 w-4" />, color: "text-accent", tip: "Clips waiting to be reviewed. Usually takes 24-48 hours." },
+          { label: "Earnings", value: formatCurrency(timeFilteredClips.filter((c: any) => c.status === "APPROVED").reduce((s: number, c: any) => s + (c.earnings || 0), 0)), icon: <DollarSign className="h-4 w-4" />, color: "text-accent", tip: "Your total approved earnings including level and streak bonuses." },
+        ].map((stat) => (
+          <Card key={stat.label}>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] flex items-center">
+                {stat.label}
+                <Tooltip text={stat.tip} />
+              </p>
+              <span className={stat.color}>{stat.icon}</span>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{stat.value}</p>
+          </Card>
+        ))}
       </div>
 
-      {/* ── Level + Streak bar ── */}
-      {g && g.level != null && (
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] px-4 py-3.5">
-          <div className="flex items-center justify-between gap-4">
-            {/* Level side */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1.5">
-                <Star className="h-3.5 w-3.5 text-accent flex-shrink-0" />
-                <span className="text-sm font-semibold text-white">Level {g.level}</span>
-                <span className="text-xs text-white/40">{levelName}</span>
-                <span className="text-xs font-semibold text-accent ml-auto sm:ml-2">+{g.levelBonus || 0}%</span>
-              </div>
-              {g.earningsToNextLevel > 0 && (
-                <div className="flex items-center gap-2.5">
-                  <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                    <div className="h-full bg-accent rounded-full transition-all duration-700" style={{ width: `${levelProgress}%` }} />
-                  </div>
-                  <span className="text-[11px] text-white/30 tabular-nums flex-shrink-0">{formatCurrency(g.earningsToNextLevel)} left</span>
-                </div>
+      {/* Gamification — Level, Streak, Bonus */}
+      {gamification && gamification.level != null && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] flex items-center">
+                Your Level
+                <Tooltip text="Based on lifetime earnings. Higher levels = bigger permanent bonus." />
+              </p>
+              <Star className="h-4 w-4 text-accent" />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <p className="text-3xl font-bold text-accent">Level {gamification.level}</p>
+              {gamification.bonusPercent > 0 && (
+                <span className="text-sm font-medium text-emerald-400">+{gamification.bonusPercent}% bonus</span>
               )}
             </div>
-
-            {/* Divider */}
-            <div className="w-px h-10 bg-white/[0.06] hidden sm:block" />
-
-            {/* Streak side */}
-            <div className="flex items-center gap-2.5 flex-shrink-0">
-              <Flame className="h-4 w-4 text-accent" />
-              <div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-bold text-white tabular-nums">{g.currentStreak}</span>
-                  <span className="text-xs text-white/30">day{g.currentStreak !== 1 ? "s" : ""}</span>
+            {gamification.earningsToNextLevel > 0 && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-[var(--text-muted)]">{formatCurrency(gamification.totalEarnings)} earned</span>
+                  <span className="text-accent">{formatCurrency(gamification.nextLevelAt)} for Level {gamification.level + 1}</span>
                 </div>
-                {g.streakBonusPercent > 0 ? (
-                  <p className="text-[11px] text-accent font-medium">+{g.streakBonusPercent}% streak</p>
-                ) : g.nextStreakReward ? (
-                  <p className="text-[11px] text-white/25">{g.nextStreakReward.days - g.currentStreak}d to +{g.nextStreakReward.bonusPercent}%</p>
-                ) : null}
+                <div className="h-2 rounded-full bg-[var(--bg-input)] border border-[var(--border-subtle)]">
+                  <div className="h-full rounded-full bg-accent transition-all duration-500"
+                    style={{ width: `${Math.min((gamification.totalEarnings / gamification.nextLevelAt) * 100, 100)}%` }} />
+                </div>
+                <p className="text-xs text-[var(--text-muted)] mt-1">
+                  {formatCurrency(gamification.earningsToNextLevel)} to next level
+                </p>
               </div>
+            )}
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] flex items-center">
+                Daily Streak
+                <Tooltip text="Post 1 approved clip per day. Miss a day and it resets." />
+              </p>
+              <Flame className="h-4 w-4 text-accent" />
             </div>
-          </div>
+            <div className="flex items-baseline gap-2">
+              <p className="text-3xl font-bold text-accent">{gamification.currentStreak}</p>
+              <span className="text-sm text-[var(--text-muted)]">day{gamification.currentStreak !== 1 ? "s" : ""}</span>
+            </div>
+            {gamification.currentStreak > 0 && gamification.streakReward && (
+              <p className="text-xs text-emerald-400 mt-1">+{gamification.streakReward.bonusPercent}% streak bonus active</p>
+            )}
+            {gamification.nextStreakReward && (
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                Post daily to reach {gamification.nextStreakReward.days}-day streak (+{gamification.nextStreakReward.bonusPercent}%)
+              </p>
+            )}
+            {gamification.longestStreak > gamification.currentStreak && (
+              <p className="text-xs text-[var(--text-muted)] mt-1">Best: {gamification.longestStreak} days</p>
+            )}
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] flex items-center">
+                Total Bonus
+                <Tooltip text="Level + streak + app bonuses combined. Applied to all earnings." />
+              </p>
+              <Zap className="h-4 w-4 text-accent" />
+            </div>
+            <p className="text-3xl font-bold text-accent">+{gamification.bonusPercent}%</p>
+            <div className="mt-2 space-y-0.5">
+              <p className="text-xs text-[var(--text-muted)]">Level: +{gamification.levelBonus || 0}%</p>
+              <p className="text-xs text-[var(--text-muted)]">Streak: +{gamification.streakBonusPercent || 0}%</p>
+              {gamification.isPWAUser && <p className="text-xs text-[var(--text-muted)]">App: +{gamification.pwaBonusPercent || 0}%</p>}
+            </div>
+          </Card>
         </div>
       )}
 
-      {/* ── Earnings Chart ── */}
-      <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 sm:p-5">
+      {/* Earnings Chart */}
+      <div>
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-white">Earnings over time</h2>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Earnings over time</h2>
           <div className="flex flex-wrap items-center gap-2">
             <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
             <EarningsFilters values={earningsFilters} onChange={setEarningsFilters} />
@@ -217,32 +316,36 @@ export default function DashboardPage() {
         <EarningsChart clips={timeFilteredClips} filters={earningsFilters} days={timeframeDays} />
       </div>
 
-      {/* ── Recent Clips ── */}
+      {/* Recent Clips */}
       <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">Recent clips</h2>
-          <Link href="/clips" className="text-xs text-accent">View all</Link>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recent clips</h2>
+          <Link href="/clips" className="text-sm text-accent hover:underline">View all</Link>
         </div>
         {recentClips.length === 0 ? (
-          <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6">
-            <EmptyState icon={<Film className="h-10 w-10" />} title="No clips yet" description="Submit your first clip to get started." />
-          </div>
+          <EmptyState
+            icon={<Film className="h-10 w-10" />}
+            title="No clips yet"
+            description="Submit your first clip to get started."
+          />
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {recentClips.map((clip: any) => (
-              <div key={clip.id} className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--border-color)] px-4 py-3 flex items-center gap-3 transition-colors">
+              <Card key={clip.id} className="flex items-center gap-3 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-white truncate">{clip.campaign?.name}</p>
-                  <p className="text-xs text-white/25 truncate">{clip.clipAccount?.username} · {formatRelative(clip.createdAt)}</p>
+                  <p className="text-[15px] font-medium text-[var(--text-primary)] truncate">{clip.campaign?.name}</p>
+                  <p className="text-sm text-[var(--text-muted)] truncate mt-0.5">{clip.clipAccount?.username} · {formatRelative(clip.createdAt)}</p>
                 </div>
-                <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="text-accent flex-shrink-0">
-                  <ExternalLink className="h-3.5 w-3.5" />
+                <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline whitespace-nowrap flex-shrink-0">
+                  <ExternalLink className="h-3 w-3" /> Open clip
                 </a>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {clip.earnings > 0 && <span className="text-xs font-bold text-accent tabular-nums">{formatCurrency(clip.earnings)}</span>}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  {clip.earnings > 0 && (
+                    <span className="text-sm font-medium text-[var(--text-primary)]">{formatCurrency(clip.earnings)}</span>
+                  )}
                   <Badge variant={clip.status.toLowerCase() as any}>{clip.status}</Badge>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         )}
