@@ -207,6 +207,7 @@ export default function PayoutsPage() {
     APPROVED: "approved",
     PAID: "active",
     REJECTED: "rejected",
+    VOIDED: "voided",
   };
 
   // Earnings per campaign — only count APPROVED clips
@@ -227,6 +228,7 @@ export default function PayoutsPage() {
     APPROVED: "Approved",
     PAID: "Paid",
     REJECTED: "Rejected",
+    VOIDED: "Voided",
   };
 
   const getCallForPayout = (payoutId: string, payout?: any) => {
