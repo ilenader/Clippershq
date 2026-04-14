@@ -221,44 +221,18 @@ export default function DashboardPage() {
         </GlassCard>
       )}
 
-      {/* ── Stat Cards ── */}
-      <div className="grid gap-5 sm:grid-cols-3">
-        <GlassCard hover>
-          <div className="flex items-center justify-between mb-3">
-            <StatLabel tip="Total clips you've submitted across all campaigns.">Clips</StatLabel>
-            <div className="h-10 w-10 rounded-xl bg-accent/10 flex items-center justify-center">
-              <Film className="h-5 w-5 text-accent" />
-            </div>
+      {/* ── Earnings Card ── */}
+      <GlassCard hover>
+        <div className="flex items-center justify-between mb-3">
+          <StatLabel tip="Your total approved earnings including level and streak bonuses.">Earnings</StatLabel>
+          <div className="h-10 w-10 rounded-xl bg-accent/10 flex items-center justify-center">
+            <DollarSign className="h-5 w-5 text-accent" />
           </div>
-          <p className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)]" style={{ textShadow: "0 0 20px rgba(37,150,190,0.15)" }}>
-            {timeFilteredClips.length}
-          </p>
-        </GlassCard>
-
-        <GlassCard hover>
-          <div className="flex items-center justify-between mb-3">
-            <StatLabel tip="Clips waiting to be reviewed. Usually takes 24-48 hours.">Pending</StatLabel>
-            <div className="h-10 w-10 rounded-xl bg-accent/10 flex items-center justify-center">
-              <TrendingUp className="h-5 w-5 text-accent" />
-            </div>
-          </div>
-          <p className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)]" style={{ textShadow: "0 0 20px rgba(37,150,190,0.15)" }}>
-            {filteredPending}
-          </p>
-        </GlassCard>
-
-        <GlassCard hover>
-          <div className="flex items-center justify-between mb-3">
-            <StatLabel tip="Your total approved earnings including level and streak bonuses.">Earnings</StatLabel>
-            <div className="h-10 w-10 rounded-xl bg-accent/10 flex items-center justify-center">
-              <DollarSign className="h-5 w-5 text-accent" />
-            </div>
-          </div>
-          <p className="text-3xl sm:text-4xl font-bold text-accent" style={{ textShadow: "0 0 30px rgba(37,150,190,0.4)" }}>
-            {formatCurrency(filteredEarnings)}
-          </p>
-        </GlassCard>
-      </div>
+        </div>
+        <p className="text-3xl sm:text-4xl font-bold text-accent" style={{ textShadow: "0 0 30px rgba(37,150,190,0.4)" }}>
+          {formatCurrency(filteredEarnings)}
+        </p>
+      </GlassCard>
 
       {/* ── Gamification ── */}
       {gamification && gamification.level != null && (
