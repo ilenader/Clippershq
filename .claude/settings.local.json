@@ -126,7 +126,12 @@
       "Bash(ls:*)",
       "Bash(npm uninstall:*)",
       "Bash(npx skills:*)",
-      "Bash(git clone:*)"
+      "Bash(git clone:*)",
+      "Read(//c/Users/Game Centar/.claude/skills/**)",
+      "Read(//c/Users/Game Centar/.claude/plugins/**)",
+      "Read(//c/Users/Game Centar/.claude/**)",
+      "Read(//c/Users/Game Centar/.agents/**)",
+      "Read(//mnt/**)"
     ]
   }
 }

@@ -342,7 +342,12 @@ async function processTrackingJob(
             newOwnerAmt = thisClipCurrentOwner;
           }
         }
-      } catch {}
+      } catch (budgetErr: any) {
+        console.error(`[BUDGET-CHECK] Error for clip ${clip.id}:`, budgetErr?.message);
+        // Safe default: keep current earnings unchanged — do not increase
+        newEarnings = clip.earnings || 0;
+        newOwnerAmt = 0;
+      }
 
       const earningsChanged = newEarnings !== (clip.earnings || 0);
       if (earningsChanged) {

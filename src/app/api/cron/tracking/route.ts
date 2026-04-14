@@ -16,14 +16,16 @@ export const maxDuration = 300; // 5 minutes — cron processes many clips via A
  * In development, accessible without secret.
  */
 export async function GET(req: NextRequest) {
-  // Production: verify Vercel cron secret
-  // Vercel sends: Authorization: Bearer <CRON_SECRET>
-  if (process.env.NODE_ENV === "production" && process.env.CRON_SECRET) {
-    const authHeader = req.headers.get("authorization");
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      console.log("[CRON] Unauthorized — invalid or missing authorization header");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  // Always require CRON_SECRET — no unauthenticated access
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error("[CRON] CRON_SECRET not configured — blocking request");
+    return NextResponse.json({ error: "Cron secret not configured" }, { status: 500 });
+  }
+  const authHeader = req.headers.get("authorization");
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    console.error("[CRON] Unauthorized tracking attempt blocked");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   console.log("[CRON] Tracking cron fired at", new Date().toISOString());
