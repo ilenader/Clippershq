@@ -52,15 +52,16 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         onClick={(e) => {
           hapticLight();
           const rect = e.currentTarget.getBoundingClientRect();
-          const size = Math.max(rect.width, rect.height);
+          const rippleSize = Math.max(rect.width, rect.height) * 2;
           const span = document.createElement("span");
           span.className = "ripple-effect";
-          span.style.width = span.style.height = size + "px";
-          span.style.left = (e.clientX - rect.left - size / 2) + "px";
-          span.style.top = (e.clientY - rect.top - size / 2) + "px";
+          span.style.width = rippleSize + "px";
+          span.style.height = rippleSize + "px";
+          span.style.left = (e.clientX - rect.left - rippleSize / 2) + "px";
+          span.style.top = (e.clientY - rect.top - rippleSize / 2) + "px";
           e.currentTarget.appendChild(span);
-          setTimeout(() => span.remove(), 500);
-          props.onClick?.(e);
+          setTimeout(() => span.remove(), 600);
+          if (props.onClick) props.onClick(e);
         }}
       >
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}

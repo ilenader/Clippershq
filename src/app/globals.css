@@ -130,7 +130,7 @@ body {
 .ripple-effect {
   position: absolute;
   border-radius: 50%;
-  background: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.35);
   animation: ripple 500ms ease-out forwards;
   pointer-events: none;
 }
