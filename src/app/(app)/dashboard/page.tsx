@@ -173,11 +173,9 @@ export default function DashboardPage() {
       {/* ── Status Grid 2x2 ── */}
       <div className="grid grid-cols-2 gap-3">
         {/* Level */}
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Star className="h-3.5 w-3.5 text-accent" />
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Level</span>
-          </div>
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 text-center">
+          <Star className="h-4 w-4 text-accent mx-auto mb-1" />
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Level</p>
           <p className="text-2xl font-bold text-[var(--text-primary)]">Level {g?.level ?? 0}</p>
           <p className="text-sm text-[var(--text-muted)]">{levelName} · +{g?.levelBonus ?? 0}%</p>
           {g?.earningsToNextLevel > 0 && (
@@ -191,33 +189,24 @@ export default function DashboardPage() {
         </div>
 
         {/* Streak */}
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Flame className="h-3.5 w-3.5 text-accent" />
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Streak</span>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{g?.currentStreak ?? 0}</p>
-            <span className="text-xs text-[var(--text-muted)]">days</span>
-          </div>
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 text-center">
+          <Flame className="h-4 w-4 text-accent mx-auto mb-1" />
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Streak</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{g?.currentStreak ?? 0} <span className="text-sm font-normal text-[var(--text-muted)]">days</span></p>
           {g?.streakBonusPercent > 0 && (
             <p className="text-sm text-accent font-medium">+{g.streakBonusPercent}% bonus</p>
           )}
           {postedToday ? (
             <p className="text-sm text-emerald-400 mt-0.5">✓ Posted today</p>
           ) : (
-            <p className="text-sm text-accent mt-0.5">
-              <Clock className="h-3 w-3 inline-block -mt-0.5 mr-0.5" />Post to keep streak
-            </p>
+            <p className="text-sm text-accent mt-0.5">Post to keep streak</p>
           )}
         </div>
 
         {/* Clips Today */}
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Film className="h-3.5 w-3.5 text-accent" />
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Clips Today</span>
-          </div>
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 text-center">
+          <Film className="h-4 w-4 text-accent mx-auto mb-1" />
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Clips Today</p>
           <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{clipsToday}</p>
           {clipsApprovedToday > 0 && (
             <p className="text-sm text-emerald-400">{clipsApprovedToday} approved</p>
@@ -228,11 +217,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Payout */}
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4">
-          <div className="flex items-center gap-1.5 mb-1">
-            <DollarSign className="h-3.5 w-3.5 text-accent" />
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Available</span>
-          </div>
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 text-center">
+          <DollarSign className="h-4 w-4 text-accent mx-auto mb-1" />
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Available</p>
           <p className="text-2xl font-bold text-accent tabular-nums">{formatCurrency(available)}</p>
           {lockedInPayouts > 0 && (
             <p className="text-sm text-amber-400">{formatCurrency(lockedInPayouts)} pending</p>
@@ -243,7 +230,7 @@ export default function DashboardPage() {
       {/* ── Submit CTA ── */}
       <div className="my-2">
         <Link
-          href="/clips"
+          href="/clips?submit=true"
           onClick={() => hapticMedium()}
           className="flex items-center justify-center gap-2 w-full rounded-xl bg-accent hover:bg-accent-hover active:bg-accent-hover/90 active:scale-[0.97] text-white font-bold py-3.5 text-center transition-all duration-150 shadow-sm"
         >
@@ -252,12 +239,6 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* ── Quick Stats ── */}
-      <div className="flex items-center justify-between text-xs text-[var(--text-muted)] px-1">
-        <span>{allClips.length} clips</span>
-        <span>Best streak: {g?.longestStreak ?? 0}d</span>
-        <span>Level {g?.level ?? 0}: {levelName}</span>
-      </div>
 
     </div>
   );

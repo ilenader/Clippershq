@@ -106,14 +106,14 @@ export default function ProgressPage() {
   const postedToday = todayStatus === "confirmed" || todayStatus === "pending";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Your Progress</h1>
         <p className="text-[15px] text-[var(--text-secondary)]">Level up, keep your streak, invite friends, and earn more.</p>
       </div>
 
       {/* ── Top summary ── */}
-      <div className="grid gap-4 grid-cols-2">
+      <div className="grid gap-3 grid-cols-2">
         <Card className="border-accent/20 bg-accent/5 text-center py-6">
           <p className="text-xs font-medium uppercase tracking-wider text-accent">Total Bonus</p>
           <p className="text-2xl sm:text-4xl font-bold text-accent mt-1">+{bonusPercent}%</p>
@@ -145,7 +145,7 @@ export default function ProgressPage() {
         </div>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {/* ── Level Progress ── */}
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between mb-4">

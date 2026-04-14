@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ function detectUrlPlatform(url: string): string | null {
 export default function ClipsPage() {
   const { data: session } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const userRole = (session?.user as any)?.role;
 
   // Role isolation: clips page is clipper-only
@@ -42,6 +43,14 @@ export default function ClipsPage() {
   const [joinedCampaignIds, setJoinedCampaignIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+
+  // Auto-open submit modal when linked from dashboard
+  useEffect(() => {
+    if (searchParams.get("submit") === "true") {
+      setShowModal(true);
+      router.replace("/clips", { scroll: false });
+    }
+  }, [searchParams, router]);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     campaignId: "",
