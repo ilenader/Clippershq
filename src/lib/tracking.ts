@@ -280,98 +280,100 @@ async function processTrackingJob(
         ? calculateOwnerEarnings(stats.views, (clip.campaign as any).ownerCpm, breakdown.baseEarnings, cCpm)
         : 0;
 
-      // Budget cap
+      // Budget cap + earnings save — serializable transaction to prevent race conditions
       try {
-        const { getCampaignBudgetStatus } = await import("@/lib/balance");
-        const budgetStatus = await getCampaignBudgetStatus(clip.campaignId);
-        if (budgetStatus && budgetStatus.budget > 0) {
-          const freshClip = await db.clip.findUnique({ where: { id: clip.id }, select: { earnings: true } });
-          const currentClipEarnings = freshClip?.earnings || 0;
-
-          let thisClipCurrentOwner = 0;
-          if (isCpmSplit) {
-            try {
-              const existingAe = await db.agencyEarning.findUnique({ where: { clipId: clip.id } });
-              thisClipCurrentOwner = existingAe?.amount || 0;
-            } catch {}
-          }
-          const otherSpent = budgetStatus.spent - currentClipEarnings - thisClipCurrentOwner;
-          const remaining = Math.max(budgetStatus.budget - otherSpent, 0);
-          const totalForThisClip = newEarnings + newOwnerAmt;
-
-          console.log(`[BUDGET-CHECK] Campaign: ${clip.campaignId} Budget: $${budgetStatus.budget} Total spent: $${budgetStatus.spent.toFixed(2)} This clip DB earnings: $${currentClipEarnings} Other spent: $${otherSpent.toFixed(2)} Remaining: $${remaining.toFixed(2)} New clipper: $${newEarnings} New owner: $${newOwnerAmt}`);
-
-          if (remaining <= 0) {
-            newEarnings = currentClipEarnings;
-            newOwnerAmt = thisClipCurrentOwner;
-            console.log(`[BUDGET-CHECK] No budget remaining, keeping current for clip ${clip.id}`);
-          } else if (totalForThisClip > remaining) {
-            // Ratio-based cap: split remaining budget by CPM ratio
-            const clipperCpmVal = (clip.campaign as any).clipperCpm || (clip.campaign as any).cpmRate || 1;
-            const ownerCpmVal = (clip.campaign as any).ownerCpm || 0;
-            const totalCpm = clipperCpmVal + ownerCpmVal;
-            const ownerRatio = ownerCpmVal / totalCpm;
-            const clipperRatio = clipperCpmVal / totalCpm;
-
-            newOwnerAmt = Math.round(remaining * ownerRatio * 100) / 100;
-            newEarnings = Math.round(remaining * clipperRatio * 100) / 100;
-
-            // Safety: ensure total doesn't exceed remaining
-            if (newEarnings + newOwnerAmt > remaining) {
-              newEarnings = Math.round((remaining - newOwnerAmt) * 100) / 100;
+        await db.$transaction(async (tx: any) => {
+          // Inline budget status using tx (not external getCampaignBudgetStatus which uses its own db)
+          const txCampaign = await tx.campaign.findUnique({
+            where: { id: clip.campaignId },
+            select: { budget: true, pricingModel: true },
+          });
+          if (txCampaign?.budget && txCampaign.budget > 0) {
+            const earningsAgg = await tx.clip.aggregate({
+              where: { campaignId: clip.campaignId, isDeleted: false, status: "APPROVED" },
+              _sum: { earnings: true },
+            });
+            let spent = Math.round((earningsAgg._sum.earnings ?? 0) * 100) / 100;
+            if (txCampaign.pricingModel === "CPM_SPLIT") {
+              const ownerAgg = await tx.agencyEarning.aggregate({
+                where: { campaignId: clip.campaignId },
+                _sum: { amount: true },
+              });
+              spent = Math.round((spent + (ownerAgg._sum.amount ?? 0)) * 100) / 100;
             }
-            newEarnings = Math.max(newEarnings, 0);
-            newOwnerAmt = Math.max(newOwnerAmt, 0);
 
-            console.log(`[BUDGET-CHECK] Ratio-based cap: clipper=$${newEarnings} (ratio ${clipperRatio.toFixed(2)}) owner=$${newOwnerAmt} (ratio ${ownerRatio.toFixed(2)}) remaining=$${remaining.toFixed(2)}`);
+            const freshClip = await tx.clip.findUnique({ where: { id: clip.id }, select: { earnings: true } });
+            const currentClipEarnings = freshClip?.earnings || 0;
+            let thisClipCurrentOwner = 0;
+            if (isCpmSplit) {
+              const existingAe = await tx.agencyEarning.findUnique({ where: { clipId: clip.id } });
+              thisClipCurrentOwner = existingAe?.amount || 0;
+            }
+
+            const otherSpent = spent - currentClipEarnings - thisClipCurrentOwner;
+            const remaining = Math.max(txCampaign.budget - otherSpent, 0);
+            const totalForThisClip = newEarnings + newOwnerAmt;
+
+            console.log(`[BUDGET-CHECK] Campaign: ${clip.campaignId} Budget: $${txCampaign.budget} Spent: $${spent.toFixed(2)} This clip: $${currentClipEarnings} Remaining: $${remaining.toFixed(2)} New: $${newEarnings}+$${newOwnerAmt}`);
+
+            if (remaining <= 0) {
+              newEarnings = currentClipEarnings;
+              newOwnerAmt = thisClipCurrentOwner;
+              console.log(`[BUDGET-CHECK] No budget remaining, keeping current for clip ${clip.id}`);
+            } else if (totalForThisClip > remaining) {
+              const clipperCpmVal = (clip.campaign as any).clipperCpm || (clip.campaign as any).cpmRate || 1;
+              const ownerCpmVal = (clip.campaign as any).ownerCpm || 0;
+              const totalCpm = clipperCpmVal + ownerCpmVal;
+              newOwnerAmt = Math.round(remaining * (ownerCpmVal / totalCpm) * 100) / 100;
+              newEarnings = Math.round(remaining * (clipperCpmVal / totalCpm) * 100) / 100;
+              if (newEarnings + newOwnerAmt > remaining) newEarnings = Math.round((remaining - newOwnerAmt) * 100) / 100;
+              newEarnings = Math.max(newEarnings, 0);
+              newOwnerAmt = Math.max(newOwnerAmt, 0);
+              console.log(`[BUDGET-CHECK] Ratio-capped: clipper=$${newEarnings} owner=$${newOwnerAmt} remaining=$${remaining.toFixed(2)}`);
+            }
+
+            // Auto-pause
+            const newTotalSpent = otherSpent + newEarnings + newOwnerAmt;
+            if (newTotalSpent >= txCampaign.budget - 0.01) {
+              await tx.campaign.update({ where: { id: clip.campaignId }, data: { status: "PAUSED", lastBudgetPauseAt: new Date() } });
+              console.log(`[BUDGET] Campaign ${clip.campaignId} paused — budget $${txCampaign.budget} reached`);
+              details.push(`Campaign ${clip.campaignId}: AUTO-PAUSED (budget $${txCampaign.budget} reached)`);
+            }
           }
 
-          // Auto-pause BEFORE saving earnings (with $0.01 tolerance)
-          const newTotalSpent = otherSpent + newEarnings + newOwnerAmt;
-          if (newTotalSpent >= budgetStatus.budget - 0.01) {
-            await db.campaign.update({ where: { id: clip.campaignId }, data: { status: "PAUSED", lastBudgetPauseAt: new Date() } });
-            console.log(`[BUDGET] Campaign ${clip.campaignId} paused — budget $${budgetStatus.budget} reached (spent: $${newTotalSpent.toFixed(2)})`);
-            details.push(`Campaign ${clip.campaignId}: AUTO-PAUSED (budget $${budgetStatus.budget} reached)`);
+          // Save earnings inside the transaction
+          if (newEarnings !== (clip.earnings || 0)) {
+            await tx.clip.update({
+              where: { id: clip.id },
+              data: { earnings: newEarnings, baseEarnings: breakdown.baseEarnings, bonusPercent: breakdown.bonusPercent, bonusAmount: breakdown.bonusAmount },
+            });
           }
 
-          // Double-check after potential concurrent pause
-          const freshBudget = await getCampaignBudgetStatus(clip.campaignId);
-          if (freshBudget && freshBudget.budget > 0 && freshBudget.spent >= freshBudget.budget - 0.01) {
-            console.log(`[BUDGET-CHECK] Campaign already over budget after recheck, keeping current earnings for clip ${clip.id}`);
-            newEarnings = currentClipEarnings;
-            newOwnerAmt = thisClipCurrentOwner;
+          // Save owner earnings inside the transaction
+          if (isCpmSplit) {
+            if (newOwnerAmt > 0) {
+              await tx.agencyEarning.upsert({
+                where: { clipId: clip.id },
+                create: { campaignId: clip.campaignId, clipId: clip.id, amount: newOwnerAmt, views: stats.views },
+                update: { amount: newOwnerAmt, views: stats.views },
+              });
+            } else {
+              try { await tx.agencyEarning.delete({ where: { clipId: clip.id } }); } catch {}
+            }
           }
+        }, { isolationLevel: "Serializable" as any });
+      } catch (txErr: any) {
+        if (txErr?.code === "P2034") {
+          console.log(`[BUDGET] Transaction conflict for clip ${clip.id}, will retry next cron`);
+        } else {
+          console.error(`[BUDGET-CHECK] Transaction error for clip ${clip.id}:`, txErr?.message);
         }
-      } catch (budgetErr: any) {
-        console.error(`[BUDGET-CHECK] Error for clip ${clip.id}:`, budgetErr?.message);
-        // Safe default: keep current earnings unchanged — do not increase
+        // Safe default: earnings unchanged
         newEarnings = clip.earnings || 0;
         newOwnerAmt = 0;
       }
 
       const earningsChanged = newEarnings !== (clip.earnings || 0);
-      if (earningsChanged) {
-        await db.clip.update({
-          where: { id: clip.id },
-          data: { earnings: newEarnings, baseEarnings: breakdown.baseEarnings, bonusPercent: breakdown.bonusPercent, bonusAmount: breakdown.bonusAmount },
-        });
-      }
-
-      // Save owner earnings for CPM_SPLIT
-      if (isCpmSplit) {
-        console.log(`[AGENCY-TRACK] Clip ${clip.id}: clipper=$${newEarnings}, owner=$${newOwnerAmt}`);
-        if (newOwnerAmt > 0) {
-          try {
-            await db.agencyEarning.upsert({
-              where: { clipId: clip.id },
-              create: { campaignId: clip.campaignId, clipId: clip.id, amount: newOwnerAmt, views: stats.views },
-              update: { amount: newOwnerAmt, views: stats.views },
-            });
-          } catch (aeErr: any) { console.error(`[AGENCY-TRACK] Failed:`, aeErr?.message); }
-        } else {
-          try { await db.agencyEarning.delete({ where: { clipId: clip.id } }); } catch {}
-        }
-      }
 
       // Sync user stats/level
       if (earningsChanged && clip.userId && !clip.isOwnerOverride) {

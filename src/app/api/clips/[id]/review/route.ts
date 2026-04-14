@@ -97,94 +97,101 @@ export async function POST(
           finalOwnerAmt = calculateOwnerEarnings(views, oCpm, breakdown.baseEarnings, cCpm);
         }
 
-        // ── Budget cap: check BEFORE saving status or earnings ──
-        // Since clip is still in old status (PENDING/FLAGGED), getCampaignBudgetStatus
-        // only counts OTHER approved clips. No need to subtract this clip's contribution.
-        const campaignBudget = (clipWithData.campaign as any).budget;
-        if (campaignBudget && campaignBudget > 0) {
-          try {
-            const budgetStatus = await getCampaignBudgetStatus(clip.campaignId);
-            if (budgetStatus) {
-              // If clip was previously APPROVED (e.g. re-approval), subtract its current contribution
+        // Budget cap + approval save — serializable transaction to prevent race conditions
+        try {
+          await db.$transaction(async (tx: any) => {
+            const campaignBudget = (clipWithData.campaign as any).budget;
+            if (campaignBudget && campaignBudget > 0) {
+              // Inline budget status using tx
+              const earningsAgg = await tx.clip.aggregate({
+                where: { campaignId: clip.campaignId, isDeleted: false, status: "APPROVED" },
+                _sum: { earnings: true },
+              });
+              let spent = Math.round((earningsAgg._sum.earnings ?? 0) * 100) / 100;
+              if (isCpmSplit) {
+                const ownerAgg = await tx.agencyEarning.aggregate({
+                  where: { campaignId: clip.campaignId },
+                  _sum: { amount: true },
+                });
+                spent = Math.round((spent + (ownerAgg._sum.amount ?? 0)) * 100) / 100;
+              }
+
+              // If re-approval, subtract this clip's current contribution from spent
               let thisClipInSpent = 0;
               if (clip.status === "APPROVED") {
                 thisClipInSpent = clipWithData.earnings || 0;
                 if (isCpmSplit) {
-                  try {
-                    const existingAe = await db.agencyEarning.findUnique({ where: { clipId: id } });
-                    thisClipInSpent += existingAe?.amount || 0;
-                  } catch {}
+                  const existingAe = await tx.agencyEarning.findUnique({ where: { clipId: id } });
+                  thisClipInSpent += existingAe?.amount || 0;
                 }
               }
-              const otherSpent = budgetStatus.spent - thisClipInSpent;
-              const remaining = Math.max(budgetStatus.budget - otherSpent, 0);
+
+              const otherSpent = spent - thisClipInSpent;
+              const remaining = Math.max(campaignBudget - otherSpent, 0);
               const totalForThisClip = finalClipperEarnings + finalOwnerAmt;
 
-              console.log(`[BUDGET] Clip ${id}: budget=$${budgetStatus.budget}, otherSpent=$${otherSpent.toFixed(2)}, remaining=$${remaining.toFixed(2)}, thisClip=$${totalForThisClip.toFixed(2)}`);
+              console.log(`[BUDGET] Clip ${id}: budget=$${campaignBudget}, otherSpent=$${otherSpent.toFixed(2)}, remaining=$${remaining.toFixed(2)}, thisClip=$${totalForThisClip.toFixed(2)}`);
 
               if (remaining <= 0) {
                 finalClipperEarnings = 0;
                 finalOwnerAmt = 0;
-                console.log(`[BUDGET] Clip ${id}: no budget remaining, earnings set to $0`);
               } else if (totalForThisClip > remaining) {
                 const scaleFactor = remaining / totalForThisClip;
                 finalClipperEarnings = Math.floor(finalClipperEarnings * scaleFactor * 100) / 100;
                 finalOwnerAmt = Math.floor(finalOwnerAmt * scaleFactor * 100) / 100;
-                // Ensure combined doesn't exceed remaining after rounding
                 if (finalClipperEarnings + finalOwnerAmt > remaining) {
                   finalClipperEarnings = Math.floor((remaining - finalOwnerAmt) * 100) / 100;
                 }
-                console.log(`[BUDGET] Clip ${id}: capped. clipper=$${finalClipperEarnings}, owner=$${finalOwnerAmt}`);
               }
 
-              // Auto-pause if budget fully spent after this clip
+              // Auto-pause
               const newTotalSpent = otherSpent + finalClipperEarnings + finalOwnerAmt;
-              if (newTotalSpent >= budgetStatus.budget) {
-                await db.campaign.update({
+              if (newTotalSpent >= campaignBudget - 0.01) {
+                await tx.campaign.update({
                   where: { id: clip.campaignId },
-                  data: { status: "PAUSED" },
+                  data: { status: "PAUSED", lastBudgetPauseAt: new Date() },
                 });
-                console.log(`[BUDGET] Campaign ${clip.campaignId} auto-paused — budget $${budgetStatus.budget} fully spent`);
+                console.log(`[BUDGET] Campaign ${clip.campaignId} auto-paused — budget $${campaignBudget} reached`);
               }
             }
-          } catch (budgetErr: any) {
-            console.error(`[BUDGET] Budget check failed for clip ${id}:`, budgetErr?.message);
-          }
-        }
 
-        // NOW save status + earnings in one update (atomic — prevents race where status
-        // is APPROVED but earnings haven't been written yet)
-        await db.clip.update({
-          where: { id },
-          data: {
-            status: action,
-            rejectionReason: null,
-            reviewedById: session.user.id,
-            reviewedAt: new Date(),
-            earnings: finalClipperEarnings,
-            baseEarnings: breakdown.baseEarnings,
-            bonusPercent: breakdown.bonusPercent,
-            bonusAmount: breakdown.bonusAmount,
-            ...(action === "APPROVED" ? { streakDayLocked: true, streakDayLockedAt: new Date() } : {}),
-          },
-        });
+            // Save status + earnings atomically
+            await tx.clip.update({
+              where: { id },
+              data: {
+                status: action,
+                rejectionReason: null,
+                reviewedById: session.user.id,
+                reviewedAt: new Date(),
+                earnings: finalClipperEarnings,
+                baseEarnings: breakdown.baseEarnings,
+                bonusPercent: breakdown.bonusPercent,
+                bonusAmount: breakdown.bonusAmount,
+                streakDayLocked: true,
+                streakDayLockedAt: new Date(),
+              },
+            });
 
-        // Save agency earnings for CPM_SPLIT campaigns
-        if (isCpmSplit) {
-          console.log(`[AGENCY] Clip ${id}: clipper=$${finalClipperEarnings}, owner=$${finalOwnerAmt}`);
-          if (finalOwnerAmt > 0) {
-            try {
-              await db.agencyEarning.upsert({
-                where: { clipId: id },
-                create: { campaignId: clip.campaignId, clipId: id, amount: finalOwnerAmt, views: clipWithData.stats[0].views },
-                update: { amount: finalOwnerAmt, views: clipWithData.stats[0].views },
-              });
-            } catch (aeErr: any) {
-              console.error(`[AGENCY] Failed to save AgencyEarning for clip ${id}:`, aeErr?.message);
+            // Save agency earnings
+            if (isCpmSplit) {
+              if (finalOwnerAmt > 0) {
+                await tx.agencyEarning.upsert({
+                  where: { clipId: id },
+                  create: { campaignId: clip.campaignId, clipId: id, amount: finalOwnerAmt, views: clipWithData.stats[0].views },
+                  update: { amount: finalOwnerAmt, views: clipWithData.stats[0].views },
+                });
+              } else {
+                try { await tx.agencyEarning.delete({ where: { clipId: id } }); } catch {}
+              }
             }
-          } else {
-            try { await db.agencyEarning.delete({ where: { clipId: id } }); } catch {}
+          }, { isolationLevel: "Serializable" as any });
+        } catch (txErr: any) {
+          if (txErr?.code === "P2034") {
+            console.log(`[BUDGET] Transaction conflict for clip ${id}, please retry`);
+            return NextResponse.json({ error: "Concurrent approval conflict, please retry" }, { status: 409 });
           }
+          console.error(`[BUDGET] Transaction error for clip ${id}:`, txErr?.message);
+          return NextResponse.json({ error: "Failed to save approval" }, { status: 500 });
         }
       } else {
         // No stats — just set status
