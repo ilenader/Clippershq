@@ -254,7 +254,7 @@ export default function ProgressPage() {
           {/* Collapsible "How streaks work" */}
           <button
             onClick={() => setShowStreakHelp(!showStreakHelp)}
-            className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer mb-3"
+            className="flex items-center gap-1.5 text-sm sm:text-base font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer mb-3"
           >
             {showStreakHelp ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
             How streaks work
@@ -331,7 +331,7 @@ export default function ProgressPage() {
           </div>
 
           {/* Legend */}
-          <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1.5 mt-5 mb-2 text-[10px] sm:text-[11px] text-[var(--text-muted)]">
+          <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1.5 mt-5 mb-2 text-xs sm:text-sm text-[var(--text-muted)]">
             <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent/60" /> Completed</span>
             <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-500/30 border border-amber-500/50" /> Under review</span>
             <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--bg-card)] border border-[var(--border-color)]" /> Upcoming</span>
@@ -340,7 +340,7 @@ export default function ProgressPage() {
           {/* Toggle 30/60 days */}
           <button
             onClick={() => setShowFull90(!showFull90)}
-            className="flex items-center gap-1 text-xs text-accent hover:underline cursor-pointer mb-4"
+            className="flex items-center gap-1 text-sm text-accent hover:underline cursor-pointer mb-4"
           >
             <ChevronDown className={`h-3 w-3 transition-transform ${showFull90 ? "rotate-180" : ""}`} />
             {showFull90 ? "Show 60 days" : "Show 90 days"}
