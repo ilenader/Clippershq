@@ -69,7 +69,8 @@ export default function DashboardPage() {
   const [earningsFilters, setEarningsFilters] = useState<EarningsFilterKey[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [campaignOptions, setCampaignOptions] = useState<{ value: string; label: string }[]>([]);
-  const [timeframeDays, setTimeframeDays] = useState(15);
+  const [timeframeDays, setTimeframeDays] = useState(30);
+  useEffect(() => { if (window.innerWidth < 1024) setTimeframeDays(15); }, []);
   const [loading, setLoading] = useState(true);
   const [gamification, setGamification] = useState<any>(null);
 

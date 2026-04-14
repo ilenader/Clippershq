@@ -121,6 +121,7 @@ export default function AdminAnalyticsPage() {
   const [statusDropOpen, setStatusDropOpen] = useState(false);
   const statusDropRef = useRef<HTMLDivElement>(null);
   const [timeframeDays, setTimeframeDays] = useState(30);
+  useEffect(() => { if (window.innerWidth < 1024) setTimeframeDays(15); }, []);
   const [leftChartMode, setLeftChartMode] = useState<"clips" | "earnings">("clips");
   const [loading, setLoading] = useState(true);
 

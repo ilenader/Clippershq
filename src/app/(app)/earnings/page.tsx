@@ -32,6 +32,7 @@ export default function EarningsPage() {
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [campaignOptions, setCampaignOptions] = useState<{ value: string; label: string }[]>([]);
   const [timeframeDays, setTimeframeDays] = useState(30);
+  useEffect(() => { if (window.innerWidth < 1024) setTimeframeDays(15); }, []);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback((campaignIds: string[], buildOptions = false) => {

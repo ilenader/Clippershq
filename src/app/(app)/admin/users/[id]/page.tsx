@@ -19,7 +19,8 @@ export default function UserProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [timeframeDays, setTimeframeDays] = useState(15);
+  const [timeframeDays, setTimeframeDays] = useState(30);
+  useEffect(() => { if (window.innerWidth < 1024) setTimeframeDays(15); }, []);
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [showBanModal, setShowBanModal] = useState(false);
   const [banConfirmText, setBanConfirmText] = useState("");
