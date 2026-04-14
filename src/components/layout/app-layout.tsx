@@ -54,7 +54,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     const onTouchStart = (e: TouchEvent) => {
       if (window.innerWidth >= 1024) return;
       const touch = e.touches[0];
-      if (touch.clientX < 30 || mobileOpen) {
+      if ((touch.clientX > 15 && touch.clientX < 60) || mobileOpen) {
         swipeRef.current = { startX: touch.clientX, startY: touch.clientY, tracking: true };
       }
     };
