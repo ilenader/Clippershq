@@ -10,6 +10,7 @@ import { Film, DollarSign, Flame, Star, Rocket, Check, UserCircle, Megaphone, Cl
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { hapticMedium } from "@/lib/haptics";
+import { useCountUp } from "@/lib/use-count-up";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -98,6 +99,8 @@ export default function DashboardPage() {
   const g = gamification;
   const totalEarned = earnings?.approvedEarnings ?? 0;
   const available = earnings?.available ?? 0;
+  const animatedEarnings = useCountUp(totalEarned);
+  const animatedAvailable = useCountUp(available);
   const lockedInPayouts = earnings?.lockedInPayouts ?? 0;
   const levelNames = ["Rookie", "Clipper", "Creator", "Influencer", "Viral", "Icon"];
   const levelName = g ? (levelNames[g.level] || "") : "";
@@ -161,7 +164,7 @@ export default function DashboardPage() {
       {/* ── Earnings Hero ── */}
       <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--text-muted)] mb-2">Total Earnings</p>
-        <p className="text-4xl sm:text-5xl font-bold text-accent tabular-nums tracking-tight">{formatCurrency(totalEarned)}</p>
+        <p className="text-4xl sm:text-5xl font-bold text-accent tabular-nums tracking-tight">{formatCurrency(Math.round(animatedEarnings * 100) / 100)}</p>
         {g && g.bonusPercent > 0 && (
           <p className="text-sm text-[var(--text-secondary)] mt-2">
             <span className="text-accent font-semibold">+{g.bonusPercent}%</span> bonus
@@ -220,7 +223,7 @@ export default function DashboardPage() {
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 text-center">
           <DollarSign className="h-4 w-4 text-accent mx-auto mb-1" />
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Available</p>
-          <p className="text-2xl font-bold text-accent tabular-nums">{formatCurrency(available)}</p>
+          <p className="text-2xl font-bold text-accent tabular-nums">{formatCurrency(Math.round(animatedAvailable * 100) / 100)}</p>
           {lockedInPayouts > 0 && (
             <p className="text-sm text-amber-400">{formatCurrency(lockedInPayouts)} pending</p>
           )}
