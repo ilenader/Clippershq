@@ -160,10 +160,36 @@ export async function POST() {
     console.log(`[FIX-BUDGET] Fixed ${campaign.name}: $${budgetStatus.spent.toFixed(2)} → $${runningTotal.toFixed(2)}, ${clipsZeroed} zeroed, ${clipsCapped} capped`);
   }
 
+  // Second pass: unpause campaigns where cleanup freed budget
+  let campaignsResumed = 0;
+  for (const entry of report) {
+    if (entry.spentAfter < entry.budget) {
+      try {
+        const cam = await db.campaign.findUnique({
+          where: { id: entry.campaignId },
+          select: { status: true, lastBudgetPauseAt: true },
+        });
+        if (cam?.status === "PAUSED" && cam.lastBudgetPauseAt) {
+          await db.campaign.update({
+            where: { id: entry.campaignId },
+            data: { status: "ACTIVE", lastBudgetPauseAt: null },
+          });
+          await db.trackingJob.updateMany({
+            where: { campaignId: entry.campaignId, isActive: false },
+            data: { isActive: true },
+          });
+          campaignsResumed++;
+          console.log(`[FIX-BUDGET] Campaign ${entry.campaignName} auto-resumed — $${(entry.budget - entry.spentAfter).toFixed(2)} of $${entry.budget} budget available`);
+        }
+      } catch {}
+    }
+  }
+
   return NextResponse.json({
     success: true,
     campaignsChecked: campaigns.length,
     campaignsFixed: report.length,
+    campaignsResumed,
     report,
   });
 }

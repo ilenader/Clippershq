@@ -356,43 +356,34 @@ export async function POST(
           console.error(`[QUALITY] Check failed:`, qualErr?.message);
         }
 
-        // Auto-resume: if campaign was budget-paused and rejection freed up budget
-        if (clip.earnings > 0) {
-          try {
-            const rejCampaign = await db.campaign.findUnique({
-              where: { id: clip.campaignId },
-              select: { status: true, budget: true, pricingModel: true, lastBudgetPauseAt: true },
+      }
+
+      // Auto-resume: if campaign was budget-paused and undo/rejection freed up budget
+      // (runs for both REJECTED and PENDING/undo)
+      if (clip.earnings > 0) {
+        try {
+          const undoCampaign = await db.campaign.findUnique({
+            where: { id: clip.campaignId },
+            select: { status: true, budget: true, pricingModel: true, lastBudgetPauseAt: true },
+          });
+          if (undoCampaign?.status === "PAUSED" && undoCampaign.lastBudgetPauseAt && undoCampaign.budget && undoCampaign.budget > 0) {
+            const eAgg = await db.clip.aggregate({
+              where: { campaignId: clip.campaignId, isDeleted: false, status: "APPROVED" },
+              _sum: { earnings: true },
             });
-            if (rejCampaign?.status === "PAUSED" && rejCampaign.lastBudgetPauseAt && rejCampaign.budget && rejCampaign.budget > 0) {
-              // Calculate current spend after rejection
-              const earningsAgg = await db.clip.aggregate({
-                where: { campaignId: clip.campaignId, isDeleted: false, status: "APPROVED" },
-                _sum: { earnings: true },
-              });
-              let currentSpent = Math.round((earningsAgg._sum.earnings ?? 0) * 100) / 100;
-              if (rejCampaign.pricingModel === "CPM_SPLIT") {
-                const ownerAgg = await db.agencyEarning.aggregate({
-                  where: { campaignId: clip.campaignId },
-                  _sum: { amount: true },
-                });
-                currentSpent = Math.round((currentSpent + (ownerAgg._sum.amount ?? 0)) * 100) / 100;
-              }
-              if (currentSpent < rejCampaign.budget) {
-                await db.campaign.update({
-                  where: { id: clip.campaignId },
-                  data: { status: "ACTIVE", lastBudgetPauseAt: null },
-                });
-                await db.trackingJob.updateMany({
-                  where: { campaignId: clip.campaignId, isActive: false },
-                  data: { isActive: true },
-                });
-                const freed = Math.round((rejCampaign.budget - currentSpent) * 100) / 100;
-                console.log(`[BUDGET] Campaign ${clip.campaignId} auto-resumed after rejection freed $${freed} of budget`);
-              }
+            let spent = Math.round((eAgg._sum.earnings ?? 0) * 100) / 100;
+            if (undoCampaign.pricingModel === "CPM_SPLIT") {
+              const oAgg = await db.agencyEarning.aggregate({ where: { campaignId: clip.campaignId }, _sum: { amount: true } });
+              spent = Math.round((spent + (oAgg._sum.amount ?? 0)) * 100) / 100;
             }
-          } catch (resumeErr: any) {
-            console.error(`[BUDGET] Auto-resume check after rejection failed:`, resumeErr?.message);
+            if (spent < undoCampaign.budget) {
+              await db.campaign.update({ where: { id: clip.campaignId }, data: { status: "ACTIVE", lastBudgetPauseAt: null } });
+              await db.trackingJob.updateMany({ where: { campaignId: clip.campaignId, isActive: false }, data: { isActive: true } });
+              console.log(`[BUDGET] Campaign ${clip.campaignId} auto-resumed after ${action.toLowerCase()} freed budget`);
+            }
           }
+        } catch (resumeErr: any) {
+          console.error(`[BUDGET] Auto-resume check failed:`, resumeErr?.message);
         }
       }
     } else if (action === "FLAGGED") {
