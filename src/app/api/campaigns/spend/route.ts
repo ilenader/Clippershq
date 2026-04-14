@@ -23,13 +23,11 @@ export async function GET() {
   if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
-  if (role === "CLIPPER") {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
 
   if (!db) return NextResponse.json({});
 
   try {
+    // Clipper-only spend: just approved clip earnings, no agency/owner data
     const result = await db.clip.groupBy({
       by: ["campaignId"],
       where: {
@@ -45,20 +43,21 @@ export async function GET() {
       spendMap[row.campaignId] = Math.round((row._sum.earnings || 0) * 100) / 100;
     }
 
-    // For CPM_SPLIT campaigns, budget covers both clipper and owner earnings
-    // Add agency earnings to the spend totals
-    try {
-      const agencyResult = await db.agencyEarning.groupBy({
-        by: ["campaignId"],
-        _sum: { amount: true },
-      });
-      for (const row of agencyResult) {
-        const ownerSpend = Math.round((row._sum.amount || 0) * 100) / 100;
-        if (ownerSpend > 0) {
-          spendMap[row.campaignId] = Math.round(((spendMap[row.campaignId] || 0) + ownerSpend) * 100) / 100;
+    // OWNER/ADMIN: also include agency/owner earnings in spend totals
+    if (role === "OWNER" || role === "ADMIN") {
+      try {
+        const agencyResult = await db.agencyEarning.groupBy({
+          by: ["campaignId"],
+          _sum: { amount: true },
+        });
+        for (const row of agencyResult) {
+          const ownerSpend = Math.round((row._sum.amount || 0) * 100) / 100;
+          if (ownerSpend > 0) {
+            spendMap[row.campaignId] = Math.round(((spendMap[row.campaignId] || 0) + ownerSpend) * 100) / 100;
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
     return NextResponse.json(spendMap);
   } catch (err: any) {
