@@ -117,27 +117,3 @@ body {
     font-size: 16px !important;
   }
 }
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.animate-fadeIn {
-  animation: fadeIn 200ms ease-out;
-}
-
-@keyframes ripple {
-  from { transform: scale(0); opacity: 0.4; }
-  to { transform: scale(2.5); opacity: 0; }
-}
-.animate-ripple {
-  animation: ripple 500ms ease-out forwards;
-}
-
-@keyframes splashFadeOut {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-.animate-splashOut {
-  animation: splashFadeOut 300ms ease-out forwards;
-}

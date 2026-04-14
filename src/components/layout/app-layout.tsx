@@ -238,7 +238,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="hidden lg:block">
           <Navbar />
         </div>
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6"><div key={pathname} className="animate-fadeIn">{children}</div></main>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6">{children}</main>
       </div>
       <ChatWidget userId={effectiveSession.user.id} role={effectiveRole} />
       {!isPWA && <PWAInstallPopup />}

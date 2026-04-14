@@ -36,28 +36,11 @@ const sizeStyles: Record<ButtonSize, string> = {
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "primary", size = "md", loading, icon, children, disabled, ...props }, ref) => {
-    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-      hapticLight();
-      // Ripple effect
-      const btn = e.currentTarget;
-      const diameter = Math.max(btn.clientWidth, btn.clientHeight);
-      const radius = diameter / 2;
-      const rect = btn.getBoundingClientRect();
-      const circle = document.createElement("span");
-      circle.style.width = circle.style.height = `${diameter}px`;
-      circle.style.left = `${e.clientX - rect.left - radius}px`;
-      circle.style.top = `${e.clientY - rect.top - radius}px`;
-      circle.className = "absolute rounded-full bg-white/20 animate-ripple pointer-events-none";
-      btn.appendChild(circle);
-      setTimeout(() => circle.remove(), 500);
-      props.onClick?.(e);
-    };
-
     return (
       <button
         ref={ref}
         className={cn(
-          "relative overflow-hidden inline-flex items-center justify-center gap-2 font-medium whitespace-nowrap transition-all duration-150",
+          "inline-flex items-center justify-center gap-2 font-medium whitespace-nowrap transition-all duration-150",
           "active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed",
           "cursor-pointer",
           variantStyles[variant],
@@ -66,7 +49,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         )}
         disabled={disabled || loading}
         {...props}
-        onClick={handleClick}
+        onClick={(e) => { hapticLight(); props.onClick?.(e); }}
       >
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
         {children}
