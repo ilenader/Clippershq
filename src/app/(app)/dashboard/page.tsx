@@ -10,6 +10,7 @@ import { Film, DollarSign, Flame, Star, Rocket, Check, UserCircle, Megaphone, Cl
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { hapticMedium } from "@/lib/haptics";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -90,7 +91,7 @@ export default function DashboardPage() {
   if (loading && allClips.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-color)] border-t-accent" />
+        <Spinner />
       </div>
     );
   }
