@@ -150,6 +150,7 @@ export default function EarningsPage() {
       <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--text-muted)] mb-2">Available for Payout</p>
         <p className="text-3xl sm:text-4xl font-bold text-accent tabular-nums">{formatCurrency(summary.available)}</p>
+        <p className="text-[11px] text-[var(--text-muted)] mt-1">All-time balance</p>
       </div>
       <div className="grid grid-cols-3 gap-2">
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-3 text-center">

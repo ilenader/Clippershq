@@ -44,13 +44,13 @@ export default function ClipsPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
-  // Auto-open submit modal when linked from dashboard
+  // Auto-open submit modal when linked from dashboard (wait for data)
   useEffect(() => {
-    if (searchParams.get("submit") === "true") {
+    if (searchParams.get("submit") === "true" && !loading && campaigns.length > 0) {
       setShowModal(true);
       router.replace("/clips", { scroll: false });
     }
-  }, [searchParams, router]);
+  }, [searchParams, loading, campaigns, router]);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     campaignId: "",
