@@ -237,6 +237,8 @@ export async function POST(
           earnings: 0,
         },
       });
+      // Delete agency earnings for this clip (CPM_SPLIT campaigns)
+      try { await db.agencyEarning.delete({ where: { clipId: id } }); } catch {}
       // Broadcast immediately
       try {
         broadcastToUser(clip.userId, "clip_updated", { clipId: id, status: action, earnings: 0 });
