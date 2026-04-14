@@ -113,7 +113,10 @@ export default function DashboardPage() {
   const campaignsPostedToday = new Set(
     allClips.filter((c: any) => new Date(c.createdAt) >= todayStart).map((c: any) => c.campaignId)
   );
-  const campaignsNeedClips = campaigns.filter((c: any) => !campaignsPostedToday.has(c.id)).length;
+  const todayClips = allClips.filter((c: any) => new Date(c.createdAt) >= todayStart);
+  const clipsToday = todayClips.length;
+  const clipsApprovedToday = todayClips.filter((c: any) => c.status === "APPROVED").length;
+  const clipsPendingToday = todayClips.filter((c: any) => c.status === "PENDING").length;
 
   return (
     <div className="space-y-4">
@@ -175,7 +178,7 @@ export default function DashboardPage() {
             <Star className="h-3.5 w-3.5 text-accent" />
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Level</span>
           </div>
-          <p className="text-xl font-bold text-[var(--text-primary)]">Level {g?.level ?? 0}</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">Level {g?.level ?? 0}</p>
           <p className="text-sm text-[var(--text-muted)]">{levelName} · +{g?.levelBonus ?? 0}%</p>
           {g?.earningsToNextLevel > 0 && (
             <div className="mt-2">
@@ -194,7 +197,7 @@ export default function DashboardPage() {
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Streak</span>
           </div>
           <div className="flex items-baseline gap-1.5">
-            <p className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{g?.currentStreak ?? 0}</p>
+            <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{g?.currentStreak ?? 0}</p>
             <span className="text-xs text-[var(--text-muted)]">days</span>
           </div>
           {g?.streakBonusPercent > 0 && (
@@ -209,18 +212,18 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Active Campaigns */}
+        {/* Clips Today */}
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4">
           <div className="flex items-center gap-1.5 mb-1">
-            <Megaphone className="h-3.5 w-3.5 text-accent" />
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Campaigns</span>
+            <Film className="h-3.5 w-3.5 text-accent" />
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Clips Today</span>
           </div>
-          <p className="text-xl font-bold text-[var(--text-primary)]">{campaigns.length}</p>
-          {campaignsNeedClips > 0 && (
-            <p className="text-sm text-accent">{campaignsNeedClips} need clips</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{clipsToday}</p>
+          {clipsApprovedToday > 0 && (
+            <p className="text-sm text-emerald-400">{clipsApprovedToday} approved</p>
           )}
-          {campaignsNeedClips === 0 && campaigns.length > 0 && (
-            <p className="text-sm text-emerald-400">✓ All posted</p>
+          {clipsPendingToday > 0 && clipsApprovedToday === 0 && (
+            <p className="text-sm text-amber-400">{clipsPendingToday} pending</p>
           )}
         </div>
 
@@ -230,7 +233,7 @@ export default function DashboardPage() {
             <DollarSign className="h-3.5 w-3.5 text-accent" />
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Available</span>
           </div>
-          <p className="text-xl font-bold text-accent tabular-nums">{formatCurrency(available)}</p>
+          <p className="text-2xl font-bold text-accent tabular-nums">{formatCurrency(available)}</p>
           {lockedInPayouts > 0 && (
             <p className="text-sm text-amber-400">{formatCurrency(lockedInPayouts)} pending</p>
           )}
@@ -238,14 +241,23 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Submit CTA ── */}
-      <Link
-        href="/clips"
-        onClick={() => hapticMedium()}
-        className="flex items-center justify-center gap-2 w-full rounded-xl bg-accent hover:bg-accent-hover active:bg-accent-hover/90 text-white font-bold py-3.5 text-center transition-all duration-150 shadow-sm"
-      >
-        <Film className="h-5 w-5" />
-        Submit a Clip
-      </Link>
+      <div className="my-2">
+        <Link
+          href="/clips"
+          onClick={() => hapticMedium()}
+          className="flex items-center justify-center gap-2 w-full rounded-xl bg-accent hover:bg-accent-hover active:bg-accent-hover/90 active:scale-[0.97] text-white font-bold py-3.5 text-center transition-all duration-150 shadow-sm"
+        >
+          <Film className="h-5 w-5" />
+          Submit a Clip
+        </Link>
+      </div>
+
+      {/* ── Quick Stats ── */}
+      <div className="flex items-center justify-between text-xs text-[var(--text-muted)] px-1">
+        <span>{allClips.length} clips</span>
+        <span>Best streak: {g?.longestStreak ?? 0}d</span>
+        <span>Level {g?.level ?? 0}: {levelName}</span>
+      </div>
 
     </div>
   );
