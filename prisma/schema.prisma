@@ -438,7 +438,7 @@ model ScheduledCall {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  payout PayoutRequest @relation(fields: [payoutId], references: [id])
+  payout PayoutRequest @relation(fields: [payoutId], references: [id], onDelete: Cascade)
   user   User          @relation(fields: [userId], references: [id])
 
   @@index([scheduledAt])

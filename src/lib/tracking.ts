@@ -267,6 +267,7 @@ async function processTrackingJob(
         // Still update stats below, but skip earnings recalculation
       } else {
       // Normal earnings calculation
+      const oldEarnings = clip.earnings || 0;
       const breakdown = recalculateClipEarningsBreakdown({
         stats: [{ views: stats.views }],
         campaign: clip.campaign,
@@ -373,7 +374,7 @@ async function processTrackingJob(
         newOwnerAmt = 0;
       }
 
-      const earningsChanged = newEarnings !== (clip.earnings || 0);
+      const earningsChanged = newEarnings !== oldEarnings;
 
       // Sync user stats/level
       if (earningsChanged && clip.userId && !clip.isOwnerOverride) {

@@ -21,6 +21,7 @@ export async function GET() {
     // Get all campaigns with their agency earnings and agency fees
     const campaigns = await db.campaign.findMany({
       where: {},
+      take: 100,
       select: {
         id: true, name: true, platform: true, pricingModel: true,
         ownerCpm: true, agencyFee: true, budget: true, status: true, isArchived: true,

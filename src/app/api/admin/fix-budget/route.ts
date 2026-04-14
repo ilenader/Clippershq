@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { getCampaignBudgetStatus } from "@/lib/balance";
 import { calculateOwnerEarnings } from "@/lib/earnings-calc";
+import { checkBanStatus } from "@/lib/check-ban";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ export async function POST() {
 
   const role = (session.user as any).role;
   if (role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
 
   if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 

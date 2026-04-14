@@ -130,7 +130,7 @@ export default function EarningsPage() {
         <div className="mt-3">
           <MultiDropdown
             label="Campaign"
-            options={campaignOptions.length > 0 ? campaignOptions : [{ value: "milenko", label: "milenko" }, { value: "dusan-ristic", label: "Dusan Ristic" }]}
+            options={campaignOptions}
             values={selectedCampaigns}
             onChange={handleCampaignChange}
             allLabel="All campaigns"

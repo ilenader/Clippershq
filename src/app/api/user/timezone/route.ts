@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
+import { checkBanStatus } from "@/lib/check-ban";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,10 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
+
   if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 
   let body: any;
@@ -16,6 +21,11 @@ export async function POST(req: NextRequest) {
 
   const tz = body?.timezone;
   if (!tz || typeof tz !== "string" || tz.length > 100) {
+    return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
+  }
+
+  // Validate IANA timezone
+  try { Intl.DateTimeFormat(undefined, { timeZone: tz }); } catch {
     return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
   }
 

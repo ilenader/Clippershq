@@ -49,6 +49,10 @@ export async function POST(
     const comments = body.comments !== undefined ? parseInt(body.comments) : (clip.stats[0]?.comments || 0);
     const shares = body.shares !== undefined ? parseInt(body.shares) : (clip.stats[0]?.shares || 0);
 
+    if (isNaN(views) || views < 0 || isNaN(likes) || likes < 0 || isNaN(comments) || comments < 0 || isNaN(shares) || shares < 0) {
+      return NextResponse.json({ error: "All stat values must be non-negative numbers" }, { status: 400 });
+    }
+
     // Create manual stat snapshot
     await db.clipStat.create({
       data: { clipId: id, views, likes, comments, shares, isManual: true },
@@ -59,6 +63,9 @@ export async function POST(
     if (body.earnings !== undefined) {
       // Direct earnings override (fallback tool)
       newEarnings = Math.round(parseFloat(body.earnings) * 100) / 100;
+      if (isNaN(newEarnings) || newEarnings < 0) {
+        return NextResponse.json({ error: "Earnings must be a non-negative number" }, { status: 400 });
+      }
     } else {
       // Auto-calculate from campaign rules
       newEarnings = calculateClipEarnings({

@@ -31,7 +31,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (existing?.status === "BANNED") {
             return false; // blocks sign-in entirely
           }
-        } catch {}
+        } catch (err: any) {
+          console.error("[AUTH] Ban check DB error:", err?.message);
+          // Allow login on DB error — don't block everyone
+        }
       }
 
       // Auto-join the user to the Clippers HQ Discord server
