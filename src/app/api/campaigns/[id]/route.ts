@@ -173,6 +173,11 @@ export async function PATCH(
         select: { status: true, budget: true },
       });
 
+      // Manual pause: clear lastBudgetPauseAt so auto-resume won't unpause it
+      if (data.status === "PAUSED" && oldCampaign?.status !== "PAUSED") {
+        data.lastBudgetPauseAt = null;
+      }
+
       const campaign = await db.campaign.update({ where: { id }, data });
 
       // Auto-resume: if campaign was PAUSED and budget was increased past spent

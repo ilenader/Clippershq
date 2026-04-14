@@ -120,8 +120,10 @@ export default function AdminAnalyticsPage() {
   const [clipStatusFilter, setClipStatusFilter] = useState("APPROVED");
   const [statusDropOpen, setStatusDropOpen] = useState(false);
   const statusDropRef = useRef<HTMLDivElement>(null);
-  const [timeframeDays, setTimeframeDays] = useState(30);
-  useEffect(() => { if (window.innerWidth < 1024) setTimeframeDays(15); }, []);
+  const [timeframeDays, setTimeframeDays] = useState(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 1024) return 15;
+    return 30;
+  });
   const [leftChartMode, setLeftChartMode] = useState<"clips" | "earnings">("clips");
   const [loading, setLoading] = useState(true);
 
