@@ -371,25 +371,6 @@ export default function PayoutsPage() {
         </Button>
       </div>
 
-      {/* Earnings by campaign */}
-      {campaignList.length > 0 && (
-        <Card>
-          <h3 className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] mb-3">Earnings by campaign</h3>
-          <div className="space-y-2">
-            {campaignList.map((c) => (
-              <div key={c.id} className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-[var(--text-primary)]">{c.name}</span>
-                <span className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{formatCurrency(c.earned)}</span>
-              </div>
-            ))}
-            <div className="border-t border-[var(--border-subtle)] pt-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-[var(--text-muted)]">Total</span>
-              <span className="text-sm font-bold text-accent tabular-nums">{formatCurrency(earnings?.totalEarned || 0)}</span>
-            </div>
-          </div>
-        </Card>
-      )}
-
       {payouts.length === 0 ? (
         <EmptyState
           icon={<Wallet className="h-10 w-10" />}
@@ -449,7 +430,7 @@ export default function PayoutsPage() {
                     </div>
                   );
                 }
-                if (call.status === "COMPLETED") return <p className="mt-2 text-xs text-emerald-400"><Check className="h-4 w-4 text-emerald-400 inline-block -mt-0.5 mr-1" /> Verification call completed</p>;
+                if (call.status === "COMPLETED") return <p className="mt-2 text-xs text-accent"><Check className="h-4 w-4 text-accent inline-block -mt-0.5 mr-1" /> Verification call completed</p>;
                 if (call.status === "MISSED") return <p className="mt-2 text-xs text-red-400"><X className="h-4 w-4 text-red-400 inline-block -mt-0.5 mr-1" /> You missed the verification call</p>;
                 return null;
               })()}
