@@ -51,6 +51,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Progressive swipe-to-open sidebar on mobile
   const sidebarPanelRef = useRef<HTMLDivElement>(null);
   const backdropElRef = useRef<HTMLDivElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
   const SIDEBAR_W = 256; // w-64 = 256px
   const swipeRef = useRef({ startX: 0, startY: 0, lastX: 0, tracking: false, decided: false });
 
@@ -89,12 +90,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         const offset = Math.max(-SIDEBAR_W, Math.min(0, -SIDEBAR_W + diffX));
         panel.style.transition = "none";
         panel.style.transform = `translateX(${offset}px)`;
+        const openProgress = Math.max(0, Math.min(1, diffX / SIDEBAR_W));
         if (backdrop) {
-          const p = Math.max(0, Math.min(1, diffX / SIDEBAR_W));
           backdrop.style.transition = "none";
-          backdrop.style.opacity = `${p * 0.5}`;
-          backdrop.style.pointerEvents = p > 0.05 ? "auto" : "none";
+          backdrop.style.opacity = `${openProgress * 0.5}`;
+          backdrop.style.pointerEvents = openProgress > 0.05 ? "auto" : "none";
         }
+        if (closeBtnRef.current) { closeBtnRef.current.style.opacity = `${openProgress}`; closeBtnRef.current.style.transition = "none"; }
       } else {
         // Closing: follow finger left
         const offset = Math.min(0, Math.max(-SIDEBAR_W, diffX));
@@ -105,6 +107,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           backdrop.style.transition = "none";
           backdrop.style.opacity = `${p * 0.5}`;
         }
+        if (closeBtnRef.current) { const cp = Math.max(0, 1 + diffX / SIDEBAR_W); closeBtnRef.current.style.opacity = `${cp}`; closeBtnRef.current.style.transition = "none"; }
       }
     };
 
@@ -206,8 +209,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         >
           <Sidebar role={effectiveRole} />
           <button
+            ref={closeBtnRef}
             onClick={() => setMobileOpen(false)}
-            className="absolute top-4 right-[-44px] flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] cursor-pointer"
+            className="absolute top-4 right-[-44px] flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] cursor-pointer transition-opacity duration-300"
+            style={{ opacity: mobileOpen ? 1 : 0, pointerEvents: mobileOpen ? "auto" : "none" }}
           >
             <X className="h-4 w-4" />
           </button>
