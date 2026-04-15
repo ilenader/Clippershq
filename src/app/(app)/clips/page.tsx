@@ -12,7 +12,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Film, Plus, ExternalLink } from "lucide-react";
+import { Film, Plus, ExternalLink, ChevronDown } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative, formatNumber, formatCurrency } from "@/lib/utils";
 
@@ -59,6 +59,7 @@ export default function ClipsPage() {
     note: "",
   });
   const [platformError, setPlatformError] = useState<string | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -300,17 +301,26 @@ export default function ClipsPage() {
                 </div>
               );
             })()}
-            <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-3 py-2.5 space-y-1">
-              <p className="text-xs font-medium text-yellow-400">Important rules</p>
-              <p className="text-xs text-[var(--text-muted)]">• You must join a campaign before submitting clips to it</p>
-              <p className="text-xs text-[var(--text-muted)]">• The clip URL must match your account platform (TikTok account → TikTok link)</p>
-              <p className="text-xs text-[var(--text-muted)]">• You must submit the clip within 2 hours after posting</p>
-              <p className="text-xs text-accent">• Post time is verified automatically from the platform</p>
-              <p className="text-xs text-[var(--text-muted)]">• Clips are reviewed within 24–48 hours</p>
+            <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-3 py-2.5">
+              <button type="button" className="flex w-full items-center justify-between" onClick={() => setRulesOpen(!rulesOpen)}>
+                <p className="text-xs font-medium text-yellow-400">Important rules</p>
+                <ChevronDown className={`h-3.5 w-3.5 text-yellow-400 transition-transform duration-200 ${rulesOpen ? "rotate-180" : ""}`} />
+              </button>
+              {rulesOpen && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-[var(--text-muted)]">• You must join a campaign before submitting clips to it</p>
+                  <p className="text-xs text-[var(--text-muted)]">• The clip URL must match your account platform (TikTok account → TikTok link)</p>
+                  <p className="text-xs text-[var(--text-muted)]">• You must submit the clip within 2 hours after posting</p>
+                  <p className="text-xs text-accent">• Post time is verified automatically from the platform</p>
+                  <p className="text-xs text-[var(--text-muted)]">• Clips are reviewed within 24–48 hours</p>
+                </div>
+              )}
             </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-              <Button type="submit" loading={submitting} disabled={!!platformError}>Submit Clip</Button>
+            <div className="sticky bottom-0 bg-[var(--bg-card)] pt-3 pb-1 border-t border-[var(--border-color)] -mx-6 px-6 -mb-6">
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button type="submit" loading={submitting} disabled={!!platformError}>Submit Clip</Button>
+              </div>
             </div>
           </form>
         )}
