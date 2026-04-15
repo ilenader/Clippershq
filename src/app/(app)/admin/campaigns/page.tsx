@@ -748,7 +748,7 @@ export default function AdminCampaignsPage() {
                     <span className="text-[10px] text-[var(--text-muted)] ml-auto">{formatRelative(event.createdAt)}</span>
                   </div>
                   <p className="text-sm text-[var(--text-primary)]">{event.description}</p>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{event.user?.username || "System"}</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{event.user?.name || event.user?.username || "System"}</p>
                 </div>
               );
             })}

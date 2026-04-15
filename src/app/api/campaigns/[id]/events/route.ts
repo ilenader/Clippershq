@@ -32,7 +32,7 @@ export async function GET(
     // Fetch user info for events with userId
     const userIds = [...new Set(events.filter((e: any) => e.userId).map((e: any) => e.userId))];
     const users = userIds.length > 0
-      ? await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, username: true, image: true } })
+      ? await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, username: true, name: true, image: true } })
       : [];
     const userMap = new Map(users.map((u: any) => [u.id, u]));
 
