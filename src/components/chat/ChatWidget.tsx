@@ -805,6 +805,17 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
               </div>
             )}
 
+            {/* Waiting for agent — clipper view */}
+            {isClipper && needsHumanSupport && (
+              <div className="flex items-center gap-2.5 px-5 py-3 border-b border-accent/20 bg-accent/5">
+                <MessageCircle className="h-4 w-4 text-accent animate-pulse flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-[var(--text-primary)]">An agent will be with you shortly</p>
+                  <p className="text-[10px] text-[var(--text-muted)]">We typically respond within a few minutes</p>
+                </div>
+              </div>
+            )}
+
             {/* Messages area */}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2">
               {loadingMessages ? (

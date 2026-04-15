@@ -27,7 +27,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           id={id}
           className={cn(
             "w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2",
-            "text-sm text-[var(--text-primary)]",
+            "text-sm",
+            props.value ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]",
             "transition-theme focus:border-accent focus:ring-1 focus:ring-accent focus:outline-none",
             "cursor-pointer appearance-none",
             error && "border-red-500",

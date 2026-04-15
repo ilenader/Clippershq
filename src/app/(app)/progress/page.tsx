@@ -317,13 +317,13 @@ export default function ProgressPage() {
                   title={isTodayCell ? "Today" : isCompleted ? `Day ${dayNumber} — completed` : milestone ? `Day ${dayNumber}: +${milestone.bonus}% streak bonus` : `Day ${dayNumber}`}
                   className={`flex flex-col items-center justify-center ${isTodayCell ? "h-8 w-8 sm:h-9" : "h-7 w-7 sm:h-8"} sm:w-auto rounded-lg border font-bold transition-all ${bgClass} ${
                     isTodayCell
-                      ? `ring-2 ring-accent ring-offset-1 ring-offset-[var(--bg-page)] ${!postedToday ? "animate-pulse" : ""}`
+                      ? `ring-2 ${isCompleted && milestone ? "ring-white" : "ring-accent"} ring-offset-1 ring-offset-[var(--bg-page)] ${!postedToday ? "animate-pulse" : ""}`
                       : ""
                   }`}
                 >
                   {content}
                   {isTodayCell && (
-                    <span className="text-[7px] font-bold text-accent leading-none -mt-0.5">TODAY</span>
+                    <span className={`text-[7px] font-bold leading-none -mt-0.5 ${isCompleted && milestone ? "text-white" : "text-accent"}`}>TODAY</span>
                   )}
                 </div>
               );
