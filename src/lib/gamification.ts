@@ -46,7 +46,7 @@ export async function loadConfig() {
   const configs: Record<string, any> = {};
   if (db && db.gamificationConfig) {
     try {
-      const rows = await db.gamificationConfig.findMany();
+      const rows = await db.gamificationConfig.findMany({ take: 100 });
       for (const row of rows) {
         try { configs[row.key] = JSON.parse(row.value); } catch (parseErr: any) {
           console.warn(`[GAMIFICATION] Failed to parse config "${row.key}":`, parseErr?.message);
@@ -207,6 +207,7 @@ export async function updateStreak(userId: string): Promise<void> {
     const memberships = await db.campaignAccount.findMany({
       where: { clipAccount: { userId } },
       include: { campaign: { select: { id: true, status: true } } },
+      take: 500,
     });
     if (memberships.length > 0) {
       const activeCampaignIds = memberships
@@ -524,6 +525,7 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
   const paidPayouts = await db.payoutRequest.findMany({
     where: { userId, status: "PAID" },
     select: { campaignId: true },
+    take: 1000,
   });
   const paidCampaignIds = new Set(paidPayouts.map((p: any) => p.campaignId).filter(Boolean));
 
@@ -534,6 +536,7 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
       stats: { orderBy: { checkedAt: "desc" }, take: 1 },
       campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true, lastBudgetPauseAt: true } },
     },
+    take: 5000,
   });
 
   const config = await loadConfig();

@@ -84,7 +84,7 @@ export default function ClipsPage() {
       setJoinedCampaignIds(new Set(joinsArr.map((j: any) => j.campaignId)));
       if (gamData && !gamData.error) setGamification(gamData);
     } catch (err) {
-      console.error("Failed to load clips page data:", err);
+      // Failed to load clips page data
     } finally {
       setLoading(false);
     }

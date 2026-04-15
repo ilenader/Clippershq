@@ -213,7 +213,7 @@ export default function PayoutsPage() {
   // Earnings per campaign — only count APPROVED clips
   const campaignEarnings: Record<string, { name: string; earned: number }> = {};
   for (const clip of clips) {
-    if (clip.status === "APPROVED" && clip.earnings > 0 && clip.campaignId) {
+    if (clip.status === "APPROVED" && clip.earnings > 0 && !clip.videoUnavailable && clip.campaignId) {
       if (!campaignEarnings[clip.campaignId]) {
         campaignEarnings[clip.campaignId] = { name: clip.campaign?.name || "Unknown", earned: 0 };
       }

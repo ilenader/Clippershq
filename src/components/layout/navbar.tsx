@@ -53,7 +53,7 @@ export function Navbar() {
           const lastSeen = sessionStorage.getItem("last_seen_notif_id");
           const latestId = notifs[0].id;
           if (lastSeen && latestId !== lastSeen) {
-            console.log(`[NOTIF-SOUND] New notification detected: ${latestId} (prev: ${lastSeen})`);
+            // New notification detected
             playNotificationSound();
           }
           sessionStorage.setItem("last_seen_notif_id", latestId);

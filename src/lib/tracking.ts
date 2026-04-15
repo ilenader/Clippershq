@@ -454,11 +454,13 @@ async function processTrackingJob(
         const allClips = await db.clip.findMany({
           where: { userId: clip.userId, status: "APPROVED", isOwnerOverride: false, videoUnavailable: false },
           select: { earnings: true },
+          take: 5000,
         });
         const allStatSnapshots = await db.clipStat.findMany({
-          where: { clip: { userId: clip.userId, isOwnerOverride: false } },
+          where: { clip: { userId: clip.userId, isOwnerOverride: false, videoUnavailable: false } },
           orderBy: { checkedAt: "desc" as any },
           distinct: ["clipId" as any],
+          take: 5000,
           select: { views: true },
         });
         const totalEarnings = allClips.reduce((sum: number, c: any) => sum + (c.earnings || 0), 0);

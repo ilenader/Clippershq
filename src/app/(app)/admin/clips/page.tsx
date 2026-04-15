@@ -63,7 +63,7 @@ export default function AdminClipsPage() {
       setClips(Array.isArray(clipsData) ? clipsData : []);
       setCampaigns(Array.isArray(campaignData) ? campaignData : []);
     } catch (err) {
-      console.error("Failed to load admin clips:", err);
+      // Failed to load admin clips
     } finally {
       setLoading(false);
     }

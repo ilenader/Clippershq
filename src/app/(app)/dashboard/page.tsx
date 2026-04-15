@@ -197,7 +197,7 @@ export default function DashboardPage() {
             <p className="text-sm text-accent font-medium">+{g.streakBonusPercent}% bonus</p>
           )}
           {postedToday ? (
-            <p className="text-sm text-emerald-400 mt-0.5">✓ Posted today</p>
+            <p className="text-sm text-emerald-400 mt-0.5"><Check className="h-3.5 w-3.5 inline-block -mt-0.5 mr-0.5" /> Posted today</p>
           ) : (
             <p className="text-sm text-accent mt-0.5">Post to keep streak</p>
           )}
