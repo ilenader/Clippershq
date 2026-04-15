@@ -633,8 +633,8 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     }
 
     const campaignGroupIds = Object.keys(jobsByCampaign);
-    const CAMPAIGN_BATCH_SIZE = source === "manual" ? 20 : 10;
-    const CLIP_BATCH_SIZE = 5;
+    const CAMPAIGN_BATCH_SIZE = source === "manual" ? 20 : 15;
+    const CLIP_BATCH_SIZE = source === "manual" ? 10 : 5;
     console.log(`[TRACKING] ${dueJobs.length} jobs across ${campaignGroupIds.length} campaigns (${source}, campaignBatch=${CAMPAIGN_BATCH_SIZE})`);
 
     for (let i = 0; i < campaignGroupIds.length; i += CAMPAIGN_BATCH_SIZE) {
@@ -652,31 +652,23 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           let campaignProcessed = 0;
           let campaignErrors = 0;
 
-          if (source === "manual") {
-            // Manual: parallel batches of 5 within same campaign
-            // Budget is still protected by Serializable transactions that retry on conflict
-            for (let b = 0; b < jobs.length; b += CLIP_BATCH_SIZE) {
-              if (Date.now() - startTime > 250000) break;
-              const batch = jobs.slice(b, b + CLIP_BATCH_SIZE);
-              const batchResults = await Promise.allSettled(
-                batch.map((job: any) => processTrackingJob(job, source, details))
-              );
-              for (const r of batchResults) {
-                if (r.status === "fulfilled" && r.value.success) campaignProcessed++;
-                else campaignErrors++;
-                progressCounter++;
+          // Parallel batches for both cron and manual
+          // Budget is protected by Serializable transactions that retry on conflict
+          for (let b = 0; b < jobs.length; b += CLIP_BATCH_SIZE) {
+            if (Date.now() - startTime > 250000) break;
+            const batch = jobs.slice(b, b + CLIP_BATCH_SIZE);
+            const batchResults = await Promise.allSettled(
+              batch.map((job: any) => processTrackingJob(job, source, details))
+            );
+            for (const r of batchResults) {
+              if (r.status === "fulfilled" && r.value.success) campaignProcessed++;
+              else campaignErrors++;
+              progressCounter++;
+              if (source === "manual") {
                 for (const oid of ownerIds) {
                   try { broadcastToUser(oid, "tracking_progress", { status: "processing", total: dueJobs.length, processed: progressCounter }); } catch {}
                 }
               }
-            }
-          } else {
-            // Cron: sequential within same campaign to protect budget
-            for (const job of jobs) {
-              if (Date.now() - startTime > 250000) break;
-              const result = await processTrackingJob(job, source, details);
-              if (result.success) campaignProcessed++;
-              else campaignErrors++;
             }
           }
 
