@@ -149,32 +149,32 @@ export default function EarningsPage() {
       {/* ── Compact Summary ── */}
       <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center">
         <p className="text-[11px] lg:text-xs font-semibold uppercase tracking-[0.15em] text-[var(--text-muted)] mb-2">Available for Payout</p>
-        <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-accent tabular-nums">{formatCurrency(summary.available)}</p>
+        <p className="text-3xl sm:text-4xl lg:text-6xl font-bold text-accent tabular-nums">{formatCurrency(summary.available)}</p>
         <p className="text-[11px] text-[var(--text-muted)] mt-1">All-time balance</p>
       </div>
       <div className="grid grid-cols-3 gap-2 lg:gap-4">
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-3 lg:p-5 text-center">
           <p className="text-[11px] lg:text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Earned</p>
-          <p className="text-lg lg:text-2xl font-bold text-[var(--text-primary)] tabular-nums">{formatCurrency(summary.totalEarned)}</p>
+          <p className="text-lg lg:text-3xl font-bold text-[var(--text-primary)] tabular-nums">{formatCurrency(summary.totalEarned)}</p>
         </div>
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-3 lg:p-5 text-center">
           <p className="text-[11px] lg:text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Approved</p>
-          <p className="text-lg lg:text-2xl font-bold text-emerald-400 tabular-nums">{formatCurrency(summary.approvedEarnings)}</p>
+          <p className="text-lg lg:text-3xl font-bold text-emerald-400 tabular-nums">{formatCurrency(summary.approvedEarnings)}</p>
         </div>
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-3 lg:p-5 text-center">
           <p className="text-[11px] lg:text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Paid Out</p>
-          <p className="text-lg lg:text-2xl font-bold text-accent tabular-nums">{formatCurrency(summary.paidOut)}</p>
+          <p className="text-lg lg:text-3xl font-bold text-accent tabular-nums">{formatCurrency(summary.paidOut)}</p>
         </div>
       </div>
       {(summary.pendingEarnings > 0 || summary.lockedInPayouts > 0) && (
         <div className="flex flex-wrap gap-2">
           {summary.pendingEarnings > 0 && (
-            <span className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-400">
+            <span className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 text-xs lg:text-sm font-medium text-amber-400">
               {formatCurrency(summary.pendingEarnings)} pending review
             </span>
           )}
           {summary.lockedInPayouts > 0 && (
-            <span className="rounded-lg bg-accent/10 border border-accent/20 px-3 py-1.5 text-xs font-medium text-accent">
+            <span className="rounded-lg bg-accent/10 border border-accent/20 px-3 py-1.5 text-xs lg:text-sm font-medium text-accent">
               {formatCurrency(summary.lockedInPayouts)} in payout queue
             </span>
           )}

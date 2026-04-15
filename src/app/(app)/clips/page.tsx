@@ -207,7 +207,7 @@ export default function ClipsPage() {
           {clips.map((clip: any) => {
             const stat = clip.stats?.[0];
             return (
-              <div key={clip.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 hover:bg-[var(--bg-card-hover)] transition-colors">
+              <div key={clip.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 lg:p-5 hover:bg-[var(--bg-card-hover)] transition-colors">
                 {/* Video unavailable warning */}
                 {clip.videoUnavailable && (
                   <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">

@@ -87,11 +87,11 @@ export default function ReferralsPage() {
         <div className="grid gap-4 grid-cols-2">
           <div className="rounded-xl border border-accent/20 px-4 py-4 text-center">
             <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Invited</p>
-            <p className="text-3xl font-bold text-[var(--text-primary)] mt-1">{ref?.referralCount || 0}</p>
+            <p className="text-3xl lg:text-4xl font-bold text-[var(--text-primary)] mt-1">{ref?.referralCount || 0}</p>
           </div>
           <div className="rounded-xl border border-accent/20 px-4 py-4 text-center">
             <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Referral Earnings</p>
-            <p className="text-3xl font-bold text-accent mt-1">{formatCurrency(ref?.referralEarnings || 0)}</p>
+            <p className="text-3xl lg:text-4xl font-bold text-accent mt-1">{formatCurrency(ref?.referralEarnings || 0)}</p>
           </div>
         </div>
       </Card>

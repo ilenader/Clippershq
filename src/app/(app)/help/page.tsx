@@ -19,11 +19,11 @@ function Collapsible({ icon, title, content, defaultOpen }: HelpSection & { defa
         className="flex items-center gap-3 w-full text-left cursor-pointer"
       >
         {icon}
-        <h2 className="text-[15px] sm:text-[16px] lg:text-lg font-semibold text-[var(--text-primary)] flex-1">{title}</h2>
+        <h2 className="text-[15px] sm:text-[16px] lg:text-xl font-semibold text-[var(--text-primary)] flex-1">{title}</h2>
         <ChevronDown className={`h-4 w-4 text-[var(--text-muted)] transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="mt-4 text-sm text-[var(--text-secondary)] space-y-3">
+        <div className="mt-4 text-sm lg:text-base text-[var(--text-secondary)] space-y-3">
           {content}
         </div>
       )}

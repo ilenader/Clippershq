@@ -204,7 +204,7 @@ export function Navbar() {
           {notifOpen && typeof document !== "undefined" && notifPos && createPortal(
             <div ref={notifRef}
               className="fixed rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-elevated)] overflow-hidden"
-              style={{ top: notifPos.top, left: 8, right: 8, maxWidth: 320, marginLeft: "auto", zIndex: 99999 }}>
+              style={{ top: notifPos.top, left: 8, right: 8, maxWidth: typeof window !== "undefined" && window.innerWidth >= 1024 ? 384 : 320, marginLeft: "auto", zIndex: 99999 }}>
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border-subtle)]">
                 <p className="text-sm font-semibold text-[var(--text-primary)]">Notifications</p>
                 {notifCount > 0 && (

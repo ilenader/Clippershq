@@ -227,7 +227,7 @@ export default function ProgressPage() {
         <Card>
           <div className="flex items-center gap-2 mb-4">
             <Flame className="h-5 w-5 text-accent" />
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">{streak}-Day Streak</h2>
+            <h2 className="text-lg lg:text-xl font-semibold text-[var(--text-primary)]">{streak}-Day Streak</h2>
             {streakReward && <span className="rounded-full bg-accent/10 border border-accent/20 px-2.5 py-0.5 text-xs font-bold text-accent">+{streakReward.bonusPercent}%</span>}
           </div>
 
@@ -371,7 +371,7 @@ export default function ProgressPage() {
       <Card>
         <div className="flex items-center gap-2 mb-5">
           <Crown className="h-5 w-5 text-accent" />
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Top Earners</h2>
+          <h2 className="text-lg lg:text-xl font-semibold text-[var(--text-primary)]">Top Earners</h2>
           <span className="text-xs text-[var(--text-muted)] ml-auto">Last 30 days</span>
         </div>
         {leaderboard.length === 0 ? (
@@ -389,7 +389,7 @@ export default function ProgressPage() {
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-lg font-semibold text-[var(--text-primary)]">{entry.name}</p>
+                    <p className="text-lg lg:text-xl font-semibold text-[var(--text-primary)]">{entry.name}</p>
                     <p className="text-xs text-[var(--text-muted)]">{(entry.views || 0).toLocaleString()} views</p>
                   </div>
                   <p className="text-lg font-bold text-accent">{formatCurrency(entry.earnings || 0)}</p>
@@ -402,7 +402,7 @@ export default function ProgressPage() {
 
       {/* ── How to Earn More ── */}
       <Card>
-        <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">How to Earn More</h2>
+        <h2 className="text-lg lg:text-xl font-semibold text-[var(--text-primary)] mb-2">How to Earn More</h2>
         <p className="text-sm text-[var(--text-secondary)] mb-5">Every percentage point directly affects how much money you take home.</p>
         <div className="space-y-4">
           {[

@@ -585,7 +585,7 @@ export default function PayoutsPage() {
             <p className="text-xs text-[var(--text-muted)]">
               {form.campaignId ? "Available balance" : "Select a campaign below"}
             </p>
-            <p className="text-xl font-bold text-accent">
+            <p className="text-xl lg:text-2xl font-bold text-accent">
               {form.campaignId ? formatCurrency(selectedAvailable) : "-"}
             </p>
           </div>

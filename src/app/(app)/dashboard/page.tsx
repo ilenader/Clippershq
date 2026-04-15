@@ -163,7 +163,7 @@ export default function DashboardPage() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--text-muted)] mb-2">Total Earnings</p>
         <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-accent tabular-nums tracking-tight">{formatCurrency(totalEarned)}</p>
         {g && g.bonusPercent > 0 && (
-          <p className="text-sm text-[var(--text-secondary)] mt-2">
+          <p className="text-sm lg:text-base text-[var(--text-secondary)] mt-2">
             <span className="text-accent font-semibold">+{g.bonusPercent}%</span> bonus
             <span className="text-[var(--text-muted)] ml-1.5">Level +{g.levelBonus || 0}% · Streak +{g.streakBonusPercent || 0}%{g.isPWAUser ? ` · App +${g.pwaBonusPercent || 0}%` : ""}</span>
           </p>
@@ -227,32 +227,37 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Submit CTA ── */}
-      <div className="my-2 lg:max-w-lg lg:mx-auto">
-        <Link
-          href="/clips?submit=true"
-          onClick={() => hapticMedium()}
-          className="flex items-center justify-center gap-2 w-full rounded-xl bg-accent hover:bg-accent-hover active:bg-accent-hover/90 active:scale-[0.97] text-white font-bold py-3.5 lg:py-4 text-center transition-all duration-150 shadow-sm lg:text-base"
-        >
-          <Film className="h-5 w-5" />
-          Submit a Clip
+      {/* ── Submit CTA (mobile position) ── */}
+      <div className="my-2 lg:hidden">
+        <Link href="/clips?submit=true" onClick={() => hapticMedium()} className="flex items-center justify-center gap-2 w-full rounded-xl bg-accent hover:bg-accent-hover active:bg-accent-hover/90 active:scale-[0.97] text-white font-bold py-3.5 text-center transition-all duration-150 shadow-sm">
+          <Film className="h-5 w-5" /> Submit a Clip
         </Link>
       </div>
 
       {/* ── Desktop Extra Stats ── */}
       <div className="hidden lg:grid grid-cols-3 gap-4 mt-2">
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-5">
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center">
+          <Film className="h-4 w-4 text-accent mx-auto mb-1" />
           <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] mb-1">Lifetime Clips</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)]">{allClips.length}</p>
+          <p className="text-3xl font-bold text-[var(--text-primary)]">{allClips.length}</p>
         </div>
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-5">
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center">
+          <Flame className="h-4 w-4 text-accent mx-auto mb-1" />
           <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] mb-1">Best Streak</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)]">{g?.longestStreak ?? 0}d</p>
+          <p className="text-3xl font-bold text-[var(--text-primary)]">{g?.longestStreak ?? 0}d</p>
         </div>
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-5">
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center">
+          <Megaphone className="h-4 w-4 text-accent mx-auto mb-1" />
           <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] mb-1">Campaigns Joined</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)]">{campaigns.length}</p>
+          <p className="text-3xl font-bold text-[var(--text-primary)]">{campaigns.length}</p>
         </div>
+      </div>
+
+      {/* ── Submit CTA (desktop position — after extra stats) ── */}
+      <div className="hidden lg:block my-2 max-w-lg mx-auto">
+        <Link href="/clips?submit=true" onClick={() => hapticMedium()} className="flex items-center justify-center gap-2 w-full rounded-xl bg-accent hover:bg-accent-hover active:bg-accent-hover/90 active:scale-[0.97] text-white font-bold py-5 text-lg text-center transition-all duration-150 shadow-sm">
+          <Film className="h-5 w-5" /> Submit a Clip
+        </Link>
       </div>
 
     </div>
