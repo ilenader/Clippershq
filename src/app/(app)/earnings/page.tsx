@@ -123,7 +123,7 @@ export default function EarningsPage() {
   }
 
   return (
-    <div className="space-y-4 max-w-5xl mx-auto">
+    <div className="space-y-4">
       <div>
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -147,23 +147,23 @@ export default function EarningsPage() {
       </div>
 
       {/* ── Compact Summary ── */}
-      <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center max-w-lg mx-auto">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--text-muted)] mb-2">Available for Payout</p>
-        <p className="text-3xl sm:text-4xl font-bold text-accent tabular-nums">{formatCurrency(summary.available)}</p>
+      <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center">
+        <p className="text-[11px] lg:text-xs font-semibold uppercase tracking-[0.15em] text-[var(--text-muted)] mb-2">Available for Payout</p>
+        <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-accent tabular-nums">{formatCurrency(summary.available)}</p>
         <p className="text-[11px] text-[var(--text-muted)] mt-1">All-time balance</p>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-3 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Earned</p>
-          <p className="text-lg font-bold text-[var(--text-primary)] tabular-nums">{formatCurrency(summary.totalEarned)}</p>
+      <div className="grid grid-cols-3 gap-2 lg:gap-4">
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-3 lg:p-5 text-center">
+          <p className="text-[11px] lg:text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Earned</p>
+          <p className="text-lg lg:text-2xl font-bold text-[var(--text-primary)] tabular-nums">{formatCurrency(summary.totalEarned)}</p>
         </div>
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-3 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Approved</p>
-          <p className="text-lg font-bold text-emerald-400 tabular-nums">{formatCurrency(summary.approvedEarnings)}</p>
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-3 lg:p-5 text-center">
+          <p className="text-[11px] lg:text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Approved</p>
+          <p className="text-lg lg:text-2xl font-bold text-emerald-400 tabular-nums">{formatCurrency(summary.approvedEarnings)}</p>
         </div>
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-3 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Paid Out</p>
-          <p className="text-lg font-bold text-accent tabular-nums">{formatCurrency(summary.paidOut)}</p>
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-3 lg:p-5 text-center">
+          <p className="text-[11px] lg:text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Paid Out</p>
+          <p className="text-lg lg:text-2xl font-bold text-accent tabular-nums">{formatCurrency(summary.paidOut)}</p>
         </div>
       </div>
       {(summary.pendingEarnings > 0 || summary.lockedInPayouts > 0) && (
@@ -184,7 +184,7 @@ export default function EarningsPage() {
       {/* Earnings Chart */}
       <div>
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Earnings over time</h2>
+          <h2 className="text-lg lg:text-xl font-semibold text-[var(--text-primary)]">Earnings over time</h2>
           <div className="flex flex-wrap items-center gap-2">
             <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
             <EarningsFilters values={earningsFilters} onChange={setEarningsFilters} />

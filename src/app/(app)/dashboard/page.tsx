@@ -119,7 +119,7 @@ export default function DashboardPage() {
   const clipsPendingToday = todayClips.filter((c: any) => c.status === "PENDING").length;
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto">
+    <div className="space-y-4">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -159,9 +159,9 @@ export default function DashboardPage() {
       )}
 
       {/* ── Earnings Hero ── */}
-      <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center max-w-xl lg:max-w-2xl mx-auto">
+      <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--text-muted)] mb-2">Total Earnings</p>
-        <p className="text-4xl sm:text-5xl font-bold text-accent tabular-nums tracking-tight">{formatCurrency(totalEarned)}</p>
+        <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-accent tabular-nums tracking-tight">{formatCurrency(totalEarned)}</p>
         {g && g.bonusPercent > 0 && (
           <p className="text-sm text-[var(--text-secondary)] mt-2">
             <span className="text-accent font-semibold">+{g.bonusPercent}%</span> bonus
@@ -173,10 +173,10 @@ export default function DashboardPage() {
       {/* ── Status Grid 2x2 ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Level */}
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 text-center">
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 lg:p-6 text-center">
           <Star className="h-4 w-4 text-accent mx-auto mb-1" />
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Level</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)]">Level {g?.level ?? 0}</p>
+          <p className="text-2xl lg:text-3xl font-bold text-[var(--text-primary)]">Level {g?.level ?? 0}</p>
           <p className="text-sm text-[var(--text-muted)]">{levelName} · +{g?.levelBonus ?? 0}%</p>
           {g?.earningsToNextLevel > 0 && (
             <div className="mt-2">
@@ -189,10 +189,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Streak */}
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 text-center">
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 lg:p-6 text-center">
           <Flame className="h-4 w-4 text-accent mx-auto mb-1" />
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Streak</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{g?.currentStreak ?? 0} <span className="text-sm font-normal text-[var(--text-muted)]">days</span></p>
+          <p className="text-2xl lg:text-3xl font-bold text-[var(--text-primary)] tabular-nums">{g?.currentStreak ?? 0} <span className="text-sm font-normal text-[var(--text-muted)]">days</span></p>
           {g?.streakBonusPercent > 0 && (
             <p className="text-sm text-accent font-medium">+{g.streakBonusPercent}% bonus</p>
           )}
@@ -204,10 +204,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Clips Today */}
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 text-center">
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 lg:p-6 text-center">
           <Film className="h-4 w-4 text-accent mx-auto mb-1" />
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Clips Today</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{clipsToday}</p>
+          <p className="text-2xl lg:text-3xl font-bold text-[var(--text-primary)] tabular-nums">{clipsToday}</p>
           {clipsApprovedToday > 0 && (
             <p className="text-sm text-emerald-400">{clipsApprovedToday} approved</p>
           )}
@@ -217,10 +217,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Payout */}
-        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 text-center">
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 lg:p-6 text-center">
           <DollarSign className="h-4 w-4 text-accent mx-auto mb-1" />
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-1">Available</p>
-          <p className="text-2xl font-bold text-accent tabular-nums">{formatCurrency(available)}</p>
+          <p className="text-2xl lg:text-3xl font-bold text-accent tabular-nums">{formatCurrency(available)}</p>
           {lockedInPayouts > 0 && (
             <p className="text-sm text-amber-400">{formatCurrency(lockedInPayouts)} pending</p>
           )}
@@ -228,17 +228,32 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Submit CTA ── */}
-      <div className="my-2 max-w-md mx-auto">
+      <div className="my-2 lg:max-w-lg lg:mx-auto">
         <Link
           href="/clips?submit=true"
           onClick={() => hapticMedium()}
-          className="flex items-center justify-center gap-2 w-full rounded-xl bg-accent hover:bg-accent-hover active:bg-accent-hover/90 active:scale-[0.97] text-white font-bold py-3.5 text-center transition-all duration-150 shadow-sm"
+          className="flex items-center justify-center gap-2 w-full rounded-xl bg-accent hover:bg-accent-hover active:bg-accent-hover/90 active:scale-[0.97] text-white font-bold py-3.5 lg:py-4 text-center transition-all duration-150 shadow-sm lg:text-base"
         >
           <Film className="h-5 w-5" />
           Submit a Clip
         </Link>
       </div>
 
+      {/* ── Desktop Extra Stats ── */}
+      <div className="hidden lg:grid grid-cols-3 gap-4 mt-2">
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-5">
+          <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] mb-1">Lifetime Clips</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">{allClips.length}</p>
+        </div>
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-5">
+          <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] mb-1">Best Streak</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">{g?.longestStreak ?? 0}d</p>
+        </div>
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-5">
+          <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] mb-1">Campaigns Joined</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">{campaigns.length}</p>
+        </div>
+      </div>
 
     </div>
   );
