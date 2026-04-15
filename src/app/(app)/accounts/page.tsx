@@ -358,9 +358,11 @@ export default function AccountsPage() {
               <input type="checkbox" required className="mt-1 h-4 w-4 rounded border-[var(--border-color)] accent-accent" />
               <span className="text-sm text-[var(--text-primary)]">I agree to the Terms of Service and confirm this is my real account with genuine content.</span>
             </label>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-              <Button type="submit" loading={submitting}>Submit account</Button>
+            <div className="sticky bottom-0 bg-[var(--bg-card)] pt-3 pb-1 border-t border-[var(--border-color)] -mx-6 px-6 -mb-6">
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button type="submit" loading={submitting}>Submit account</Button>
+              </div>
             </div>
           </form>
         )}

@@ -684,9 +684,11 @@ export default function PayoutsPage() {
           <p className="text-xs text-[var(--text-muted)]">
             Minimum payout is $10. A screen recording of your analytics may be required for verification.
           </p>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button type="submit" loading={submitting}>Submit Request</Button>
+          <div className="sticky bottom-0 bg-[var(--bg-card)] pt-3 pb-1 border-t border-[var(--border-color)] -mx-6 px-6 -mb-6">
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+              <Button type="submit" loading={submitting}>Submit Request</Button>
+            </div>
           </div>
         </form>
       </Modal>
