@@ -5,6 +5,7 @@ import { createNotification } from "@/lib/notifications";
 import { sendPayoutApproved, sendPayoutRejected } from "@/lib/email";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
+import { formatCurrency } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -44,6 +45,40 @@ export async function POST(
     // Fetch current payout for audit
     const existing = await db.payoutRequest.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "Payout not found" }, { status: 404 });
+
+    // Validate campaign balance before marking as PAID
+    if (action === "PAID" && existing.campaignId) {
+      const campaignClips = await db.clip.findMany({
+        where: {
+          userId: existing.userId,
+          campaignId: existing.campaignId,
+          status: "APPROVED",
+          isDeleted: false,
+          videoUnavailable: false,
+        },
+        select: { earnings: true },
+      });
+      const campaignEarned = campaignClips.reduce((s: number, c: any) => s + (c.earnings || 0), 0);
+
+      const campaignPayouts = await db.payoutRequest.findMany({
+        where: {
+          userId: existing.userId,
+          campaignId: existing.campaignId,
+          id: { not: id }, // Exclude the current payout being approved
+          status: { in: ["PAID", "REQUESTED", "UNDER_REVIEW", "APPROVED"] },
+        },
+        select: { amount: true },
+      });
+      const campaignPaidAndLocked = campaignPayouts.reduce((s: number, p: any) => s + (p.amount || 0), 0);
+
+      const campaignAvailable = Math.round(Math.max(campaignEarned - campaignPaidAndLocked, 0) * 100) / 100;
+
+      if (existing.amount > campaignAvailable) {
+        return NextResponse.json({
+          error: `Cannot approve — campaign earnings (${formatCurrency(campaignEarned)}) are less than total payouts (${formatCurrency(campaignPaidAndLocked + existing.amount)}). Earnings may have changed since this payout was requested.`,
+        }, { status: 400 });
+      }
+    }
 
     await db.payoutRequest.update({
       where: { id },

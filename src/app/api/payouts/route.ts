@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { calculatePayoutBreakdown } from "@/lib/payout-calc";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
+import { formatCurrency } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,42 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json(payouts);
+
+    // Enrich each payout with campaignAvailable for owner review
+    const enriched = await Promise.all(
+      payouts.map(async (payout: any) => {
+        if (!payout.campaignId) return { ...payout, campaignAvailable: null };
+
+        const [clipAgg, payoutAgg] = await Promise.all([
+          db!.clip.aggregate({
+            where: {
+              userId: payout.userId,
+              campaignId: payout.campaignId,
+              status: "APPROVED",
+              isDeleted: false,
+              videoUnavailable: false,
+            },
+            _sum: { earnings: true },
+          }),
+          db!.payoutRequest.findMany({
+            where: {
+              userId: payout.userId,
+              campaignId: payout.campaignId,
+              status: { in: ["PAID", "REQUESTED", "UNDER_REVIEW", "APPROVED"] },
+            },
+            select: { amount: true },
+          }),
+        ]);
+
+        const earned = clipAgg._sum.earnings ?? 0;
+        const paidAndLocked = payoutAgg.reduce((s: number, p: any) => s + (p.amount || 0), 0);
+        const campaignAvailable = Math.round(Math.max(earned - paidAndLocked, 0) * 100) / 100;
+
+        return { ...payout, campaignAvailable };
+      })
+    );
+
+    return NextResponse.json(enriched);
   } catch {
     return NextResponse.json([]);
   }
@@ -130,7 +166,7 @@ export async function POST(req: NextRequest) {
       const available = Math.round(Math.max(earned - paidOut - locked, 0) * 100) / 100;
 
       if (roundedAmount > available) {
-        throw new Error(`Insufficient balance. Available: $${available.toFixed(2)}`);
+        throw new Error(`Amount exceeds available balance for this campaign (${formatCurrency(available)} available)`);
       }
 
       // Create payout with full breakdown stored
@@ -162,7 +198,7 @@ export async function POST(req: NextRequest) {
     if (err.message === "DUPLICATE_PAYOUT") {
       return NextResponse.json({ error: "A payout request was just submitted. Please wait before trying again." }, { status: 409 });
     }
-    if (err.message?.includes("Insufficient balance")) {
+    if (err.message?.includes("Amount exceeds available balance")) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
     if (err.code === "P2034" || err.message?.includes("deadlock") || err.message?.includes("could not serialize")) {
