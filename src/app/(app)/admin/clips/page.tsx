@@ -155,6 +155,18 @@ export default function AdminClipsPage() {
   const [trackResult, setTrackResult] = useState<string | null>(null);
   const [showTrackModal, setShowTrackModal] = useState(false);
   const [trackSelected, setTrackSelected] = useState<Set<string>>(new Set());
+  const [trackingProgress, setTrackingProgress] = useState<{ status: string; total: number; processed: number; errors?: number } | null>(null);
+
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      setTrackingProgress(e.detail);
+      if (e.detail.status === "completed") {
+        setTimeout(() => setTrackingProgress(null), 5000);
+      }
+    };
+    window.addEventListener("sse:tracking_progress", handler as any);
+    return () => window.removeEventListener("sse:tracking_progress", handler as any);
+  }, []);
 
   // Count active clips per campaign for the modal
   const activeClipsByCampaign: Record<string, number> = {};
@@ -234,6 +246,28 @@ export default function AdminClipsPage() {
       {trackResult && (
         <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-2.5">
           <p className="text-sm text-accent">{trackResult}</p>
+        </div>
+      )}
+
+      {trackingProgress && (
+        <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-medium text-[var(--text-primary)]">
+              {trackingProgress.status === "completed"
+                ? `Done — ${trackingProgress.processed} clips checked${trackingProgress.errors ? `, ${trackingProgress.errors} errors` : ""}`
+                : `Checking clips... ${trackingProgress.processed}/${trackingProgress.total}`
+              }
+            </p>
+            <span className="text-xs text-[var(--text-muted)] tabular-nums">
+              {Math.round((trackingProgress.processed / Math.max(trackingProgress.total, 1)) * 100)}%
+            </span>
+          </div>
+          <div className="h-2 bg-[var(--bg-input)] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-accent rounded-full transition-all duration-300"
+              style={{ width: `${Math.round((trackingProgress.processed / Math.max(trackingProgress.total, 1)) * 100)}%` }}
+            />
+          </div>
         </div>
       )}
 

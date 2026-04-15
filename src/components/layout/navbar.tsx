@@ -85,6 +85,9 @@ export function Navbar() {
     es.addEventListener("earnings_updated", (e) => {
       try { window.dispatchEvent(new CustomEvent("sse:earnings_updated", { detail: JSON.parse(e.data) })); } catch {}
     });
+    es.addEventListener("tracking_progress", (e) => {
+      try { window.dispatchEvent(new CustomEvent("sse:tracking_progress", { detail: JSON.parse(e.data) })); } catch {}
+    });
 
     es.onerror = () => {};
 

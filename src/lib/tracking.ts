@@ -573,6 +573,8 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
   let errors = 0;
   const startTime = Date.now();
   const processedCampaignIds = new Set<string>();
+  let ownerIds: string[] = [];
+  let progressCounter = 0;
 
   try {
     const where: any = options?.includeInactive ? {} : { isActive: true };
@@ -599,6 +601,17 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
 
     console.log(`[TRACKING] Found ${dueJobs.length} due jobs`);
     details.push(`Found ${dueJobs.length} due jobs`);
+
+    // For manual checks, broadcast progress to all owners via SSE
+    if (source === "manual") {
+      try {
+        const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true }, take: 10 });
+        ownerIds = owners.map((o: any) => o.id);
+        for (const oid of ownerIds) {
+          broadcastToUser(oid, "tracking_progress", { status: "started", total: dueJobs.length, processed: 0 });
+        }
+      } catch {}
+    }
 
     // Group jobs by campaign: parallel across campaigns, sequential within same campaign
     // This prevents budget overflow from parallel clips in the same campaign
@@ -642,6 +655,10 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
               for (const r of batchResults) {
                 if (r.status === "fulfilled" && r.value.success) campaignProcessed++;
                 else campaignErrors++;
+                progressCounter++;
+                for (const oid of ownerIds) {
+                  try { broadcastToUser(oid, "tracking_progress", { status: "processing", total: dueJobs.length, processed: progressCounter }); } catch {}
+                }
               }
             }
           } else {
@@ -690,6 +707,13 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     }
   } catch (sweepErr: any) {
     console.error(`[BUDGET] Sweep error:`, sweepErr.message);
+  }
+
+  // Broadcast completion to owners for manual checks
+  if (source === "manual" && ownerIds.length > 0) {
+    for (const oid of ownerIds) {
+      try { broadcastToUser(oid, "tracking_progress", { status: "completed", total: progressCounter, processed: progressCounter, errors }); } catch {}
+    }
   }
 
   console.log(`[TRACKING] Completed: ${processed} processed, ${errors} errors`);
