@@ -607,8 +607,15 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
       try {
         const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true }, take: 10 });
         ownerIds = owners.map((o: any) => o.id);
-        for (const oid of ownerIds) {
-          broadcastToUser(oid, "tracking_progress", { status: "started", total: dueJobs.length, processed: 0 });
+        if (dueJobs.length === 0) {
+          // No clips to check — broadcast completed immediately
+          for (const oid of ownerIds) {
+            broadcastToUser(oid, "tracking_progress", { status: "completed", total: 0, processed: 0, errors: 0 });
+          }
+        } else {
+          for (const oid of ownerIds) {
+            broadcastToUser(oid, "tracking_progress", { status: "started", total: dueJobs.length, processed: 0 });
+          }
         }
       } catch {}
     }

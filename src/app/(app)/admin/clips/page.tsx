@@ -192,8 +192,12 @@ export default function AdminClipsPage() {
 
   const handleTrackSelected = () => {
     if (trackSelected.size === 0) { toast.error("Select at least one campaign."); return; }
-    toast.success("Checking clips in the background...");
     setShowTrackModal(false);
+
+    // Show progress bar immediately as a fallback (SSE will override with real-time updates)
+    const estimatedClips = Array.from(trackSelected).reduce((sum, id) => sum + (activeClipsByCampaign[id] || 0), 0);
+    setTrackingProgress({ status: "started", total: estimatedClips || 1, processed: 0 });
+
     fetch("/api/admin/track-all", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -204,6 +208,7 @@ export default function AdminClipsPage() {
         try { data = await res.json(); } catch { data = null; }
         if (!mountedRef.current) return;
         if (!res.ok) {
+          setTrackingProgress(null);
           toast.error(data?.error || "Tracking failed.");
           return;
         }
@@ -211,19 +216,26 @@ export default function AdminClipsPage() {
           setTrackResult("Check started, still processing in background...");
           toast.success("Check started, still processing...");
         } else {
+          const checked = data?.checked ?? 0;
           const viewChanges = (data?.details || []).filter((d: string) => /→/.test(d)).length;
-          const msg = `Checked ${data?.checked ?? 0} clips across ${data?.campaignsChecked ?? 0} campaigns. ${viewChanges > 0 ? `${viewChanges} had view changes.` : "No view changes."}`;
+          const msg = `Checked ${checked} clips across ${data?.campaignsChecked ?? 0} campaigns. ${viewChanges > 0 ? `${viewChanges} had view changes.` : "No view changes."}`;
           if (data?.campaignsBlocked > 0) {
             setTrackResult(`${msg} (${data.campaignsBlocked} campaign(s) were rate-limited)`);
           } else {
             setTrackResult(msg);
           }
-          toast.success(`Tracking complete — ${data?.checked ?? 0} clips checked.`);
+
+          // Update progress bar to completed (polling fallback — SSE may have already done this)
+          setTrackingProgress({ status: "completed", total: checked, processed: checked, errors: data?.errors || 0 });
+          setTimeout(() => setTrackingProgress(null), 5000);
         }
         load();
       })
       .catch(() => {
-        if (mountedRef.current) toast.error("Tracking failed.");
+        if (mountedRef.current) {
+          setTrackingProgress(null);
+          toast.error("Tracking failed.");
+        }
       });
   };
 
@@ -253,7 +265,9 @@ export default function AdminClipsPage() {
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium text-[var(--text-primary)]">
-              {trackingProgress.status === "completed"
+              {trackingProgress.status === "completed" && trackingProgress.total === 0
+                ? "No clips needed checking"
+                : trackingProgress.status === "completed"
                 ? `Done — ${trackingProgress.processed} clips checked${trackingProgress.errors ? `, ${trackingProgress.errors} errors` : ""}`
                 : `Checking clips... ${trackingProgress.processed}/${trackingProgress.total}`
               }
