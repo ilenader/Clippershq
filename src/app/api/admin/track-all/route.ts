@@ -137,6 +137,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("[TRACK-ALL] Fatal error:", err?.message);
-    return NextResponse.json({ success: false, error: "Tracking failed: " + (err?.message || "unknown error"), checked: 0, errors: 1 }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Tracking failed: " + (err?.message || "unknown error") + " | Stack: " + (err?.stack?.substring(0, 300) || "none"), checked: 0, errors: 1 }, { status: 500 });
   }
 }
