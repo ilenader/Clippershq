@@ -153,7 +153,7 @@ export default function AdminCampaignsPage() {
       { name: "agencyFee", val: form.agencyFee },
     ];
     for (const f of numericFields) {
-      if (f.val !== undefined && f.val !== null && f.val !== "" && (isNaN(Number(f.val)) || Number(f.val) < 0)) {
+      if (f.val !== undefined && f.val !== null && f.val !== "" && (isNaN(Number(f.val)) || Number(f.val) <= 0)) {
         toast.error("Please enter valid positive numbers for pricing fields.");
         return;
       }

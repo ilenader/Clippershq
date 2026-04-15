@@ -92,7 +92,7 @@ export default function EarningsPage() {
   }, [fetchData]);
 
   const timeFilteredClips = useMemo(() => filterByTimeframe(clips, timeframeDays), [clips, timeframeDays]);
-  const clipsWithEarnings = useMemo(() => clips.filter((c: any) => c.earnings > 0 && !c.videoUnavailable), [clips]);
+
 
   const summary: EarningsData = useMemo(() => {
     if (!earnings) return { totalEarned: 0, approvedEarnings: 0, pendingEarnings: 0, paidOut: 0, lockedInPayouts: 0, available: 0 };

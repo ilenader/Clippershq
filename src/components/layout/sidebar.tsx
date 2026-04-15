@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTheme } from "@/components/theme-provider";
+
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -105,7 +105,6 @@ interface SidebarProps {
 
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
-  const { theme } = useTheme();
   const { isInstalled, hasNativePrompt, triggerNativeInstall } = useInstallPrompt();
   const [showInstallModal, setShowInstallModal] = useState(false);
   const isAdmin = role === "ADMIN" || role === "OWNER";
