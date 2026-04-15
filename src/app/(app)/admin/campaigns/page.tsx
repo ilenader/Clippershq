@@ -30,7 +30,7 @@ const statusFilterOptions = [
 ];
 
 const defaultForm = {
-  name: "", clientName: "", platforms: [] as string[],
+  name: "", platforms: [] as string[],
   pricingModel: "AGENCY_FEE",
   clipperCpm: "", ownerCpm: "", agencyFee: "", budget: "",
   payoutRule: "", minViews: "", maxPayoutPerClip: "",
@@ -120,7 +120,7 @@ export default function AdminCampaignsPage() {
     setEditingId(c.id);
     const reqs = c.requirements ? c.requirements.split("\n").filter((r: string) => r.trim()) : [""];
     setForm({
-      name: c.name || "", clientName: c.clientName || "",
+      name: c.name || "",
       platforms: c.platform ? c.platform.split(",").map((p: string) => p.trim()) : [],
       pricingModel: c.pricingModel || "AGENCY_FEE",
       clipperCpm: (c.clipperCpm ?? c.cpmRate ?? "")?.toString() || "",
@@ -149,7 +149,7 @@ export default function AdminCampaignsPage() {
     try {
       const requirements = form.requirementsList.filter((r) => r.trim()).join("\n");
       const payload: Record<string, any> = {
-        name: form.name, clientName: form.clientName, platform: form.platforms.join(", "),
+        name: form.name, platform: form.platforms.join(", "),
         pricingModel: form.pricingModel, clipperCpm: form.clipperCpm,
         ownerCpm: form.ownerCpm, agencyFee: form.agencyFee, budget: form.budget,
         payoutRule: form.payoutRule,
@@ -341,7 +341,7 @@ export default function AdminCampaignsPage() {
                       <span className="text-sm font-medium text-[var(--text-primary)]">{c.name}</span>
                       <Badge variant="pending">In Review</Badge>
                     </div>
-                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{c.platform?.replace(/,\s*/g, " · ")} {c.clientName && `· ${c.clientName}`}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{c.platform?.replace(/,\s*/g, " · ")}</p>
                     <p className="text-xs text-[var(--text-muted)]">New campaign submitted by admin · {formatDate(c.createdAt)}</p>
                   </div>
                 </div>
@@ -411,7 +411,7 @@ export default function AdminCampaignsPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <CardTitle className="truncate">{c.name}</CardTitle>
-                        <CardDescription className="truncate">{c.platform?.replace(/,\s*/g, " · ")} {c.clientName && `· ${c.clientName}`}</CardDescription>
+                        <CardDescription className="truncate">{c.platform?.replace(/,\s*/g, " · ")}</CardDescription>
                       </div>
                       <Badge variant={c.status.toLowerCase() as any} className="flex-shrink-0">{c.status}</Badge>
                     </div>
@@ -506,9 +506,8 @@ export default function AdminCampaignsPage() {
             <p className="text-sm text-accent">Changes will be submitted for owner review, not applied immediately.</p>
           </div>
         )}
-        <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-5 overflow-y-auto pr-2">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <Input id="name" label="Campaign name *" value={form.name} onChange={(e) => updateField("name", e.target.value)} className="text-lg" />
-          <Input id="clientName" label="Client name" value={form.clientName} onChange={(e) => updateField("clientName", e.target.value)} />
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-[var(--text-primary)]">Platforms *</label>
             <div className="flex flex-wrap gap-2">
