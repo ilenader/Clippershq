@@ -123,7 +123,7 @@ export default function EarningsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-5xl mx-auto">
       <div>
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -147,7 +147,7 @@ export default function EarningsPage() {
       </div>
 
       {/* ── Compact Summary ── */}
-      <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center">
+      <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center max-w-lg mx-auto">
         <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--text-muted)] mb-2">Available for Payout</p>
         <p className="text-3xl sm:text-4xl font-bold text-accent tabular-nums">{formatCurrency(summary.available)}</p>
         <p className="text-[11px] text-[var(--text-muted)] mt-1">All-time balance</p>

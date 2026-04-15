@@ -119,7 +119,7 @@ export default function DashboardPage() {
   const clipsPendingToday = todayClips.filter((c: any) => c.status === "PENDING").length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-4xl mx-auto">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -159,7 +159,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Earnings Hero ── */}
-      <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center">
+      <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-6 text-center max-w-xl lg:max-w-2xl mx-auto">
         <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--text-muted)] mb-2">Total Earnings</p>
         <p className="text-4xl sm:text-5xl font-bold text-accent tabular-nums tracking-tight">{formatCurrency(totalEarned)}</p>
         {g && g.bonusPercent > 0 && (
@@ -171,7 +171,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Status Grid 2x2 ── */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Level */}
         <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 text-center">
           <Star className="h-4 w-4 text-accent mx-auto mb-1" />
@@ -228,7 +228,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Submit CTA ── */}
-      <div className="my-2">
+      <div className="my-2 max-w-md mx-auto">
         <Link
           href="/clips?submit=true"
           onClick={() => hapticMedium()}

@@ -183,7 +183,6 @@ export async function updateStreak(userId: string): Promise<void> {
   // Use user's timezone for "today" to avoid UTC/local mismatch
   const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: tz || "UTC" });
   const today = new Date(todayStr + "T00:00:00Z");
-  console.log(`[STREAK] User TZ: ${tz}, Today: ${todayStr}, Streak: ${user.currentStreak}`);
 
   // Latest evaluable day = yesterday (today isn't over yet)
   const latestEvaluable = addDays(today, -1);
@@ -264,6 +263,30 @@ export async function updateStreak(userId: string): Promise<void> {
     }
 
     cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  // Check if user posted today (today can't be fully evaluated but count it provisionally)
+  if (!streakBroken) {
+    const { start: todayStart, end: todayEnd } = dayBounds(today, tz);
+    const todayClips = await db.clip.findMany({
+      where: {
+        userId,
+        isDeleted: false,
+        OR: [{ status: "APPROVED" }, { status: "PENDING" }, { streakDayLocked: true }],
+        createdAt: { gte: todayStart, lte: todayEnd },
+      },
+      select: { id: true },
+      take: 1,
+    });
+    if (todayClips.length > 0) {
+      // User posted today — check if lastPassedDate is yesterday (continuous streak)
+      const lastDateStr = lastPassedDate ? lastPassedDate.toLocaleDateString("en-CA", { timeZone: "UTC" }) : null;
+      const yesterdayStr = addDays(today, -1).toISOString().slice(0, 10);
+      if (lastDateStr === yesterdayStr || (currentStreak === 0 && !streakBroken)) {
+        currentStreak++;
+        lastPassedDate = today;
+      }
+    }
   }
 
   const newLongest = Math.max(currentStreak, user.longestStreak);
