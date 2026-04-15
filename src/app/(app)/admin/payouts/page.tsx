@@ -284,10 +284,10 @@ export default function AdminPayoutsPage() {
                                     {(c.username || "?").charAt(0).toUpperCase()}
                                   </div>
                                 )}
-                                <a href={`/admin/users/${c.userId}`} className="text-sm font-medium text-accent hover:underline truncate max-w-[120px]">{c.username}</a>
+                                <a href={`/admin/users/${c.userId}`} className="text-sm font-medium text-accent hover:underline truncate max-w-[180px] lg:max-w-xs">{c.username}</a>
                               </div>
                             </td>
-                            <td className="py-2.5 pr-3 text-[var(--text-muted)] truncate max-w-[120px]">{c.campaignName}</td>
+                            <td className="py-2.5 pr-3 text-[var(--text-muted)] truncate max-w-[180px] lg:max-w-xs">{c.campaignName}</td>
                             <td className="py-2.5 pr-3 text-right text-[var(--text-primary)] tabular-nums">{formatCurrency(c.earned)}</td>
                             <td className="py-2.5 pr-3 text-right text-emerald-400 tabular-nums">{formatCurrency(c.paid)}</td>
                             <td className="py-2.5 pr-3 text-right text-yellow-400 tabular-nums">{formatCurrency(c.locked)}</td>
@@ -380,7 +380,7 @@ export default function AdminPayoutsPage() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="max-w-[150px] truncate text-xs" title={payout.walletAddress}>{payout.walletAddress}</TableCell>
+                <TableCell className="max-w-[150px] truncate text-xs">{payout.walletAddress}</TableCell>
                 <TableCell className="text-xs text-[var(--text-primary)]">
                   {payout.walletAsset || payout.walletChain ? (
                     <div>

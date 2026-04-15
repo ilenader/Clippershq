@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +54,7 @@ export default function AccountsPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as SessionUser)?.role;
 
   useEffect(() => {
     if (searchParams.get("message") === "add-account-first") {
@@ -94,7 +95,7 @@ export default function AccountsPage() {
         setAccounts(Array.isArray(accts) ? accts : []);
         setClips(Array.isArray(clipsData) ? clipsData : []);
       })
-      .catch(() => {})
+      .catch(() => { /* silent */ })
       .finally(() => setLoading(false));
   };
 

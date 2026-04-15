@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
@@ -44,7 +45,7 @@ function getCountdown(timezone: string | null): { hours: number; minutes: number
 export default function ProgressPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as SessionUser)?.role;
 
   useEffect(() => {
     if (session && userRole && (userRole === "ADMIN" || userRole === "OWNER")) {

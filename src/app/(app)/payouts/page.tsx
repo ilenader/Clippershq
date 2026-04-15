@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +63,7 @@ function ComboInput({ id, label, placeholder, value, onChange, suggestions }: {
 export default function PayoutsPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as SessionUser)?.role;
 
   useEffect(() => {
     if (session && userRole && userRole !== "CLIPPER") {
@@ -320,7 +321,7 @@ export default function PayoutsPage() {
       const res = await fetch(`/api/calls?available=true&date=${date}`);
       const data = await res.json();
       setAvailableSlots(Array.isArray(data.slots) ? data.slots : []);
-    } catch { setAvailableSlots([]); }
+    } catch { /* silent */ setAvailableSlots([]); }
     setLoadingSlots(false);
   };
 

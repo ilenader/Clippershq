@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -13,7 +14,7 @@ import { toast } from "@/lib/toast";
 export default function ReferralsPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as SessionUser)?.role;
 
   useEffect(() => {
     if (session && userRole && userRole === "ADMIN") {
@@ -37,7 +38,7 @@ export default function ReferralsPage() {
         setRef(refData);
         if (Array.isArray(lbData)) setLeaderboard(lbData);
       })
-      .catch(() => {})
+      .catch(() => { /* silent */ })
       .finally(() => setLoading(false));
   }, []);
 

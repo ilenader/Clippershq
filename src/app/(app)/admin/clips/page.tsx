@@ -14,6 +14,7 @@ import {
   Shield, AlertTriangle, Zap, Settings2, Activity,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { toast } from "@/lib/toast";
 import { formatRelative, formatNumber, formatCurrency } from "@/lib/utils";
 import type { FraudLevel } from "@/lib/fraud";
@@ -34,7 +35,7 @@ const fraudColors: Record<FraudLevel, { bg: string; text: string; border: string
 
 export default function AdminClipsPage() {
   const { data: session } = useSession();
-  const isOwner = (session?.user as any)?.role === "OWNER";
+  const isOwner = (session?.user as SessionUser)?.role === "OWNER";
   const [clips, setClips] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const mountedRef = useRef(true);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { useEffect, useState, useCallback } from "react";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,7 @@ import { hapticMedium } from "@/lib/haptics";
 export default function DashboardPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as SessionUser)?.role;
 
   useEffect(() => {
     if (session && userRole && userRole !== "CLIPPER") router.replace("/admin");

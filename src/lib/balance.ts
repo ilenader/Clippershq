@@ -96,6 +96,7 @@ export async function getCampaignBudgetStatus(campaignId: string): Promise<{
   remaining: number;
   isOverBudget: boolean;
 } | null> {
+  if (!campaignId) return null;
   try {
     const { db } = await import("@/lib/db");
     if (!db) return null;

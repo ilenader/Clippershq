@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { useDevAuth } from "@/components/dev-auth-provider";
 import { useRouter, usePathname } from "next/navigation";
 import { hapticMedium } from "@/lib/haptics";
@@ -39,10 +40,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const effectiveSession = isDevMode && devSession ? devSession : session;
   const effectiveRole = isDevMode && devSession
     ? devSession.user.role
-    : (session?.user as any)?.role || "CLIPPER";
+    : (session?.user as SessionUser)?.role || "CLIPPER";
   const effectiveStatus = isDevMode && devSession
     ? "ACTIVE"
-    : (session?.user as any)?.status || "ACTIVE";
+    : (session?.user as SessionUser)?.status || "ACTIVE";
   const isAuthenticated = isDevMode ? !!devRole : status === "authenticated";
 
   useEffect(() => {

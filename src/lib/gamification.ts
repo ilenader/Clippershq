@@ -365,7 +365,7 @@ export async function getStreakDayStatuses(userId: string, days: number = 60): P
 
 /** Recompute user level and bonus based on total earnings */
 export async function updateUserLevel(userId: string): Promise<void> {
-  if (!db) return;
+  if (!db || !userId) return;
 
   const user = await db.user.findUnique({
     where: { id: userId },

@@ -120,10 +120,10 @@ export function Sidebar({ role }: SidebarProps) {
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 px-5 border-b border-[var(--border-color)]">
         <div className="flex h-8 w-8 items-center justify-center">
-          <svg viewBox="0 0 100 100" className="h-7 w-7">
+          <svg viewBox="0 0 100 100" className="h-7 w-7 text-[var(--text-primary)]">
             <polygon
               points="50,10 90,85 10,85"
-              fill={theme === "dark" ? "#ffffff" : "#000000"}
+              fill="currentColor"
             />
           </svg>
         </div>

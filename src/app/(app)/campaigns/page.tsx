@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { useRouter } from "next/navigation";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +19,7 @@ import Link from "next/link";
 export default function CampaignsPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const userRole = (session?.user as any)?.role || "CLIPPER";
+  const userRole = (session?.user as SessionUser)?.role || "CLIPPER";
   const isClipper = userRole === "CLIPPER";
 
   useEffect(() => {
@@ -48,7 +49,7 @@ export default function CampaignsPage() {
       const arr = Array.isArray(joins) ? joins : [];
       setJoinsByAccount(arr);
       setJoinedCampaignIds(new Set(arr.map((j: any) => j.campaignId)));
-    } catch {}
+    } catch { /* silent — keeps existing state on error */ }
   };
 
   useEffect(() => {

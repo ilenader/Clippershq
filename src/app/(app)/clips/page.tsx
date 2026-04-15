@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Card } from "@/components/ui/card";
@@ -28,7 +29,7 @@ export default function ClipsPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as SessionUser)?.role;
 
   // Role isolation: clips page is clipper-only
   useEffect(() => {

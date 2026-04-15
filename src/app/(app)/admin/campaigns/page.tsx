@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ const defaultForm = {
 
 export default function AdminCampaignsPage() {
   const { data: session } = useSession();
-  const userRole = (session?.user as any)?.role || "CLIPPER";
+  const userRole = (session?.user as SessionUser)?.role || "CLIPPER";
   const userId = session?.user?.id;
   const isOwner = userRole === "OWNER";
 
@@ -144,6 +145,18 @@ export default function AdminCampaignsPage() {
     if (!form.name || form.platforms.length === 0) {
       toast.error("Name and at least one platform are required.");
       return;
+    }
+    const numericFields = [
+      { name: "budget", val: form.budget },
+      { name: "clipperCpm", val: form.clipperCpm },
+      { name: "ownerCpm", val: form.ownerCpm },
+      { name: "agencyFee", val: form.agencyFee },
+    ];
+    for (const f of numericFields) {
+      if (f.val !== undefined && f.val !== null && f.val !== "" && (isNaN(Number(f.val)) || Number(f.val) < 0)) {
+        toast.error("Please enter valid positive numbers for pricing fields.");
+        return;
+      }
     }
     setSubmitting(true);
     try {

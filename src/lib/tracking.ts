@@ -345,7 +345,7 @@ async function processTrackingJob(
 
             // Auto-pause
             const newTotalSpent = otherSpent + newEarnings + newOwnerAmt;
-            if (newTotalSpent >= txCampaign.budget - 0.01) {
+            if (Math.round(newTotalSpent * 100) / 100 >= Math.round(txCampaign.budget * 100) / 100) {
               await tx.campaign.update({ where: { id: clip.campaignId }, data: { status: "PAUSED", lastBudgetPauseAt: new Date() } });
               autoPausedBudget = txCampaign.budget;
               autoPausedSpent = newTotalSpent;
@@ -411,7 +411,7 @@ async function processTrackingJob(
                   newEarnings = Math.max(newEarnings, 0); newOwnerAmt = Math.max(newOwnerAmt, 0);
                 }
                 const newTotalSpent = otherSpent + newEarnings + newOwnerAmt;
-                if (newTotalSpent >= txCampaign.budget - 0.01) {
+                if (Math.round(newTotalSpent * 100) / 100 >= Math.round(txCampaign.budget * 100) / 100) {
                   await tx.campaign.update({ where: { id: clip.campaignId }, data: { status: "PAUSED", lastBudgetPauseAt: new Date() } });
                   autoPausedBudget = txCampaign.budget; autoPausedSpent = newTotalSpent;
                   details.push(`Campaign ${clip.campaignId}: AUTO-PAUSED (budget $${txCampaign.budget} reached)`);
@@ -704,7 +704,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     const { getCampaignBudgetStatus } = await import("@/lib/balance");
     for (const cId of processedCampaignIds) {
       const bs = await getCampaignBudgetStatus(cId);
-      if (bs && bs.budget > 0 && bs.spent >= bs.budget - 0.01) {
+      if (bs && bs.budget > 0 && Math.round(bs.spent * 100) / 100 >= Math.round(bs.budget * 100) / 100) {
         const campaign = await db.campaign.findUnique({ where: { id: cId }, select: { status: true } });
         if (campaign && campaign.status === "ACTIVE") {
           await db.campaign.update({ where: { id: cId }, data: { status: "PAUSED", lastBudgetPauseAt: new Date() } });

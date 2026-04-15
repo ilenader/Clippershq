@@ -199,7 +199,6 @@ export function calculateDualEarnings(input: {
   levelBonuses?: Record<number, number>;
   streakBonuses?: { days: number; bonusPercent: number }[];
   platformFeePercent?: number;
-  feeTiers?: { streakDays: number; feePercent: number }[];
   maxBonusCap?: number;
   manualBonusOverride?: number | null;
   isReferred?: boolean;
