@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     if (campaignIds.length > 0) {
       const blocked: string[] = [];
       for (const cid of campaignIds) {
-        const rl = checkRateLimit(`track-manual:${cid}`, 1, 30 * 60_000);
+        const rl = checkRateLimit(`track-manual:${cid}`, 1, 1 * 60_000);
         if (!rl.allowed) blocked.push(cid);
       }
       if (blocked.length === campaignIds.length) {
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     }
 
     // No campaign filter — check all (global rate limit)
-    const rl = checkRateLimit(`track-all:${session.user.id}`, 1, 30 * 60_000);
+    const rl = checkRateLimit(`track-all:${session.user.id}`, 1, 1 * 60_000);
     if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
     console.log("[TRACK-ALL] Manual check for ALL campaigns");
