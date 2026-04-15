@@ -6,36 +6,10 @@ export function useIsPWA(): boolean {
   const [isPWA, setIsPWA] = useState(false);
 
   useEffect(() => {
-    const standalone =
+    setIsPWA(
       window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
-    setIsPWA(standalone);
-
-    // Detect uninstall: user was PWA but no longer in standalone mode
-    if (!standalone && localStorage.getItem("pwa_installed") === "true") {
-      localStorage.removeItem("pwa_installed");
-      fetch("/api/user/pwa-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ installed: false }),
-      }).catch(() => {});
-    }
-
-    // Listen for display-mode changes (e.g. user removes from home screen)
-    const mq = window.matchMedia("(display-mode: standalone)");
-    const onChange = (e: MediaQueryListEvent) => {
-      setIsPWA(e.matches);
-      if (!e.matches && localStorage.getItem("pwa_installed") === "true") {
-        localStorage.removeItem("pwa_installed");
-        fetch("/api/user/pwa-status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ installed: false }),
-        }).catch(() => {});
-      }
-    };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+      (window.navigator as any).standalone === true
+    );
   }, []);
 
   return isPWA;
