@@ -39,7 +39,7 @@ export function DropdownFilter({ label, options, value, onChange }: DropdownFilt
         <svg className={`h-4 w-4 text-[var(--text-muted)] transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
+        <div className="absolute left-0 sm:left-auto sm:right-0 top-full z-50 mt-1 min-w-[180px] max-w-[min(280px,calc(100vw-2rem))] rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
           {options.map((opt) => (
             <button
               key={opt.value}
@@ -102,7 +102,7 @@ export function MultiDropdown({ label, options, values, onChange, allLabel = "Al
         <svg className={`h-4 w-4 text-[var(--text-muted)] transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
+        <div className="absolute left-0 sm:left-auto sm:right-0 top-full z-50 mt-1 min-w-[220px] max-w-[min(280px,calc(100vw-2rem))] rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
           <button
             onClick={() => { onChange([]); setOpen(false); }}
             className={`flex w-full items-center px-4 py-2 text-sm transition-colors cursor-pointer ${
