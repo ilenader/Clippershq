@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
+import { logCampaignEvent } from "@/lib/campaign-events";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -202,12 +203,25 @@ export async function PATCH(
               data: { isActive: true },
             });
             console.log(`[BUDGET] Campaign ${id} auto-resumed — budget increased from $${oldCampaign.budget} to $${data.budget}, spent: $${budgetStatus.spent}. Reactivated ${reactivated.count} tracking jobs.`);
-            // Re-fetch to return updated status
+            logCampaignEvent(id, "AUTO_RESUMED", `Campaign auto-resumed — budget increased from $${oldCampaign.budget} to $${data.budget}`, { oldBudget: oldCampaign.budget, newBudget: data.budget, spent: budgetStatus.spent }, session.user.id);
             const updated = await db.campaign.findUnique({ where: { id } });
             return NextResponse.json(updated);
           }
         } catch (resumeErr: any) {
           console.error(`[BUDGET] Auto-resume check failed for campaign ${id}:`, resumeErr?.message);
+        }
+      }
+
+      // Log campaign events
+      if (oldCampaign) {
+        if (data.budget != null && data.budget !== oldCampaign.budget) {
+          logCampaignEvent(id, "BUDGET_CHANGE", `Budget changed from $${oldCampaign.budget ?? 0} to $${data.budget}`, { oldBudget: oldCampaign.budget, newBudget: data.budget }, session.user.id);
+        }
+        if (data.status === "PAUSED" && oldCampaign.status !== "PAUSED") {
+          logCampaignEvent(id, "MANUAL_PAUSE", "Campaign manually paused", { previousStatus: oldCampaign.status }, session.user.id);
+        }
+        if (data.status === "ACTIVE" && oldCampaign.status !== "ACTIVE") {
+          logCampaignEvent(id, "MANUAL_RESUME", "Campaign manually resumed", { previousStatus: oldCampaign.status }, session.user.id);
         }
       }
 
@@ -273,6 +287,7 @@ export async function DELETE(
         console.log(`[ARCHIVE] Voided ${voided.count} pending payouts for campaign ${id}`);
       }
 
+      logCampaignEvent(id, "ARCHIVED", "Campaign archived", {}, session.user.id);
       return NextResponse.json({ success: true, message: "Campaign archived" });
     } catch (err: any) {
       console.error("Archive failed:", err?.message);

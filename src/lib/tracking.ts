@@ -16,6 +16,7 @@ import { fetchClipStats } from "@/lib/apify";
 import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
 import { computeFraudLevel } from "@/lib/fraud";
 import { broadcastToUser } from "@/lib/sse-broadcast";
+import { logCampaignEvent } from "@/lib/campaign-events";
 
 /** Interval tiers in minutes: 1h → 2h → 4h → 8h → 16h → 24h → 48h */
 const TIERS = [60, 120, 240, 480, 960, 1440, 2880];
@@ -292,6 +293,8 @@ async function processTrackingJob(
         : 0;
 
       // Budget cap + earnings save — serializable transaction to prevent race conditions
+      let autoPausedBudget: number | null = null;
+      let autoPausedSpent: number | null = null;
       try {
         await db.$transaction(async (tx: any) => {
           // Inline budget status using tx (not external getCampaignBudgetStatus which uses its own db)
@@ -347,6 +350,8 @@ async function processTrackingJob(
             const newTotalSpent = otherSpent + newEarnings + newOwnerAmt;
             if (newTotalSpent >= txCampaign.budget - 0.01) {
               await tx.campaign.update({ where: { id: clip.campaignId }, data: { status: "PAUSED", lastBudgetPauseAt: new Date() } });
+              autoPausedBudget = txCampaign.budget;
+              autoPausedSpent = newTotalSpent;
               console.log(`[BUDGET] Campaign ${clip.campaignId} paused — budget $${txCampaign.budget} reached`);
               details.push(`Campaign ${clip.campaignId}: AUTO-PAUSED (budget $${txCampaign.budget} reached)`);
             }
@@ -382,6 +387,11 @@ async function processTrackingJob(
         // Safe default: earnings unchanged
         newEarnings = clip.earnings || 0;
         newOwnerAmt = 0;
+      }
+
+      // Log auto-pause event outside transaction
+      if (autoPausedBudget != null) {
+        logCampaignEvent(clip.campaignId, "AUTO_PAUSED", `Campaign auto-paused — budget of $${autoPausedBudget} reached (spent: $${Number(autoPausedSpent).toFixed(2)})`, { budget: autoPausedBudget, spent: autoPausedSpent });
       }
 
       const earningsChanged = newEarnings !== oldEarnings;
@@ -604,6 +614,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           await db.campaign.update({ where: { id: cId }, data: { status: "PAUSED", lastBudgetPauseAt: new Date() } });
           console.log(`[BUDGET] Final sweep: Campaign ${cId} auto-paused — spent $${bs.spent.toFixed(2)} of $${bs.budget}`);
           details.push(`Campaign ${cId}: AUTO-PAUSED in final sweep`);
+          logCampaignEvent(cId, "AUTO_PAUSED", `Campaign auto-paused in final sweep — spent $${bs.spent.toFixed(2)} of $${bs.budget}`, { budget: bs.budget, spent: bs.spent });
         }
       }
     }

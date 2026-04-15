@@ -13,7 +13,8 @@ import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
 import { CampaignImage } from "@/components/ui/campaign-image";
-import { Plus, Megaphone, Mail, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit } from "lucide-react";
+import { Plus, Megaphone, Mail, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit, ChevronDown } from "lucide-react";
+import { formatRelative } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 
 const platformList = [
@@ -58,6 +59,9 @@ export default function AdminCampaignsPage() {
   const [memberStats, setMemberStats] = useState<Record<string, { clippers: number; accounts: number }>>({});
   const [pendingEdits, setPendingEdits] = useState<any[]>([]);
   const [reviewingEdit, setReviewingEdit] = useState<any | null>(null);
+  const [historyTarget, setHistoryTarget] = useState<string | null>(null);
+  const [historyEvents, setHistoryEvents] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const load = () => {
     const fetches: Promise<any>[] = [
@@ -470,6 +474,15 @@ export default function AdminCampaignsPage() {
                       </Button>
                     )}
                     {isOwner && (
+                      <Button size="sm" variant="outline" onClick={() => {
+                        setHistoryTarget(c.id);
+                        setHistoryLoading(true);
+                        fetch(`/api/campaigns/${c.id}/events`).then((r) => r.json()).then(setHistoryEvents).catch(() => setHistoryEvents([])).finally(() => setHistoryLoading(false));
+                      }} icon={<Clock className="h-3 w-3" />}>
+                        History
+                      </Button>
+                    )}
+                    {isOwner && (
                       <Button size="sm" variant="outline" onClick={() => { setDeleteTarget(c); setDeleteConfirmText(""); }} icon={<Trash2 className="h-3 w-3" />}
                         className="text-red-400 hover:text-red-300 hover:border-red-400/30">
                         Archive
@@ -704,6 +717,43 @@ export default function AdminCampaignsPage() {
             </div>
           );
         })()}
+      </Modal>
+
+      {/* Campaign History Modal */}
+      <Modal open={!!historyTarget} onClose={() => setHistoryTarget(null)} title="Campaign History" className="max-w-lg">
+        {historyLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-color)] border-t-accent" />
+          </div>
+        ) : historyEvents.length === 0 ? (
+          <p className="text-sm text-[var(--text-muted)] text-center py-6">No events recorded yet.</p>
+        ) : (
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+            {historyEvents.map((event: any) => {
+              const typeBg: Record<string, string> = {
+                BUDGET_CHANGE: "bg-accent/10 text-accent border-accent/20",
+                AUTO_PAUSED: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+                MANUAL_PAUSE: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+                AUTO_RESUMED: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                MANUAL_RESUME: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                ARCHIVED: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
+              };
+              const badge = typeBg[event.type] || "bg-accent/10 text-accent border-accent/20";
+              return (
+                <div key={event.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge}`}>
+                      {event.type.replace(/_/g, " ")}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-muted)] ml-auto">{formatRelative(event.createdAt)}</span>
+                  </div>
+                  <p className="text-sm text-[var(--text-primary)]">{event.description}</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{event.user?.username || "System"}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Modal>
     </div>
   );

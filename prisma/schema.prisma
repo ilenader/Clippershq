@@ -213,6 +213,7 @@ model Campaign {
   trackingJobs     TrackingJob[]
   conversations    Conversation[]
   agencyEarnings   AgencyEarning[]
+  campaignEvents   CampaignEvent[]
 
   @@index([status])
   @@index([isArchived])
@@ -603,6 +604,23 @@ model Notification {
   @@index([userId, isRead, createdAt])
   @@index([createdAt])
   @@map("notifications")
+}
+
+// ─── Campaign Events (budget history, status changes) ──────
+
+model CampaignEvent {
+  id          String   @id @default(cuid())
+  campaignId  String
+  type        String
+  description String   @db.Text
+  metadata    String?  @db.Text
+  userId      String?
+  createdAt   DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, createdAt])
+  @@map("campaign_events")
 }
 
 // ─── Gamification & Platform Config ─────────────────────────
