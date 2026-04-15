@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       }
 
       await checkNotifs();
-      const interval = setInterval(checkNotifs, 2000);
+      const interval = setInterval(checkNotifs, 10000);
 
       const heartbeat = setInterval(() => {
         if (closed) return;
