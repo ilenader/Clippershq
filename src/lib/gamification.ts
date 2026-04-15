@@ -180,9 +180,10 @@ export async function updateStreak(userId: string): Promise<void> {
   }
 
   const tz = user.timezone || null;
-  const now = new Date();
-  const today = new Date(now);
-  today.setUTCHours(0, 0, 0, 0);
+  // Use user's timezone for "today" to avoid UTC/local mismatch
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: tz || "UTC" });
+  const today = new Date(todayStr + "T00:00:00Z");
+  console.log(`[STREAK] User TZ: ${tz}, Today: ${todayStr}, Streak: ${user.currentStreak}`);
 
   // Latest evaluable day = yesterday (today isn't over yet)
   const latestEvaluable = addDays(today, -1);
@@ -190,8 +191,8 @@ export async function updateStreak(userId: string): Promise<void> {
   // Where to start evaluating from
   let evalStart: Date;
   if (user.lastActiveDate) {
-    const last = new Date(user.lastActiveDate);
-    last.setUTCHours(0, 0, 0, 0);
+    const lastStr = new Date(user.lastActiveDate).toLocaleDateString("en-CA", { timeZone: tz || "UTC" });
+    const last = new Date(lastStr + "T00:00:00Z");
     evalStart = addDays(last, 1); // day after last confirmed
   } else {
     // No streak history — start from 14 days ago max
@@ -237,7 +238,6 @@ export async function updateStreak(userId: string): Promise<void> {
 
   // Walk each day from evalStart to yesterday
   const cursor = new Date(evalStart);
-  cursor.setUTCHours(0, 0, 0, 0);
 
   while (cursor <= latestEvaluable) {
     const status = await evaluateDay(userId, cursor, tz);
@@ -303,8 +303,9 @@ export async function getStreakDayStatuses(userId: string, days: number = 60): P
   });
   const tz = user?.timezone || null;
 
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  // Use user's timezone for "today"
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: tz || "UTC" });
+  const today = new Date(todayStr + "T00:00:00Z");
 
   // Fetch all clips from the last N days in one query
   const cutoff = addDays(today, -(days - 1));

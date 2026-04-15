@@ -122,15 +122,3 @@ body {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
-@keyframes ripple {
-  from { transform: scale(0); opacity: 0.4; }
-  to { transform: scale(2.5); opacity: 0; }
-}
-.ripple-effect {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.35);
-  animation: ripple 500ms ease-out forwards;
-  pointer-events: none;
-}
