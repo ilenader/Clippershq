@@ -160,6 +160,8 @@ export default function ClipsPage() {
       // Await load so clips list is updated before success toast
       await load();
       toast.success("Your clip was submitted successfully.");
+      // Trigger PWA install popup after first clip submission
+      window.dispatchEvent(new CustomEvent("pwa:clip_submitted"));
     } catch (err: any) {
       toast.error(err.message || "Submission failed. Please try again or contact support.");
     }

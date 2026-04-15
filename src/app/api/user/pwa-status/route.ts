@@ -20,15 +20,27 @@ export async function GET() {
   return NextResponse.json({ isPWAUser: user?.isPWAUser ?? false });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
 
+  // Parse body — default to { installed: true } for backward compatibility
+  let installed = true;
+  try {
+    const body = await req.json();
+    if (body && typeof body.installed === "boolean") {
+      installed = body.installed;
+    }
+  } catch {
+    // No body or invalid JSON — default to install
+  }
+
   const current = await db.user.findUnique({ where: { id: session.user.id }, select: { isPWAUser: true } });
-  if (!current?.isPWAUser) {
+
+  if (installed && !current?.isPWAUser) {
     await db.user.update({
       where: { id: session.user.id },
       data: { isPWAUser: true },
@@ -40,7 +52,19 @@ export async function POST() {
     } catch (err: any) {
       console.error("[PWA] Earnings recalculation failed:", err?.message);
     }
+  } else if (!installed && current?.isPWAUser) {
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { isPWAUser: false },
+    });
+    // PWA bonus removed — recalculate earnings
+    try {
+      const { recalculateUnpaidEarnings } = await import("@/lib/gamification");
+      await recalculateUnpaidEarnings(session.user.id);
+    } catch (err: any) {
+      console.error("[PWA] Earnings recalculation failed:", err?.message);
+    }
   }
 
-  return NextResponse.json({ ok: true, isPWAUser: true });
+  return NextResponse.json({ ok: true, isPWAUser: installed });
 }

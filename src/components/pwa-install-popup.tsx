@@ -199,6 +199,15 @@ export function PWAInstallPopup() {
       const timer = setTimeout(() => setShow(true), 2000);
       return () => clearTimeout(timer);
     }
+
+    // Re-show after first clip submission if previously dismissed
+    const onClipSubmitted = () => {
+      if (!isPWA && !isInstalled && dismissCount > 0) {
+        setShow(true);
+      }
+    };
+    window.addEventListener("pwa:clip_submitted", onClipSubmitted);
+    return () => window.removeEventListener("pwa:clip_submitted", onClipSubmitted);
   }, [isPWA, isInstalled]);
 
   // On iOS/Firefox, show instructions right away since native prompt never works
