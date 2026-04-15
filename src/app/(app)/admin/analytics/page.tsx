@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { SimpleLineChart, SimpleMultiLineChart } from "@/components/ui/simple-chart";
 import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-select";
-import { TrendingUp, Eye, Users, Film, Megaphone, Heart, CheckCircle, Clock, DollarSign } from "lucide-react";
+import { TrendingUp, Eye, Users, Film, Megaphone, Heart, CheckCircle, Clock, DollarSign, Download } from "lucide-react";
+import { toast } from "@/lib/toast";
 import { formatNumber, formatCurrency } from "@/lib/utils";
 
 type MetricKey = "views" | "likes" | "comments" | "shares" | "earnings";
@@ -126,6 +127,38 @@ export default function AdminAnalyticsPage() {
   });
   const [leftChartMode, setLeftChartMode] = useState<"clips" | "earnings">("clips");
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [exportDropOpen, setExportDropOpen] = useState(false);
+  const exportDropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (exportDropRef.current && !exportDropRef.current.contains(e.target as Node)) setExportDropOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const exportData = async (url: string, filename: string) => {
+    setExporting(true);
+    setExportDropOpen(false);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Export failed"); }
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+      toast.success("Report downloaded!");
+    } catch (err: any) {
+      toast.error(err.message || "Export failed");
+    }
+    setExporting(false);
+  };
 
   useEffect(() => {
     Promise.all([
@@ -265,6 +298,43 @@ export default function AdminAnalyticsPage() {
                   {opt.label}
                 </button>
               ))}
+            </div>
+          )}
+        </div>
+        <div className="relative" ref={exportDropRef}>
+          <button
+            onClick={() => setExportDropOpen(!exportDropOpen)}
+            disabled={exporting}
+            className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Download className="h-4 w-4 text-accent" />
+            {exporting ? "Exporting..." : "Export"}
+          </button>
+          {exportDropOpen && (
+            <div className="absolute left-0 top-full z-50 mt-1 min-w-[240px] max-w-[min(320px,calc(100vw-2rem))] rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-elevated)]">
+              <button
+                onClick={() => exportData(`/api/admin/export?view=owner&type=clips&timeframe=${timeframeDays}`, `owner-report-${new Date().toISOString().split("T")[0]}.xlsx`)}
+                className="flex w-full items-center px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+              >
+                Owner Report — All Campaigns
+              </button>
+              {selectedCampaigns.length === 1 && (
+                <>
+                  <button
+                    onClick={() => exportData(`/api/admin/export?view=owner&type=clips&campaignId=${selectedCampaigns[0]}&timeframe=${timeframeDays}`, `owner-campaign-report-${new Date().toISOString().split("T")[0]}.xlsx`)}
+                    className="flex w-full items-center px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-input)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                  >
+                    Owner Report — Current Campaign
+                  </button>
+                  <div className="border-t border-[var(--border-subtle)] my-1" />
+                  <button
+                    onClick={() => exportData(`/api/admin/export?view=client&type=clips&campaignId=${selectedCampaigns[0]}&timeframe=${timeframeDays}`, `client-report-${new Date().toISOString().split("T")[0]}.xlsx`)}
+                    className="flex w-full items-center px-4 py-2.5 text-sm text-accent hover:bg-accent/5 transition-colors cursor-pointer"
+                  >
+                    Client Report
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

@@ -14,7 +14,7 @@ import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
 import { CampaignImage } from "@/components/ui/campaign-image";
-import { Plus, Megaphone, Mail, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit, ChevronDown } from "lucide-react";
+import { Plus, Megaphone, Mail, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit, ChevronDown, Download } from "lucide-react";
 import { formatRelative } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 
@@ -51,6 +51,7 @@ export default function AdminCampaignsPage() {
 
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -307,6 +308,26 @@ export default function AdminCampaignsPage() {
     }
   };
 
+  const exportClientReport = async (campaignId: string) => {
+    setExportingId(campaignId);
+    try {
+      const res = await fetch(`/api/admin/export?view=client&type=clips&campaignId=${campaignId}`);
+      if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Export failed"); }
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `client-report-${new Date().toISOString().split("T")[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+      toast.success("Client report downloaded!");
+    } catch (err: any) {
+      toast.error(err.message || "Export failed");
+    }
+    setExportingId(null);
+  };
+
   const updateField = (field: string, value: string) => setForm({ ...form, [field]: value });
   const addRequirement = () => setForm({ ...form, requirementsList: [...form.requirementsList, ""] });
   const removeRequirement = (idx: number) => {
@@ -484,6 +505,11 @@ export default function AdminCampaignsPage() {
                     {isOwner && c.status === "ACTIVE" && (
                       <Button size="sm" variant="outline" onClick={() => { setNotifyTarget(c); setNotifyConfirmText(""); }} icon={<Mail className="h-3 w-3" />}>
                         Notify
+                      </Button>
+                    )}
+                    {isOwner && (
+                      <Button size="sm" variant="outline" loading={exportingId === c.id} onClick={() => exportClientReport(c.id)} icon={<Download className="h-3 w-3" />}>
+                        Export
                       </Button>
                     )}
                     {isOwner && (
