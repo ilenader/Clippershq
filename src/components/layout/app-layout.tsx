@@ -24,10 +24,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Close mobile nav on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-  // Sync PWA status with backend (once per session)
+  // Sync PWA status with backend (at most once per hour)
   useEffect(() => {
-    if (isPWA && !sessionStorage.getItem("pwa_synced")) {
-      sessionStorage.setItem("pwa_synced", "1");
+    const lastSync = localStorage.getItem("pwa_last_sync");
+    const oneHour = 60 * 60 * 1000;
+    if (isPWA && (!lastSync || Date.now() - parseInt(lastSync) > oneHour)) {
+      localStorage.setItem("pwa_last_sync", Date.now().toString());
       localStorage.setItem("pwa_installed", "true");
       fetch("/api/user/pwa-status", { method: "POST" }).catch(() => {});
     }
