@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Wallet, Check, X, Eye, Phone, Ban, ChevronDown, MessageCircle, DollarSign, Mail, Bell } from "lucide-react";
+import { Wallet, Check, X, Eye, Phone, Ban, ChevronDown, MessageCircle, DollarSign, Mail, Bell, Clock } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative, formatCurrency } from "@/lib/utils";
 
@@ -418,13 +418,13 @@ export default function AdminPayoutsPage() {
                     {(() => {
                       const call = getCallForPayout(payout.id);
                       if (call) {
-                        if (call.status === "PENDING") return <p className="text-xs text-yellow-400">⏳ Waiting for clipper to pick time</p>;
+                        if (call.status === "PENDING") return <p className="text-xs text-yellow-400"><Clock className="h-3.5 w-3.5 text-amber-400 inline-block -mt-0.5 mr-1" />Waiting for clipper to pick time</p>;
                         if (call.status === "CONFIRMED") {
                           const dt = call.scheduledAt ? new Date(call.scheduledAt).toLocaleString("en-US", { timeZone: "Europe/Belgrade", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "TBD";
-                          return <p className="text-xs text-accent">📞 Call: {dt} — {call.discordUsername}</p>;
+                          return <p className="text-xs text-accent"><Phone className="h-3.5 w-3.5 text-accent inline-block -mt-0.5 mr-1" />Call: {dt} — {call.discordUsername}</p>;
                         }
-                        if (call.status === "COMPLETED") return <p className="text-xs text-emerald-400">✅ Call completed</p>;
-                        if (call.status === "MISSED") return <p className="text-xs text-red-400">❌ Clipper missed the call</p>;
+                        if (call.status === "COMPLETED") return <p className="text-xs text-emerald-400"><Check className="h-3.5 w-3.5 text-emerald-400 inline-block -mt-0.5 mr-1" />Call completed</p>;
+                        if (call.status === "MISSED") return <p className="text-xs text-red-400"><X className="h-3.5 w-3.5 text-red-400 inline-block -mt-0.5 mr-1" />Clipper missed the call</p>;
                       }
                       if (payout.status === "REQUESTED" || payout.status === "UNDER_REVIEW") {
                         return (

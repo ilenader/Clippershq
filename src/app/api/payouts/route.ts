@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
         campaign: { select: { name: true, platform: true } },
       },
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
 
     // Enrich each payout with campaignAvailable for owner review
@@ -55,6 +56,7 @@ export async function GET(req: NextRequest) {
               status: { in: ["PAID", "REQUESTED", "UNDER_REVIEW", "APPROVED"] },
             },
             select: { amount: true },
+            take: 500,
           }),
         ]);
 
