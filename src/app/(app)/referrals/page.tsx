@@ -71,7 +71,6 @@ export default function ReferralsPage() {
         </div>
         <p className="text-sm text-[var(--text-secondary)] mb-4">
           Share your link. Earn <strong className="text-accent">5%</strong> of every referred user's approved earnings, forever.
-          Referred users also get a reduced platform fee (<strong className="text-accent">4%</strong> instead of 9%).
         </p>
         {ref?.referralCode && (
           <div className="flex items-center gap-2 mb-5">
