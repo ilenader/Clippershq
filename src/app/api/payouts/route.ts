@@ -51,6 +51,7 @@ export async function GET(req: NextRequest) {
             where: {
               userId: payout.userId,
               campaignId: payout.campaignId,
+              id: { not: payout.id },
               status: { in: ["PAID", "REQUESTED", "UNDER_REVIEW", "APPROVED"] },
             },
             select: { amount: true },
