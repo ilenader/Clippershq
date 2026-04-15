@@ -115,13 +115,16 @@ export default function AdminPayoutsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, rejectionReason: reason }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Action failed");
+      }
       toast.success(`Payout ${action.toLowerCase().replace("_", " ")}.`);
       setRejectModal(null);
       setRejectReason("");
       load();
-    } catch {
-      toast.error("Action failed.");
+    } catch (err: any) {
+      toast.error(err.message || "Action failed");
     }
     setActing(false);
   };
@@ -154,10 +157,13 @@ export default function AdminPayoutsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "VOIDED", rejectionReason: "Voided by owner" }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to void payout");
+      }
       toast.success("Payout voided. Balance recalculated.");
       load();
-    } catch { toast.error("Failed to void payout."); }
+    } catch (err: any) { toast.error(err.message || "Failed to void payout"); }
     setActing(false);
   };
 
@@ -368,6 +374,9 @@ export default function AdminPayoutsPage() {
                         {payout.feeAmount > 0 && <span className="text-red-400"> -{formatCurrency(payout.feeAmount)}</span>}
                         {payout.bonusAmount > 0 && <span className="text-emerald-400"> +{formatCurrency(payout.bonusAmount)}</span>}
                       </p>
+                    )}
+                    {payout.campaignAvailable != null && payout.amount > payout.campaignAvailable && payout.status !== "PAID" && payout.status !== "REJECTED" && payout.status !== "VOIDED" && (
+                      <p className="text-xs text-amber-400 mt-0.5">Campaign balance may be insufficient</p>
                     )}
                   </div>
                 </TableCell>
