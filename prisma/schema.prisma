@@ -86,6 +86,7 @@ model User {
   referredById  String?
   manualBonusOverride Float?
   isPWAUser     Boolean    @default(false)
+  lastPWAOpenAt DateTime?
   timezone      String?
   streakRestoredAt DateTime?
   createdAt     DateTime   @default(now())

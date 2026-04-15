@@ -43,7 +43,7 @@ export async function POST(req: Request) {
   if (installed && !current?.isPWAUser) {
     await db.user.update({
       where: { id: session.user.id },
-      data: { isPWAUser: true },
+      data: { isPWAUser: true, lastPWAOpenAt: new Date() },
     });
     // PWA bonus changed — recalculate earnings
     try {
@@ -52,6 +52,12 @@ export async function POST(req: Request) {
     } catch (err: any) {
       console.error("[PWA] Earnings recalculation failed:", err?.message);
     }
+  } else if (installed && current?.isPWAUser) {
+    // Already a PWA user — just refresh lastPWAOpenAt
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { lastPWAOpenAt: new Date() },
+    });
   } else if (!installed && current?.isPWAUser) {
     await db.user.update({
       where: { id: session.user.id },

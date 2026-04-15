@@ -24,9 +24,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Close mobile nav on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-  // Sync PWA status with backend
+  // Sync PWA status with backend (once per session)
   useEffect(() => {
-    if (isPWA) {
+    if (isPWA && !sessionStorage.getItem("pwa_synced")) {
+      sessionStorage.setItem("pwa_synced", "1");
       localStorage.setItem("pwa_installed", "true");
       fetch("/api/user/pwa-status", { method: "POST" }).catch(() => {});
     }

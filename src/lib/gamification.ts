@@ -400,10 +400,29 @@ export async function getGamificationState(userId: string): Promise<Gamification
     select: {
       totalEarnings: true, totalViews: true, level: true,
       bonusPercentage: true, currentStreak: true, longestStreak: true,
-      referredById: true, isPWAUser: true,
+      referredById: true, isPWAUser: true, lastPWAOpenAt: true,
     },
   });
   if (!user) return null;
+
+  // PWA 14-day expiry check
+  if (user.isPWAUser && user.lastPWAOpenAt) {
+    const daysSinceLastOpen = (Date.now() - new Date(user.lastPWAOpenAt).getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceLastOpen > 14) {
+      console.log(`[PWA] User ${userId} lost PWA bonus — no standalone access in 14 days`);
+      await db.user.update({
+        where: { id: userId },
+        data: { isPWAUser: false },
+      });
+      user.isPWAUser = false;
+      try {
+        await recalculateUnpaidEarnings(userId);
+      } catch (err: any) {
+        console.error("[PWA] Earnings recalculation failed:", err?.message);
+      }
+    }
+  }
+  // If isPWAUser but lastPWAOpenAt is null — existing user, give benefit of the doubt
 
   // Run streak evaluation (handles 48h grace)
   await updateStreak(userId);
