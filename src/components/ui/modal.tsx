@@ -42,7 +42,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
         className={cn(
           "w-full max-w-lg rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6",
           "shadow-[var(--shadow-elevated)]",
-          "max-h-[90vh] overflow-y-auto",
+          "max-h-[85vh] overflow-y-auto pb-[env(safe-area-inset-bottom,0.5rem)]",
           className
         )}
       >
