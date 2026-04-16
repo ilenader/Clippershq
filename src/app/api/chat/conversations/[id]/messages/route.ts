@@ -193,7 +193,7 @@ export async function POST(
       try {
         await db.conversation.update({
           where: { id: conversationId },
-          data: { needsHumanSupport: true },
+          data: { needsHumanSupport: true, lastHumanEmailSentAt: null },
         });
         const { createNotification } = await import("@/lib/notifications");
 
@@ -305,7 +305,7 @@ export async function POST(
                 const recentAI = history.filter((m: any) => m.senderId === responderId).slice(0, 3).map((m: any) => m.content);
                 recentAI.push(replyContent);
                 if (shouldTransferToAgent(recentAI)) {
-                  await db.conversation.update({ where: { id: conversationId }, data: { needsHumanSupport: true } });
+                  await db.conversation.update({ where: { id: conversationId }, data: { needsHumanSupport: true, lastHumanEmailSentAt: null } });
                   // Notify owners
                   const { createNotification } = await import("@/lib/notifications");
                   const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true } });
