@@ -130,6 +130,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // CLIENTs have no personal referral program
+  if (role === "CLIENT") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   // Default: personal referral data
   const [code, stats] = await Promise.all([
     ensureReferralCode(session.user.id),

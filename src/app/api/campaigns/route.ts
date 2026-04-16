@@ -16,6 +16,12 @@ export async function GET(req: NextRequest) {
   if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
+
+  // CLIENTs must use /api/client/campaigns — this route returns sensitive fields (ownerCpm, agencyFee, aiKnowledge)
+  if (role === "CLIENT") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const status = req.nextUrl.searchParams.get("status") || undefined;
   const scope = req.nextUrl.searchParams.get("scope");
   // ?archived=true → owner-only: show only archived campaigns

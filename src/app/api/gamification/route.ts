@@ -40,6 +40,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json([]);
   }
 
+  // CLIENTs have no gamification state
+  if (role === "CLIENT") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   // Role isolation: ADMIN and OWNER do not have personal gamification
   if (role === "ADMIN" || role === "OWNER") {
     return NextResponse.json({ bonusPercent: 0, levelBonus: 0, streakBonusPercent: 0, pwaBonusPercent: 0, level: 0, currentStreak: 0, longestStreak: 0 });

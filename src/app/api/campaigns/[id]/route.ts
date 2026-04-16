@@ -22,10 +22,15 @@ export async function GET(
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   try {
+    const role = (session.user as any).role;
+
+    // CLIENTs must use /api/client/campaigns/[id] — this route returns sensitive fields
+    if (role === "CLIENT") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const campaign = await db.campaign.findUnique({ where: { id } });
     if (!campaign) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-    const role = (session.user as any).role;
 
     // CLIPPERs cannot see DRAFT campaigns
     if (role === "CLIPPER" && campaign.status === "DRAFT") {

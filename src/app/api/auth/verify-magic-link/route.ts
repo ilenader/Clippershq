@@ -15,11 +15,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(new URL("/login?error=invalid-link", req.url));
     }
 
-    // Mark token as used
-    await db.magicLinkToken.update({ where: { id: record.id }, data: { used: true } });
+    // Atomic token consumption: only one concurrent verify can mark it used
+    const claimed = await db.magicLinkToken.updateMany({
+      where: { token, used: false, expiresAt: { gt: new Date() } },
+      data: { used: true },
+    });
+    if (claimed.count === 0) {
+      return NextResponse.redirect(new URL("/login?error=invalid-link", req.url));
+    }
 
-    // Find or create user
+    // Find or create user — magic links only mint sessions for CLIENT role
     let user = await db.user.findUnique({ where: { email: record.email } });
+    if (user && user.role !== "CLIENT") {
+      // Refuse to authenticate clippers/admins/owners via magic link
+      return NextResponse.redirect(new URL("/login?error=invalid-link", req.url));
+    }
     if (!user) {
       user = await db.user.create({
         data: {
@@ -30,9 +40,6 @@ export async function GET(req: NextRequest) {
           status: "ACTIVE",
         },
       });
-    } else if (user.role !== "CLIENT") {
-      // User exists with different role — don't change it
-      // They can still access client pages if they have campaign assignments
     }
 
     // Create a session by setting a cookie that the auth system will pick up

@@ -24,7 +24,7 @@ export async function POST() {
   console.log("[FIX-EARNINGS] Starting migration...");
 
   const clips = await db.clip.findMany({
-    where: { status: "APPROVED", isDeleted: false },
+    where: { status: "APPROVED", isDeleted: false, videoUnavailable: false },
     include: {
       stats: { orderBy: { checkedAt: "desc" }, take: 1 },
       campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true } },
@@ -83,7 +83,7 @@ export async function POST() {
   let agencyNewTotal = 0;
   let agencyUpdated = 0;
   try {
-    const allAgency = await db.agencyEarning.findMany({ include: { clip: { include: { stats: { orderBy: { checkedAt: "desc" }, take: 1 }, campaign: { select: { clipperCpm: true, cpmRate: true, ownerCpm: true, maxPayoutPerClip: true, minViews: true, pricingModel: true } } } } } });
+    const allAgency = await db.agencyEarning.findMany({ where: { clip: { videoUnavailable: false } }, include: { clip: { include: { stats: { orderBy: { checkedAt: "desc" }, take: 1 }, campaign: { select: { clipperCpm: true, cpmRate: true, ownerCpm: true, maxPayoutPerClip: true, minViews: true, pricingModel: true } } } } } });
     for (const ae of allAgency) {
       agencyOldTotal += ae.amount || 0;
       if (ae.clip?.stats?.[0] && ae.clip?.campaign) {
@@ -112,7 +112,7 @@ export async function POST() {
 
   for (const user of users) {
     const userClips = await db.clip.findMany({
-      where: { userId: user.id, status: "APPROVED", isDeleted: false },
+      where: { userId: user.id, status: "APPROVED", isDeleted: false, videoUnavailable: false },
       select: { earnings: true },
     });
     const total = userClips.reduce((s: number, c: any) => s + (c.earnings || 0), 0);
@@ -133,7 +133,7 @@ export async function POST() {
     for (const campaign of campaigns) {
       // Sum clipper earnings
       const clipperAgg = await db.clip.aggregate({
-        where: { campaignId: campaign.id, status: "APPROVED", isDeleted: false },
+        where: { campaignId: campaign.id, status: "APPROVED", isDeleted: false, videoUnavailable: false },
         _sum: { earnings: true },
       });
       let totalSpent = clipperAgg._sum.earnings ?? 0;
@@ -154,7 +154,7 @@ export async function POST() {
 
       // Get clips ordered by approval date (newest first) — scale down newest clips first
       const campaignClips = await db.clip.findMany({
-        where: { campaignId: campaign.id, status: "APPROVED", isDeleted: false },
+        where: { campaignId: campaign.id, status: "APPROVED", isDeleted: false, videoUnavailable: false },
         orderBy: { reviewedAt: "desc" },
         select: { id: true, earnings: true },
       });

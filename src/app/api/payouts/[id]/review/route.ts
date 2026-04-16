@@ -46,6 +46,19 @@ export async function POST(
     const existing = await db.payoutRequest.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "Payout not found" }, { status: 404 });
 
+    // State machine: PAID and REJECTED are terminal
+    const validTransitions: Record<string, string[]> = {
+      REQUESTED: ["UNDER_REVIEW", "APPROVED", "REJECTED"],
+      UNDER_REVIEW: ["APPROVED", "REJECTED"],
+      APPROVED: ["PAID", "REJECTED"],
+    };
+    if (!validTransitions[existing.status]?.includes(action)) {
+      return NextResponse.json(
+        { error: `Cannot change payout from ${existing.status} to ${action}` },
+        { status: 400 },
+      );
+    }
+
     // Validate campaign balance before marking as PAID
     if (action === "PAID" && existing.campaignId) {
       const campaignClips = await db.clip.findMany({

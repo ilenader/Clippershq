@@ -14,11 +14,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
     }
 
-    // Rate limit: 3 per email per hour
+    // Rate limit: 3 per email per hour (in-memory, per serverless instance)
     const { checkRateLimit } = await import("@/lib/rate-limit");
     const rl = checkRateLimit(`magic-link:${email}`, 3, 60 * 60_000);
     if (!rl.allowed) {
       // Always return success to not reveal if email exists
+      return NextResponse.json({ success: true });
+    }
+
+    // DB-level rate limit: 3 magic-link tokens per email per hour (cross-instance safety)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentTokens = await db.magicLinkToken.count({
+      where: { email, createdAt: { gt: oneHourAgo } },
+    });
+    if (recentTokens >= 3) {
       return NextResponse.json({ success: true });
     }
 

@@ -52,7 +52,7 @@ export async function POST() {
 
     // Get all APPROVED clips ordered by creation date (earliest first get priority)
     const clips = await db.clip.findMany({
-      where: { campaignId: campaign.id, status: "APPROVED", isDeleted: false },
+      where: { campaignId: campaign.id, status: "APPROVED", isDeleted: false, videoUnavailable: false },
       orderBy: { createdAt: "asc" },
       select: { id: true, earnings: true, baseEarnings: true, bonusAmount: true, userId: true },
     });
@@ -138,7 +138,7 @@ export async function POST() {
     const usersUpdated: string[] = [];
     for (const userId of affectedUsers) {
       const earningsAgg = await db.clip.aggregate({
-        where: { userId, status: "APPROVED", isDeleted: false },
+        where: { userId, status: "APPROVED", isDeleted: false, videoUnavailable: false },
         _sum: { earnings: true },
       });
       const newTotal = Math.round((earningsAgg._sum.earnings ?? 0) * 100) / 100;
@@ -195,7 +195,7 @@ export async function POST() {
       // Skip if already resumed in the second pass
       if (report.some((r: any) => r.campaignId === pc.id)) continue;
       const eAgg = await db.clip.aggregate({
-        where: { campaignId: pc.id, isDeleted: false, status: "APPROVED" },
+        where: { campaignId: pc.id, isDeleted: false, status: "APPROVED", videoUnavailable: false },
         _sum: { earnings: true },
       });
       let spent = Math.round((eAgg._sum.earnings ?? 0) * 100) / 100;

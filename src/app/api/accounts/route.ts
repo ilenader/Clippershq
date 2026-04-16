@@ -53,6 +53,12 @@ export async function POST(req: NextRequest) {
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
 
+  // Only clippers can add accounts
+  const role = (session.user as any).role;
+  if (role === "CLIENT") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   // Rate limit: 5 account creations per hour per user
   const rl = checkRateLimit(`account-add:${session.user.id}`, 5, 3_600_000);
   if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
