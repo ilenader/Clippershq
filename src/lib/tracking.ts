@@ -12,7 +12,7 @@
  */
 
 import { db } from "@/lib/db";
-import { fetchClipStats } from "@/lib/apify";
+import { fetchClipStats, fetchClipStatsBatch, detectPlatform } from "@/lib/apify";
 import { recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
 import { computeFraudLevel } from "@/lib/fraud";
 import { broadcastToUser } from "@/lib/sse-broadcast";
@@ -184,6 +184,7 @@ async function processTrackingJob(
   job: any,
   source: string,
   details: string[],
+  prefetchedStats?: { views: number; likes: number; comments: number; shares: number } | null,
 ): Promise<{ success: boolean; detail?: string; error?: string }> {
   const clip = job.clip;
   try {
@@ -196,8 +197,19 @@ async function processTrackingJob(
 
     console.log(`[TRACKING] Processing clip ${clip.id} (${clip.clipUrl})`);
 
-    // Fetch real stats from Apify
-    const stats = await fetchClipStats(clip.clipUrl);
+    // If batch returned no data for this clip: skip, retry next cron (don't flag unavailable)
+    if (prefetchedStats === null) {
+      await db.trackingJob.update({
+        where: { id: job.id },
+        data: { nextCheckAt: new Date(Date.now() + 30 * 60 * 1000), lastCheckedAt: new Date() },
+      }).catch(() => {});
+      console.log(`[TRACKING] Clip ${clip.id}: no batch stats, retry in 30min`);
+      details.push(`Clip ${clip.id}: batch missing, retry next cron`);
+      return { success: true, detail: "batch-missing" };
+    }
+
+    // Use prefetched stats when available; else fall back to individual fetch (manual single-clip path)
+    const stats = prefetchedStats ?? await fetchClipStats(clip.clipUrl);
 
     // Get previous snapshot for growth calculation
     const prevStat = await db.clipStat.findFirst({
@@ -652,13 +664,33 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           let campaignProcessed = 0;
           let campaignErrors = 0;
 
+          // Batch-fetch stats for ALL clips in this campaign in as few Apify calls as possible
+          // (one per platform). Each job gets stats via the Map; individual fallback if batch fails.
+          let prefetchedStats = new Map<string, { views: number; likes: number; comments: number; shares: number } | null>();
+          try {
+            const batchInput = jobs
+              .filter((j: any) => j.clip?.clipUrl)
+              .map((j: any) => ({
+                url: j.clip.clipUrl,
+                platform: detectPlatform(j.clip.clipUrl) || "unknown",
+                clipId: j.clipId,
+              }));
+            prefetchedStats = await fetchClipStatsBatch(batchInput);
+          } catch (batchErr: any) {
+            console.error(`[TRACKING] fetchClipStatsBatch threw for campaign ${cId}:`, batchErr?.message);
+            // Empty map → processTrackingJob falls back to individual fetchClipStats for each clip
+          }
+
           // Parallel batches for both cron and manual
           // Budget is protected by Serializable transactions that retry on conflict
           for (let b = 0; b < jobs.length; b += CLIP_BATCH_SIZE) {
             if (Date.now() - startTime > 250000) break;
             const batch = jobs.slice(b, b + CLIP_BATCH_SIZE);
             const batchResults = await Promise.allSettled(
-              batch.map((job: any) => processTrackingJob(job, source, details))
+              batch.map((job: any) => {
+                const stats = prefetchedStats.has(job.clipId) ? prefetchedStats.get(job.clipId) : undefined;
+                return processTrackingJob(job, source, details, stats);
+              }),
             );
             for (const r of batchResults) {
               if (r.status === "fulfilled" && r.value.success) campaignProcessed++;

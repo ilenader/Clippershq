@@ -181,6 +181,201 @@ async function fetchInstagramStats(postUrl: string): Promise<ClipStats> {
   return stats;
 }
 
+export interface ClipStatsSlim {
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+}
+
+/** Normalize URL for matching actor output to input URLs */
+function normalizeUrlForMatch(url: string): string {
+  return String(url || "")
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .split("?")[0]
+    .split("#")[0]
+    .replace(/\/$/, "")
+    .trim();
+}
+
+/** Fetch stats for many TikTok URLs in a single Apify actor call. */
+async function fetchTikTokStatsBatch(urls: string[]): Promise<Map<string, ClipStatsSlim>> {
+  if (urls.length === 0) return new Map();
+  const apiKey = getApiKey();
+  const actor = getTikTokActor();
+  const runUrl = `${APIFY_BASE}/acts/${encodeActorName(actor)}/run-sync-get-dataset-items?token=${apiKey}`;
+
+  // Scale timeout with batch size (3s/URL + 30s buffer, clamped 60s-600s)
+  const timeoutMs = Math.max(60_000, Math.min(600_000, urls.length * 3_000 + 30_000));
+
+  const res = await fetch(runUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      postURLs: urls,
+      resultsPerPage: 1,
+      shouldDownloadVideos: false,
+      shouldDownloadCovers: false,
+      shouldDownloadSubtitles: false,
+      shouldDownloadSlideshowImages: false,
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`TikTok batch Apify request failed (${res.status}): ${text.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const resultMap = new Map<string, ClipStatsSlim>();
+  if (!Array.isArray(data)) return resultMap;
+
+  for (const item of data) {
+    if (!item || (item.error && !item.playCount)) continue;
+    const stats: ClipStatsSlim = {
+      views: item.playCount ?? 0,
+      likes: item.diggCount ?? 0,
+      comments: item.commentCount ?? 0,
+      shares: item.shareCount ?? 0,
+    };
+    // Match by any URL-like field the actor returns
+    const candidates = [item.webVideoUrl, item.url, item.inputUrl, item.postUrl].filter(Boolean);
+    for (const u of candidates) resultMap.set(normalizeUrlForMatch(u), stats);
+  }
+  return resultMap;
+}
+
+/** Fetch stats for many Instagram URLs in a single Apify actor call. */
+async function fetchInstagramStatsBatch(urls: string[]): Promise<Map<string, ClipStatsSlim>> {
+  if (urls.length === 0) return new Map();
+  const apiKey = getApiKey();
+  const actor = getInstagramActor();
+  const runUrl = `${APIFY_BASE}/acts/${encodeActorName(actor)}/run-sync-get-dataset-items?token=${apiKey}`;
+
+  const timeoutMs = Math.max(60_000, Math.min(600_000, urls.length * 3_000 + 30_000));
+
+  const res = await fetch(runUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: urls,
+      resultsLimit: urls.length,
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Instagram batch Apify request failed (${res.status}): ${text.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const resultMap = new Map<string, ClipStatsSlim>();
+  if (!Array.isArray(data)) return resultMap;
+
+  for (const item of data) {
+    if (!item || item.error) continue;
+    const stats: ClipStatsSlim = {
+      views: item.videoPlayCount ?? item.videoViewCount ?? item.playCount ?? item.viewCount ?? 0,
+      likes: item.likesCount ?? item.likes ?? 0,
+      comments: item.commentsCount ?? item.comments ?? 0,
+      shares: 0,
+    };
+    const candidates = [item.url, item.inputUrl, item.postUrl].filter(Boolean);
+    for (const u of candidates) resultMap.set(normalizeUrlForMatch(u), stats);
+  }
+  return resultMap;
+}
+
+/**
+ * Fetch stats for many clips in as few Apify calls as possible.
+ * TikTok and Instagram clips are each sent in ONE actor call.
+ * YouTube clips go through the existing per-clip direct API.
+ *
+ * Returns a Map keyed by clipId. Missing URLs (actor returned no data) map to null.
+ * If a batch request fails entirely, that platform's clips fall back to individual fetches.
+ */
+export async function fetchClipStatsBatch(
+  clips: { url: string; platform: string; clipId: string }[],
+): Promise<Map<string, ClipStatsSlim | null>> {
+  const result = new Map<string, ClipStatsSlim | null>();
+  const tiktokClips = clips.filter((c) => c.platform === "tiktok");
+  const instagramClips = clips.filter((c) => c.platform === "instagram");
+  const youtubeClips = clips.filter((c) => c.platform === "youtube");
+  const unknownClips = clips.filter((c) => !["tiktok", "instagram", "youtube"].includes(c.platform));
+
+  for (const c of unknownClips) result.set(c.clipId, null);
+
+  // TikTok batch
+  if (tiktokClips.length > 0) {
+    const t0 = Date.now();
+    try {
+      const statsMap = await fetchTikTokStatsBatch(tiktokClips.map((c) => c.url));
+      let hits = 0;
+      for (const c of tiktokClips) {
+        const s = statsMap.get(normalizeUrlForMatch(c.url));
+        if (s) { result.set(c.clipId, s); hits++; } else { result.set(c.clipId, null); }
+      }
+      console.log(`[TRACKING] Batch: fetched ${hits}/${tiktokClips.length} clips for tiktok in ${Date.now() - t0}ms`);
+    } catch (err: any) {
+      console.error(`[APIFY-BATCH] TikTok batch failed, falling back to individual fetches:`, err?.message);
+      await Promise.allSettled(tiktokClips.map(async (c) => {
+        try {
+          const s = await fetchClipStats(c.url);
+          result.set(c.clipId, { views: s.views, likes: s.likes, comments: s.comments, shares: s.shares });
+        } catch {
+          result.set(c.clipId, null);
+        }
+      }));
+    }
+  }
+
+  // Instagram batch
+  if (instagramClips.length > 0) {
+    const t0 = Date.now();
+    try {
+      const statsMap = await fetchInstagramStatsBatch(instagramClips.map((c) => c.url));
+      let hits = 0;
+      for (const c of instagramClips) {
+        const s = statsMap.get(normalizeUrlForMatch(c.url));
+        if (s) { result.set(c.clipId, s); hits++; } else { result.set(c.clipId, null); }
+      }
+      console.log(`[TRACKING] Batch: fetched ${hits}/${instagramClips.length} clips for instagram in ${Date.now() - t0}ms`);
+    } catch (err: any) {
+      console.error(`[APIFY-BATCH] Instagram batch failed, falling back to individual fetches:`, err?.message);
+      await Promise.allSettled(instagramClips.map(async (c) => {
+        try {
+          const s = await fetchClipStats(c.url);
+          result.set(c.clipId, { views: s.views, likes: s.likes, comments: s.comments, shares: s.shares });
+        } catch {
+          result.set(c.clipId, null);
+        }
+      }));
+    }
+  }
+
+  // YouTube — direct API, per clip (unchanged)
+  if (youtubeClips.length > 0) {
+    const t0 = Date.now();
+    let hits = 0;
+    await Promise.allSettled(youtubeClips.map(async (c) => {
+      try {
+        const s = await fetchClipStats(c.url);
+        result.set(c.clipId, { views: s.views, likes: s.likes, comments: s.comments, shares: s.shares });
+        hits++;
+      } catch {
+        result.set(c.clipId, null);
+      }
+    }));
+    console.log(`[TRACKING] Batch: fetched ${hits}/${youtubeClips.length} clips for youtube in ${Date.now() - t0}ms`);
+  }
+
+  return result;
+}
+
 /**
  * Main function: fetch clip stats by URL.
  * Detects platform automatically.
