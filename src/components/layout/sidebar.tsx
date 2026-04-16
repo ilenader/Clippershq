@@ -41,6 +41,15 @@ interface NavSection {
   items: NavItem[];
 }
 
+const clientNav: NavSection[] = [
+  {
+    items: [
+      { label: "Dashboard", href: "/client", icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
+      { label: "Campaigns", href: "/client/campaigns", icon: <Megaphone className="h-[18px] w-[18px]" /> },
+    ],
+  },
+];
+
 const clipperNav: NavSection[] = [
   {
     items: [
@@ -100,7 +109,7 @@ const ownerExtraNav: NavSection = {
 };
 
 interface SidebarProps {
-  role: "CLIPPER" | "ADMIN" | "OWNER";
+  role: "CLIPPER" | "ADMIN" | "OWNER" | "CLIENT";
 }
 
 export function Sidebar({ role }: SidebarProps) {
@@ -108,8 +117,9 @@ export function Sidebar({ role }: SidebarProps) {
   const { isInstalled, hasNativePrompt, triggerNativeInstall } = useInstallPrompt();
   const [showInstallModal, setShowInstallModal] = useState(false);
   const isAdmin = role === "ADMIN" || role === "OWNER";
+  const isClient = role === "CLIENT";
 
-  let sections = isAdmin ? [...adminNav] : clipperNav;
+  let sections = isClient ? clientNav : isAdmin ? [...adminNav] : clipperNav;
   if (role === "OWNER") {
     sections = [...sections, ownerManageNav, ownerExtraNav];
   }
@@ -173,7 +183,7 @@ export function Sidebar({ role }: SidebarProps) {
 
       {/* Bottom */}
       <div className="border-t border-[var(--border-color)] px-4 py-4 space-y-1">
-        {role !== "OWNER" && (
+        {role !== "OWNER" && role !== "CLIENT" && (
           <a
             href="https://discord.gg/7TpufG6ak6"
             target="_blank"
@@ -184,7 +194,7 @@ export function Sidebar({ role }: SidebarProps) {
             Join our Discord
           </a>
         )}
-        {!isInstalled && role !== "OWNER" && (
+        {!isInstalled && role !== "OWNER" && role !== "CLIENT" && (
           <button
             onClick={async () => {
               if (hasNativePrompt) {

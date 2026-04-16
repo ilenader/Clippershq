@@ -282,3 +282,17 @@ export async function sendConsecutiveRejectionWarning(email: string, rejectionCo
     `),
   });
 }
+
+export async function sendClientInviteEmail(email: string, link: string): Promise<boolean> {
+  return sendEmail({
+    to: email,
+    subject: "You're invited to view your campaign on Clippers HQ",
+    html: wrap(`
+      <p style="font-size: 18px; font-weight: bold; margin: 0 0 16px; color: #2596be;">You've been invited</p>
+      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">You've been invited to view your campaign performance on Clippers HQ.</p>
+      <p style="font-size: 14px; color: #a1a1aa; margin: 0 0 24px;">Click the button below to access your dashboard. This link expires in 24 hours.</p>
+      ${emailButton("Access Dashboard", link)}
+      <p style="font-size: 12px; color: #71717a; margin: 24px 0 0;">If you didn't expect this email, you can safely ignore it.</p>
+    `),
+  });
+}

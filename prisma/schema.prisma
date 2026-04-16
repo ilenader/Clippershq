@@ -55,6 +55,7 @@ enum UserRole {
   CLIPPER
   ADMIN
   OWNER
+  CLIENT
 }
 
 enum UserStatus {
@@ -110,6 +111,7 @@ model User {
   messagesSent     Message[]
   notifications    Notification[]
   scheduledCalls   ScheduledCall[]
+  campaignClients  CampaignClient[]
 
   @@index([role])
   @@map("users")
@@ -215,6 +217,7 @@ model Campaign {
   conversations    Conversation[]
   agencyEarnings   AgencyEarning[]
   campaignEvents   CampaignEvent[]
+  campaignClients  CampaignClient[]
 
   @@index([status])
   @@index([isArchived])
@@ -632,4 +635,35 @@ model GamificationConfig {
   value     String @db.Text // JSON config
 
   @@map("gamification_config")
+}
+
+// ─── Client Access ──────────────────────────────────────────
+
+model CampaignClient {
+  id         String   @id @default(cuid())
+  userId     String
+  campaignId String
+  addedAt    DateTime @default(now())
+  addedById  String?
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, campaignId])
+  @@index([userId])
+  @@index([campaignId])
+  @@map("campaign_clients")
+}
+
+model MagicLinkToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([email])
+  @@map("magic_link_tokens")
 }

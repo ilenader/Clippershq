@@ -52,7 +52,7 @@ export async function getSession(): Promise<SessionResult | null> {
   if (isDevBypassEnabled()) {
     const cookieStore = await cookies();
     const devRole = cookieStore.get(DEV_AUTH_COOKIE)?.value;
-    if (devRole && ["CLIPPER", "ADMIN", "OWNER"].includes(devRole)) {
+    if (devRole && ["CLIPPER", "ADMIN", "OWNER", "CLIENT"].includes(devRole)) {
       const session = getDevSession(devRole as DevRole);
       // Ensure dev user exists in DB for FK constraints
       await ensureDevUserInDb(session);

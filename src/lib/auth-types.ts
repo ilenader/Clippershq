@@ -3,6 +3,6 @@ export interface SessionUser {
   name?: string;
   email?: string;
   image?: string;
-  role: "CLIPPER" | "ADMIN" | "OWNER";
+  role: "CLIPPER" | "ADMIN" | "OWNER" | "CLIENT";
   status?: string;
 }

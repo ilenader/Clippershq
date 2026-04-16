@@ -50,8 +50,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     if (isLoading) return;
     if (!isAuthenticated) {
       router.push(isDevMode ? "/dev-login" : "/login");
+      return;
     }
-  }, [isLoading, isAuthenticated, isDevMode, router]);
+    // Route CLIENT users to /client if they hit clipper/admin pages
+    if (effectiveRole === "CLIENT" && !pathname.startsWith("/client")) {
+      router.replace("/client");
+    }
+  }, [isLoading, isAuthenticated, isDevMode, router, effectiveRole, pathname]);
 
   // Progressive swipe-to-open sidebar on mobile
   const sidebarPanelRef = useRef<HTMLDivElement>(null);
@@ -244,8 +249,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6 animate-[fadeIn_200ms_ease-out]">{children}</main>
       </div>
-      <ChatWidget userId={effectiveSession.user.id} role={effectiveRole} />
-      {!isPWA && <PWAInstallPopup />}
+      {effectiveRole !== "CLIENT" && <ChatWidget userId={effectiveSession.user.id} role={effectiveRole} />}
+      {!isPWA && effectiveRole !== "CLIENT" && <PWAInstallPopup />}
     </div>
   );
 }
