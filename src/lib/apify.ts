@@ -207,8 +207,8 @@ async function fetchTikTokStatsBatch(urls: string[]): Promise<Map<string, ClipSt
   const actor = getTikTokActor();
   const runUrl = `${APIFY_BASE}/acts/${encodeActorName(actor)}/run-sync-get-dataset-items?token=${apiKey}`;
 
-  // Cap the batch timeout at 2 minutes regardless of size — leaves room for the rest of the cron
-  const timeoutMs = Math.min(urls.length * 3_000 + 30_000, 120_000);
+  // Cap the batch timeout at 3 minutes regardless of size — leaves ~100s for the rest of the cron (280s hard cap)
+  const timeoutMs = Math.min(urls.length * 3_000 + 30_000, 180_000);
 
   const res = await fetch(runUrl, {
     method: "POST",
@@ -255,8 +255,8 @@ async function fetchInstagramStatsBatch(urls: string[]): Promise<Map<string, Cli
   const actor = getInstagramActor();
   const runUrl = `${APIFY_BASE}/acts/${encodeActorName(actor)}/run-sync-get-dataset-items?token=${apiKey}`;
 
-  // Cap the batch timeout at 2 minutes regardless of size
-  const timeoutMs = Math.min(urls.length * 3_000 + 30_000, 120_000);
+  // Cap the batch timeout at 3 minutes regardless of size
+  const timeoutMs = Math.min(urls.length * 3_000 + 30_000, 180_000);
 
   const res = await fetch(runUrl, {
     method: "POST",
