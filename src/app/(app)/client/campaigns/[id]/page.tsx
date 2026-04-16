@@ -7,13 +7,15 @@ import { useRouter, useParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Film, Heart, MessageCircle, Share2, TrendingUp, ArrowLeft, ExternalLink } from "lucide-react";
+import { Eye, Film, Heart, MessageCircle, Share2, TrendingUp, ArrowLeft, ExternalLink, Download } from "lucide-react";
+import { toast } from "@/lib/toast";
 import { formatNumber, formatCurrency, formatDate } from "@/lib/utils";
 
 export default function ClientCampaignDetail() {
   const { data: session } = useSession();
   const router = useRouter();
   const params = useParams();
+  const [exporting, setExporting] = useState(false);
   const campaignId = params.id as string;
   const userRole = (session?.user as SessionUser)?.role;
   const [data, setData] = useState<any>(null);
@@ -55,14 +57,40 @@ export default function ClientCampaignDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <button onClick={() => router.push("/client")} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-colors cursor-pointer">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{campaign.name}</h1>
-          <p className="text-[15px] text-[var(--text-secondary)]">{campaign.platform} <Badge variant={campaign.status.toLowerCase() as any} className="ml-2">{campaign.status}</Badge></p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.push("/client")} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-colors cursor-pointer">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">{campaign.name}</h1>
+            <p className="text-[15px] text-[var(--text-secondary)]">{campaign.platform} <Badge variant={campaign.status.toLowerCase() as any} className="ml-2">{campaign.status}</Badge></p>
+          </div>
         </div>
+        <Button
+          variant="outline"
+          loading={exporting}
+          icon={<Download className="h-4 w-4" />}
+          onClick={async () => {
+            setExporting(true);
+            try {
+              const res = await fetch(`/api/client/export?campaignId=${campaignId}`);
+              if (!res.ok) throw new Error("Export failed");
+              const blob = await res.blob();
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = `campaign-report-${new Date().toISOString().split("T")[0]}.xlsx`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(a.href);
+              toast.success("Report downloaded!");
+            } catch { toast.error("Export failed"); }
+            setExporting(false);
+          }}
+        >
+          Export
+        </Button>
       </div>
 
       {/* Key metrics */}

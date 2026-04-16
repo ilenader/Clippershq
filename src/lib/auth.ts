@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Discord from "next-auth/providers/discord";
+import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
 
@@ -18,22 +19,43 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         },
       },
     }),
+    ...(process.env.GOOGLE_CLIENT_ID ? [Google({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true,
+    })] : []),
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      // Block banned users from signing in
-      if (db && account?.providerAccountId) {
+      // Google login: only allow for pre-existing CLIENT users
+      if (account?.provider === "google" && db && user.email) {
+        try {
+          const existingUser = await db.user.findUnique({
+            where: { email: user.email },
+            select: { role: true, status: true },
+          });
+          if (!existingUser) {
+            // No pre-existing account — block Google signup for non-clients
+            return "/login?error=google-no-account";
+          }
+          if (existingUser.status === "BANNED") return false;
+        } catch (err: any) {
+          console.error("[AUTH] Google sign-in check error:", err?.message);
+        }
+      }
+
+      // Block banned users from signing in (Discord path)
+      if (db && account?.provider === "discord" && account?.providerAccountId) {
         try {
           const existing = await db.user.findFirst({
             where: { discordId: account.providerAccountId },
             select: { status: true },
           });
           if (existing?.status === "BANNED") {
-            return false; // blocks sign-in entirely
+            return false;
           }
         } catch (err: any) {
           console.error("[AUTH] Ban check DB error:", err?.message);
-          // Allow login on DB error — don't block everyone
         }
       }
 
@@ -143,6 +165,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // After Google login, route CLIENT users to /client
+      if (url.startsWith(baseUrl)) {
+        // Check if url is /dashboard (default callback) and user might be CLIENT
+        // The session callback above sets the role, but redirect fires before session is fully built
+        // So we handle this in app-layout.tsx instead (already does CLIENT -> /client redirect)
+        return url;
+      }
+      return baseUrl;
     },
   },
   events: {

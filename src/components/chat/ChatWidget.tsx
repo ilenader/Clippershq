@@ -416,16 +416,10 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
         if (!isClipper && threadInfo?.needsHumanSupport) {
           setThreadInfo((prev) => prev ? { ...prev, needsHumanSupport: false } : prev);
         }
-        // CLIENT messages always go to human support immediately
+        // CLIENT messages silently route to human support (no auto "connect me" message)
         if (isClientRole && !needsHumanSupport) {
           setNeedsHumanSupport(true);
-          try {
-            await fetch(`/api/chat/conversations/${convoId}/messages`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ content: "connect me" }),
-            });
-          } catch { /* silent */ }
+          setThreadInfo((prev) => prev ? { ...prev, needsHumanSupport: true } : prev);
         }
       }
     } catch {}
