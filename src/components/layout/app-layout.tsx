@@ -249,7 +249,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6 animate-[fadeIn_200ms_ease-out]">{children}</main>
       </div>
-      {effectiveRole !== "CLIENT" && <ChatWidget userId={effectiveSession.user.id} role={effectiveRole} />}
+      <ChatWidget userId={effectiveSession.user.id} role={effectiveRole} />
       {!isPWA && effectiveRole !== "CLIENT" && <PWAInstallPopup />}
     </div>
   );

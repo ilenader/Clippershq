@@ -86,6 +86,12 @@ function LoginContent() {
           <p className="mt-5 text-center text-sm" style={{ color: "#7a8a9a" }}>
             Join thousands of clippers earning from their content
           </p>
+
+          <div className="mt-4 pt-4 border-t border-white/[0.06] text-center">
+            <a href="/client/login" className="text-sm hover:underline" style={{ color: "#7a8a9a" }}>
+              Brand client? <span style={{ color: "#2596be" }}>Log in here</span>
+            </a>
+          </div>
         </div>
 
         <p className="mt-6 text-center text-xs" style={{ color: "#3a4a5a" }}>

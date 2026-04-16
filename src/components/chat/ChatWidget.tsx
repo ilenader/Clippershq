@@ -154,7 +154,8 @@ interface ChatWidgetProps {
 
 export function ChatWidget({ userId, role }: ChatWidgetProps) {
   const myId = userId;
-  const isClipper = role === "CLIPPER";
+  const isClipper = role === "CLIPPER" || role === "CLIENT";
+  const isClientRole = role === "CLIENT";
 
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"list" | "thread" | "new">("list");
@@ -415,10 +416,21 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
         if (!isClipper && threadInfo?.needsHumanSupport) {
           setThreadInfo((prev) => prev ? { ...prev, needsHumanSupport: false } : prev);
         }
+        // CLIENT messages always go to human support immediately
+        if (isClientRole && !needsHumanSupport) {
+          setNeedsHumanSupport(true);
+          try {
+            await fetch(`/api/chat/conversations/${convoId}/messages`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ content: "connect me" }),
+            });
+          } catch { /* silent */ }
+        }
       }
     } catch {}
     setSending(false);
-  }, [myId, role, isClipper, threadInfo, fetchMessages, refreshList]);
+  }, [myId, role, isClipper, isClientRole, threadInfo, needsHumanSupport, fetchMessages, refreshList]);
 
   const sendFromInput = useCallback(async () => {
     const text = messageInput.trim();

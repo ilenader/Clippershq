@@ -92,6 +92,7 @@ const ownerManageNav: NavSection = {
     { label: "Accounts", href: "/admin/accounts", icon: <ClipboardList className="h-[18px] w-[18px]" /> },
     { label: "Payouts", href: "/admin/payouts", icon: <Wallet className="h-[18px] w-[18px]" /> },
     { label: "Calls", href: "/admin/calls", icon: <Phone className="h-[18px] w-[18px]" /> },
+    { label: "Clients", href: "/admin/clients", icon: <Users className="h-[18px] w-[18px]" /> },
     { label: "Flags", href: "/admin/flags", icon: <Flag className="h-[18px] w-[18px]" /> },
     { label: "Submit Clip", href: "/admin/submit-clip", icon: <Film className="h-[18px] w-[18px]" /> },
   ],
