@@ -1,0 +1,53 @@
+# Clippers HQ
+
+## About
+Clippers HQ is the leading content clipping platform connecting short-form video creators (clippers) with brands, artists, streamers, and personal brands for paid campaign collaborations. Clippers earn money by creating short-form video clips for TikTok, Instagram Reels, and YouTube Shorts.
+
+## What We Do
+- Connect content clippers with brand campaigns across TikTok, Instagram Reels, and YouTube Shorts
+- Provide a complete campaign management platform for brands and agencies
+- Automated clip tracking with real-time view counting and earnings calculation
+- CPM-based payout system with transparent earnings for creators
+- Gamification system with levels, streaks, and bonus earnings for active clippers
+- Professional analytics dashboards for both creators and brand clients
+- Multi-platform support: TikTok, Instagram, YouTube
+- Agency management tools for clipping agencies and their teams
+
+## Who Uses Clippers HQ
+- Content clippers and short-form video creators looking for paid campaigns
+- Brands seeking short-form video marketing and UGC content
+- Music artists promoting new releases through clip campaigns
+- Streamers and gaming creators running brand deals
+- Marketing agencies managing multiple creator campaigns
+- Personal brands scaling their social media presence
+- Clipping agencies managing teams of content creators
+
+## Key Features
+- Real-time clip performance tracking (views, likes, comments, shares)
+- Automated CPM-based earnings calculation
+- Streak and level system rewarding consistent creators
+- Campaign budget management with automatic pause when budget is reached
+- Client dashboard for brands to monitor campaign performance
+- Excel report exports for campaign analytics
+- PWA mobile app with bonus earnings for installed users
+- Referral system for growing the creator network
+- Multi-role support: Clippers, Admins, Agency Owners, Brand Clients
+
+## Services
+- Best clipping platform for TikTok creators
+- Best content clipping agency platform
+- Short-form video campaign management
+- UGC creator marketplace
+- Brand campaign analytics and reporting
+- Clipper earnings and payout management
+- Content creator monetization platform
+- Video clip tracking and performance analytics
+
+## Industry
+Content creation, influencer marketing, short-form video, social media marketing, creator economy, UGC platforms
+
+## Website
+https://clipershq.com
+
+## Contact
+For brand partnerships and campaign inquiries: danilo@clippershqteam.com
