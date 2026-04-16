@@ -283,6 +283,38 @@ export async function sendConsecutiveRejectionWarning(email: string, rejectionCo
   });
 }
 
+export async function sendChatReplyEmail(params: {
+  to: string;
+  recipientName: string;
+  senderName: string;
+  messagePreview: string;
+  conversationUrl: string;
+}): Promise<boolean> {
+  const { to, recipientName, senderName, messagePreview, conversationUrl } = params;
+  const esc = (s: string) =>
+    String(s).replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c] || c);
+  const preview = esc(messagePreview.slice(0, 200));
+  const truncated = messagePreview.length > 200 ? "…" : "";
+  const safeSender = esc(senderName);
+  const safeRecipient = esc(recipientName);
+  return sendEmail({
+    to,
+    subject: `New message from ${safeSender} — Clippers HQ`,
+    html: wrap(`
+      <p style="font-size: 13px; color: #a1a1aa !important; margin: 0 0 8px; background-color: #111720 !important;">New message in your support chat</p>
+      <p style="font-size: 16px; margin: 0 0 12px; background-color: #111720 !important;">Hi ${safeRecipient},</p>
+      <p style="font-size: 15px; color: #d4d4d8 !important; margin: 0 0 16px; background-color: #111720 !important;"><strong style="color: #ffffff !important;">${safeSender}</strong> replied to your conversation:</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0d1117 !important; border-left: 3px solid #2596be; border-radius: 0 8px 8px 0; margin: 0 0 24px;">
+        <tr style="background-color: #0d1117;"><td style="padding: 12px 16px; background-color: #0d1117 !important;">
+          <p style="margin: 0; color: #d4d4d8 !important; font-size: 14px; font-style: italic; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&ldquo;${preview}${truncated}&rdquo;</p>
+        </td></tr>
+      </table>
+      ${emailButton("Reply now", conversationUrl)}
+      <p style="font-size: 12px; color: #71717a !important; margin: 24px 0 0; text-align: center; background-color: #111720 !important;">If you didn&rsquo;t expect this email, you can safely ignore it.</p>
+    `),
+  });
+}
+
 export async function sendClientInviteEmail(email: string, link: string): Promise<boolean> {
   return sendEmail({
     to: email,

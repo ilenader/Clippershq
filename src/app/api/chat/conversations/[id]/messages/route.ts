@@ -341,10 +341,69 @@ export async function POST(
       } catch {}
     }
 
-    // When OWNER/ADMIN sends a message, clear needsHumanSupport flag
+    // When OWNER/ADMIN sends a message, email the recipient on the FIRST human response
+    // (once per conversation — lastHumanEmailSentAt stays set to prevent spam)
+    // then clear needsHumanSupport flag
     if (role === "OWNER" || role === "ADMIN") {
       try {
-        await db.conversation.update({ where: { id: conversationId }, data: { needsHumanSupport: false } });
+        const convo = await db.conversation.findUnique({
+          where: { id: conversationId },
+          select: {
+            needsHumanSupport: true,
+            lastHumanEmailSentAt: true,
+            participants: {
+              select: {
+                userId: true,
+                user: { select: { email: true, name: true, username: true, role: true } },
+              },
+            },
+          },
+        });
+
+        if (convo?.needsHumanSupport && !convo.lastHumanEmailSentAt && content.length > 0) {
+          const recipient = convo.participants.find(
+            (p: any) =>
+              p.userId !== userId &&
+              p.user?.email &&
+              (p.user.role === "CLIPPER" || p.user.role === "CLIENT"),
+          );
+          if (recipient?.user?.email) {
+            const senderName =
+              (message as any).sender?.name ||
+              (message as any).sender?.username ||
+              "Your account manager";
+            const recipientName =
+              recipient.user.name || recipient.user.username || "there";
+            const urlByRole: Record<string, string> = {
+              CLIENT: "https://clipershq.com/client",
+              CLIPPER: "https://clipershq.com/dashboard",
+              ADMIN: "https://clipershq.com/admin",
+            };
+            const conversationUrl =
+              urlByRole[recipient.user.role] || "https://clipershq.com/dashboard";
+            try {
+              const { sendChatReplyEmail } = await import("@/lib/email");
+              await sendChatReplyEmail({
+                to: recipient.user.email,
+                recipientName,
+                senderName,
+                messagePreview: content.slice(0, 200),
+                conversationUrl,
+              });
+              await db.conversation.update({
+                where: { id: conversationId },
+                data: { lastHumanEmailSentAt: new Date() },
+              });
+            } catch (emailErr: any) {
+              console.error("[CHAT-EMAIL] Failed:", emailErr?.message);
+            }
+          }
+        }
+
+        await db.conversation.update({
+          where: { id: conversationId },
+          data: { needsHumanSupport: false },
+        });
       } catch {}
     }
 
