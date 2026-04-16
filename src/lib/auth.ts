@@ -22,7 +22,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ...(process.env.GOOGLE_CLIENT_ID ? [Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      allowDangerousEmailAccountLinking: true,
     })] : []),
   ],
   callbacks: {
@@ -32,15 +31,37 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         try {
           const existingUser = await db.user.findUnique({
             where: { email: user.email },
-            select: { role: true, status: true },
+            select: { id: true, role: true, status: true },
           });
-          if (!existingUser) {
-            // No pre-existing account — block Google signup for non-clients
-            return "/login?error=google-no-account";
-          }
+          if (!existingUser) return "/login?error=google-no-account";
+          if (existingUser.role !== "CLIENT") return "/login?error=use-discord";
           if (existingUser.status === "BANNED") return false;
+
+          // Manually link Google account to existing CLIENT user if not already linked
+          const existingAccount = await db.account.findFirst({
+            where: { userId: existingUser.id, provider: "google" },
+          });
+          if (!existingAccount && account.providerAccountId) {
+            await db.account.create({
+              data: {
+                userId: existingUser.id,
+                type: account.type || "oauth",
+                provider: "google",
+                providerAccountId: account.providerAccountId,
+                access_token: account.access_token,
+                refresh_token: account.refresh_token,
+                expires_at: account.expires_at,
+                token_type: account.token_type,
+                scope: account.scope,
+                id_token: account.id_token,
+              },
+            });
+            // Point NextAuth user.id to existing user so PrismaAdapter doesn't create a duplicate
+            user.id = existingUser.id;
+          }
         } catch (err: any) {
           console.error("[AUTH] Google sign-in check error:", err?.message);
+          return "/login?error=server-error";
         }
       }
 
