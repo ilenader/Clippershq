@@ -22,9 +22,9 @@ import {
 // Platform dot colors
 function PlatformDot({ platform }: { platform: string }) {
   const p = (platform || "").toLowerCase();
-  if (p.includes("tiktok")) return <span className="inline-block h-2 w-2 rounded-full bg-[#ff0050] flex-shrink-0" title="TikTok" />;
-  if (p.includes("instagram")) return <span className="inline-block h-2 w-2 rounded-full bg-[#e4405f] flex-shrink-0" title="Instagram" />;
-  if (p.includes("youtube")) return <span className="inline-block h-2 w-2 rounded-full bg-[#ff0000] flex-shrink-0" title="YouTube" />;
+  if (p.includes("tiktok")) return <span className="inline-block h-2 w-2 rounded-full bg-[#00f2ea] flex-shrink-0" title="TikTok" />;
+  if (p.includes("instagram")) return <span className="inline-block h-2 w-2 rounded-full bg-[#E1306C] flex-shrink-0" title="Instagram" />;
+  if (p.includes("youtube")) return <span className="inline-block h-2 w-2 rounded-full bg-[#FF0000] flex-shrink-0" title="YouTube" />;
   return <span className="inline-block h-2 w-2 rounded-full bg-[var(--text-muted)] flex-shrink-0" />;
 }
 
@@ -46,17 +46,6 @@ function StatusColor(status: string) {
   if (s === "ACTIVE") return "bg-emerald-500/15 text-emerald-400 border-emerald-500/20";
   if (s === "PAUSED") return "bg-amber-500/15 text-amber-400 border-amber-500/20";
   return "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-subtle)]";
-}
-
-// Custom chart tooltip
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 shadow-lg">
-      <p className="text-xs text-[var(--text-muted)] mb-0.5">{label}</p>
-      <p className="text-sm font-bold text-accent tabular-nums">{formatNumber(payload[0].value)} views</p>
-    </div>
-  );
 }
 
 export default function ClientDashboard() {
@@ -334,9 +323,9 @@ export default function ClientDashboard() {
           </div>
 
           {/* ─── D) VIEWS CHART ─── */}
-          {chartData.length > 1 && (
-            <Card>
-              <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Views Over Time</h3>
+          <Card>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Views Over Time</h3>
+            {chartData.length > 0 && chartData.some((d: any) => d.views > 0) ? (
               <div className="h-[220px] sm:h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -359,7 +348,10 @@ export default function ClientDashboard() {
                       tickLine={false}
                       tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)}
                     />
-                    <Tooltip content={<ChartTooltip />} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: "8px", color: "var(--text-primary)" }}
+                      labelStyle={{ color: "var(--text-muted)" }}
+                    />
                     <Area
                       type="monotone"
                       dataKey="views"
@@ -372,8 +364,12 @@ export default function ClientDashboard() {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-            </Card>
-          )}
+            ) : (
+              <div className="h-[220px] sm:h-[260px] flex items-center justify-center">
+                <p className="text-sm text-[var(--text-muted)]">No views data yet</p>
+              </div>
+            )}
+          </Card>
 
           {/* ─── E) CLIP PERFORMANCE TABLE ─── */}
           <Card>
