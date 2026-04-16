@@ -3,11 +3,11 @@
  * Fetches real stats via Apify and saves new ClipStat snapshots.
  *
  * Tiered schedule:
- *   Phase 1 (0-4h after submission):   every 60 min
- *   Phase 2 (4-24h after submission):  every 120 min
- *   Phase 3 (24h+): view-bracket + growth-per-hour based intervals
+ *   Phase 1 (0-72h after submission):  every 60 min
+ *   Phase 2 (72h+): view-bracket + growth-per-hour based intervals, capped at 8h
  *
- *   Tiers: 1h → 2h → 4h → 8h → 16h → 24h → 48h (72h for actually-dead only)
+ *   Max interval: 8h (480 min) for all live clips.
+ *   Actually-dead override: 12h (720 min).
  *   Tracking never stops.
  */
 
@@ -20,8 +20,7 @@ import { logCampaignEvent } from "@/lib/campaign-events";
 
 /**
  * Determine the next check interval based on view bracket and growth per hour.
- * Phase 1 (0-4h): 60 min. Phase 2 (4-24h): 120 min.
- * Phase 3 (24h+): view-bracket + growthPerHour logic.
+ * Phase 1 (0-72h): 60 min. Phase 2 (72h+): view-bracket + growthPerHour logic, capped at 8h.
  */
 async function getNextInterval(
   currentIntervalMin: number,
@@ -35,13 +34,10 @@ async function getNextInterval(
     ? (Date.now() - new Date(clipCreatedAt).getTime()) / 3_600_000
     : 999;
 
-  // Phase 1: first 4 hours → always 60 min
-  if (hoursSinceSubmission <= 4) return 60;
+  // Phase 1: first 72 hours → always 60 min (hourly checks for 3 days)
+  if (hoursSinceSubmission <= 72) return 60;
 
-  // Phase 2: hours 4-24 → always 120 min
-  if (hoursSinceSubmission <= 24) return 120;
-
-  // Phase 3: view-bracket + growth-per-hour
+  // Phase 2: view-bracket + growth-per-hour
   const growthPercent = previousViews > 0
     ? ((currentViews - previousViews) / previousViews) * 100
     : (currentViews > 0 ? 100 : 0);
@@ -64,7 +60,7 @@ async function getNextInterval(
     else if (growthPerHour >= 2) interval = 120;
     else if (growthPerHour >= 1) interval = 240;
     else interval = 480;
-    interval = Math.min(interval, 960); // max 16h
+    interval = Math.min(interval, 480); // max 8h
   } else if (currentViews >= 10_000) {
     // High value
     bracket = "high";
@@ -74,7 +70,7 @@ async function getNextInterval(
     else if (growthPerHour >= 1) interval = 240;
     else if (growthPerHour >= 0.2) interval = 480;
     else interval = 960;
-    interval = Math.min(interval, 1440); // max 24h
+    interval = Math.min(interval, 480); // max 8h
   } else if (currentViews >= 1_000) {
     // Medium
     bracket = "medium";
@@ -83,21 +79,20 @@ async function getNextInterval(
     else if (growthPerHour >= 1) interval = 480;
     else if (growthPerHour >= 0.2) interval = 960;
     else interval = 1440;
-    interval = Math.min(interval, 1440); // max 24h
+    interval = Math.min(interval, 480); // max 8h
   } else if (currentViews >= 200) {
     // Low
     bracket = "low";
     if (growthPerHour >= 4) interval = 240;
     else interval = 1440;
-    interval = Math.min(interval, 1440); // max 24h
+    interval = Math.min(interval, 480); // max 8h
   } else {
     // Dead
     bracket = "dead";
-    interval = 1440;
-    // max 48h (capped below by actually-dead check)
+    interval = 480; // 8h (actually-dead override below can stretch this to 12h)
   }
 
-  // Actually-dead check: last 3 non-manual stats, if total gain < 50 views → 72h
+  // Actually-dead check: last 3 non-manual stats, if total gain < 50 views → 12h
   try {
     const recentStats = await db.clipStat.findMany({
       where: { clipId, isManual: false },
@@ -111,14 +106,14 @@ async function getNextInterval(
       const totalGain = newest - oldest;
 
       if (totalGain < 50) {
-        // Actually dead → 72h
-        interval = 4320;
+        // Actually dead → 12h (still catches delayed bot purchases twice a day)
+        interval = 720;
         bracket = "actually-dead";
       }
     }
 
-    // Resurrection check: was at 72h (actually-dead) and suddenly gained 5000+ views
-    if (currentIntervalMin === 4320 && (currentViews - previousViews) >= 5000) {
+    // Resurrection check: was at the actually-dead interval (>=12h) and suddenly gained 5000+ views
+    if (currentIntervalMin >= 720 && (currentViews - previousViews) >= 5000) {
       interval = 120;
       bracket = "resurrected";
       console.log(`[TRACKING-INTERVAL] Clip ${clipId} resurrected: ${previousViews}→${currentViews} views, checking fraud`);
@@ -503,7 +498,7 @@ async function processTrackingJob(
       newInterval = 4320;
     } else if (clip.isOwnerOverride) {
       newInterval = await getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt, job.lastCheckedAt, clip.id);
-      newInterval = Math.min(newInterval, 2880);
+      newInterval = Math.min(newInterval, 480);
     } else {
       newInterval = await getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt, job.lastCheckedAt, clip.id);
     }
