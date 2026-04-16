@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { TimeframeSelect } from "@/components/ui/timeframe-select";
 import {
   Megaphone, Eye, Film, Heart, MessageCircle, Share2, TrendingUp,
   Trophy, Download, ChevronDown, ChevronRight, ExternalLink, DollarSign,
@@ -19,13 +20,8 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 
-// Platform dot colors
 function PlatformDot({ platform }: { platform: string }) {
-  const p = (platform || "").toLowerCase();
-  if (p.includes("tiktok")) return <span className="inline-block h-2 w-2 rounded-full bg-[#00f2ea] flex-shrink-0" title="TikTok" />;
-  if (p.includes("instagram")) return <span className="inline-block h-2 w-2 rounded-full bg-[#E1306C] flex-shrink-0" title="Instagram" />;
-  if (p.includes("youtube")) return <span className="inline-block h-2 w-2 rounded-full bg-[#FF0000] flex-shrink-0" title="YouTube" />;
-  return <span className="inline-block h-2 w-2 rounded-full bg-[var(--text-muted)] flex-shrink-0" />;
+  return <span className="inline-block h-2 w-2 rounded-full bg-accent flex-shrink-0" title={platform} />;
 }
 
 function PlatformBadges({ platform }: { platform: string }) {
@@ -33,7 +29,7 @@ function PlatformBadges({ platform }: { platform: string }) {
   return (
     <div className="flex items-center gap-1.5">
       {platforms.map((p) => (
-        <span key={p} className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-input)] border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
+        <span key={p} className="inline-flex items-center gap-1 rounded-md bg-accent/10 border border-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent">
           <PlatformDot platform={p} /> {p}
         </span>
       ))}
@@ -61,6 +57,7 @@ export default function ClientDashboard() {
   const [exporting, setExporting] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(false);
+  const [timeframeDays, setTimeframeDays] = useState(15);
 
   useEffect(() => {
     if (session && userRole && userRole !== "CLIENT" && userRole !== "OWNER") {
@@ -152,23 +149,63 @@ export default function ClientDashboard() {
   }
 
   const campaign = detail?.campaign || selectedCampaign;
-  const summary = detail?.summary;
-  const clips = detail?.clips || [];
-  const dailyBreakdown = detail?.dailyBreakdown || [];
+  const allClips = detail?.clips || [];
+  const allDailyBreakdown = detail?.dailyBreakdown || [];
+
+  // Build local-date ISO (YYYY-MM-DD) without UTC shift
+  const toLocalIso = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() - (timeframeDays - 1));
+  const cutoffIso = toLocalIso(cutoff);
+
+  // Filter clips and daily breakdown by timeframe
+  const filteredClips = allClips.filter((c: any) => {
+    if (!c.submitted) return false;
+    return toLocalIso(new Date(c.submitted)) >= cutoffIso;
+  });
+  const filteredDailyBreakdown = allDailyBreakdown.filter((d: any) => d.date && d.date >= cutoffIso);
+
+  // Recompute summary from filtered clips
+  const approvedFiltered = filteredClips.filter((c: any) => c.status === "APPROVED");
+  const filteredTotalViews = approvedFiltered.reduce((s: number, c: any) => s + (c.views || 0), 0);
+  const summary = {
+    totalSpent: approvedFiltered.reduce((s: number, c: any) => s + (c.earnings || 0), 0),
+    totalViews: filteredTotalViews,
+    totalLikes: approvedFiltered.reduce((s: number, c: any) => s + (c.likes || 0), 0),
+    totalComments: approvedFiltered.reduce((s: number, c: any) => s + (c.comments || 0), 0),
+    totalShares: approvedFiltered.reduce((s: number, c: any) => s + (c.shares || 0), 0),
+    approvedClips: approvedFiltered.length,
+    pendingClips: filteredClips.filter((c: any) => c.status === "PENDING").length,
+    avgViewsPerClip: approvedFiltered.length > 0 ? Math.round(filteredTotalViews / approvedFiltered.length) : 0,
+    topViews: approvedFiltered.reduce((max: number, c: any) => Math.max(max, c.views || 0), 0),
+  };
 
   // Sort clips by views descending
-  const sortedClips = [...clips].sort((a: any, b: any) => (b.views || 0) - (a.views || 0));
+  const sortedClips = [...filteredClips].sort((a: any, b: any) => (b.views || 0) - (a.views || 0));
   const displayClips = sortedClips.slice(0, 50);
   const hasMoreClips = sortedClips.length > 50;
 
-  // Chart data from daily breakdown
-  const chartData = dailyBreakdown.map((d: any) => ({
-    date: d.date?.slice(5) || "", // MM-DD format
-    views: d.views || 0,
-  }));
+  // Chart data: fill every day in the selected timeframe so gaps show as zeros
+  const byDate = new Map<string, any>(filteredDailyBreakdown.map((d: any) => [d.date, d]));
+  const chartData: { date: string; views: number }[] = [];
+  for (let i = timeframeDays - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const iso = toLocalIso(d);
+    const entry = byDate.get(iso);
+    chartData.push({ date: iso.slice(5), views: entry?.views || 0 });
+  }
 
-  // Daily totals
-  const dailyTotals = dailyBreakdown.reduce(
+  // Daily totals for filtered breakdown
+  const dailyTotals = filteredDailyBreakdown.reduce(
     (acc: any, d: any) => ({
       clips: acc.clips + (d.clips || 0),
       views: acc.views + (d.views || 0),
@@ -324,8 +361,11 @@ export default function ClientDashboard() {
 
           {/* ─── D) VIEWS CHART ─── */}
           <Card>
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Views Over Time</h3>
-            {chartData.length > 0 && chartData.some((d: any) => d.views > 0) ? (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Views Over Time</h3>
+              <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
+            </div>
+            {chartData.some((d) => d.views > 0) ? (
               <div className="h-[220px] sm:h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -427,7 +467,7 @@ export default function ClientDashboard() {
           </Card>
 
           {/* ─── F) DAILY BREAKDOWN (collapsible) ─── */}
-          {dailyBreakdown.length > 0 && (
+          {filteredDailyBreakdown.length > 0 && (
             <Card>
               <button
                 onClick={() => setDailyOpen(!dailyOpen)}
@@ -453,7 +493,7 @@ export default function ClientDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {dailyBreakdown.map((day: any, i: number) => (
+                      {filteredDailyBreakdown.map((day: any, i: number) => (
                         <tr key={day.date} className={`border-b border-[var(--border-subtle)] ${i % 2 === 1 ? "bg-[var(--bg-secondary)]" : ""}`}>
                           <td className="px-4 py-2.5 text-[var(--text-secondary)]">{day.date}</td>
                           <td className="px-3 py-2.5 text-right text-[var(--text-primary)] tabular-nums">{day.clips}</td>
