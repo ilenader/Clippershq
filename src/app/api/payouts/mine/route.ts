@@ -26,6 +26,7 @@ export async function GET() {
         scheduledCalls: { orderBy: { createdAt: "desc" }, take: 1 },
       },
       orderBy: { createdAt: "desc" },
+      take: 1000,
     });
     return NextResponse.json(payouts);
   } catch (err: any) {
@@ -36,6 +37,7 @@ export async function GET() {
         where: { userId: session.user.id },
         include: { campaign: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
+        take: 1000,
       });
       return NextResponse.json(payouts);
     } catch {

@@ -4,9 +4,10 @@
  */
 
 import { NextResponse } from "next/server";
+import type { SessionUser } from "@/lib/auth-types";
 
 export function checkBanStatus(session: any): Response | null {
-  const status = (session?.user as any)?.status;
+  const status = (session?.user as SessionUser | undefined)?.status;
 
   if (status === "BANNED") {
     return NextResponse.json(

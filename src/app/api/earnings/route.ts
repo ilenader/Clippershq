@@ -37,10 +37,12 @@ export async function GET(request: Request) {
       db.clip.findMany({
         where: clipWhere,
         select: { id: true, earnings: true, status: true, campaignId: true, createdAt: true },
+        take: 5000,
       }),
       db.payoutRequest.findMany({
         where: payoutWhere,
         select: { amount: true, status: true, campaignId: true },
+        take: 1000,
       }),
     ]);
 

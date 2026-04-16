@@ -38,6 +38,7 @@ export async function GET(request: Request) {
         stats: { orderBy: { checkedAt: "desc" }, take: 1 },
       },
       orderBy: { createdAt: "desc" },
+      take: 5000,
     });
     return NextResponse.json(clips);
   } catch {

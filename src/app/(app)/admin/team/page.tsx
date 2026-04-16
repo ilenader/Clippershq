@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +29,7 @@ const roleBadge: Record<string, string> = {
 
 export default function TeamPage() {
   const { data: session } = useSession();
-  const userRole = (session?.user as any)?.role || "CLIPPER";
+  const userRole = (session?.user as SessionUser | undefined)?.role || "CLIPPER";
   const isOwner = userRole === "OWNER";
   const router = useRouter();
 

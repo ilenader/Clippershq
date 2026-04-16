@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,7 @@ export default function CampaignDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const { data: session } = useSession();
-  const userRole = (session?.user as any)?.role || "CLIPPER";
+  const userRole = (session?.user as SessionUser | undefined)?.role || "CLIPPER";
   const isClipper = userRole === "CLIPPER";
   const [campaign, setCampaign] = useState<any>(null);
   const [loading, setLoading] = useState(true);

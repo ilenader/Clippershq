@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
         _count: { select: { clips: true } },
       },
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
     return NextResponse.json(campaigns);
   } catch {
@@ -88,6 +89,17 @@ export async function POST(req: NextRequest) {
 
   if (!data.name || !data.platform) {
     return NextResponse.json({ error: "Name and platform are required" }, { status: 400 });
+  }
+
+  // Reject negative or NaN numeric inputs (budget must be >= 0 or absent for unlimited)
+  for (const field of ["budget", "clipperCpm", "ownerCpm", "agencyFee", "maxPayoutPerClip", "minViews", "videoLengthMin", "videoLengthMax"]) {
+    const v = data[field];
+    if (v !== undefined && v !== null && v !== "") {
+      const num = parseFloat(v);
+      if (!isFinite(num) || num < 0) {
+        return NextResponse.json({ error: `${field} must be a non-negative number` }, { status: 400 });
+      }
+    }
   }
 
   const campaignData = {

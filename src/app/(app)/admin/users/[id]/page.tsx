@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
+import type { SessionUser } from "@/lib/auth-types";
 import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,7 @@ export default function UserProfilePage() {
   const campDropRef = useRef<HTMLDivElement>(null);
 
   const currentUserId = session?.user?.id;
-  const currentUserRole = (session?.user as any)?.role;
+  const currentUserRole = (session?.user as SessionUser | undefined)?.role;
   const isOwner = currentUserRole === "OWNER";
   const isViewingOwnProfile = currentUserId === id;
 
