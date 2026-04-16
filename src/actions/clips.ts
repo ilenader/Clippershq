@@ -95,7 +95,8 @@ export async function submitClip(data: {
         data: {
           clipId: newClip.id,
           campaignId: data.campaignId,
-          nextCheckAt: roundToNextSlot(60),
+          // First check in ~5 minutes — unaligned so new clips don't wait for the next hour slot
+          nextCheckAt: new Date(Date.now() + 5 * 60_000),
           checkIntervalMin: 60,
           isActive: true,
         },

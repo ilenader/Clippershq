@@ -29,6 +29,7 @@ async function getNextInterval(
   clipCreatedAt: Date | null,
   lastCheckedAt: Date | null,
   clipId: string,
+  clipStatus?: string,
 ): Promise<number> {
   const hoursSinceSubmission = clipCreatedAt
     ? (Date.now() - new Date(clipCreatedAt).getTime()) / 3_600_000
@@ -115,8 +116,7 @@ async function getNextInterval(
     // Resurrection check: was at the actually-dead interval (>=12h) and suddenly gained 5000+ views
     if (currentIntervalMin >= 720 && (currentViews - previousViews) >= 5000) {
       // Don't resurrect REJECTED clips — they stay at their long interval
-      const clipInfo = await db.clip.findUnique({ where: { id: clipId }, select: { status: true } });
-      if (clipInfo?.status === "REJECTED") {
+      if (clipStatus === "REJECTED") {
         console.log(`[TRACKING-INTERVAL] Clip ${clipId} gained ${currentViews - previousViews} views but is REJECTED — skipping resurrection`);
       } else {
         interval = 120;
@@ -163,19 +163,34 @@ async function getNextInterval(
 }
 
 /**
- * Round to the next clean hour slot based on interval.
- * 60min → next round hour. 120min → next even hour. 240min → next 4h mark. etc.
+ * Round the next check time to the nearest full UTC hour so clips cluster together.
+ * Alignment lets the per-platform Apify batch pick up ALL due clips in one run per cron tick.
+ * Minutes 0-29 round down to current hour; 30-59 round up. A 10-minute safety floor
+ * prevents re-checking within the same cron window.
  */
 export function roundToNextSlot(intervalMin: number): Date {
-  const next = new Date(Date.now() + intervalMin * 60 * 1000);
+  const rawNext = new Date(Date.now() + intervalMin * 60_000);
 
-  // 5-minute safety floor: ensure nextCheckAt is at least 5 minutes in the future
-  const minTime = new Date(Date.now() + 5 * 60 * 1000);
-  if (next < minTime) {
-    return minTime;
+  const rounded = new Date(rawNext);
+  const minutes = rounded.getMinutes();
+
+  if (minutes >= 30) {
+    // Round up to next hour
+    rounded.setMinutes(0, 0, 0);
+    rounded.setHours(rounded.getHours() + 1);
+  } else {
+    // Round down to current hour
+    rounded.setMinutes(0, 0, 0);
   }
 
-  return next;
+  // Safety: rounded time must be at least 10 minutes from now, else push to next hour.
+  const minNext = new Date(Date.now() + 10 * 60_000);
+  if (rounded <= minNext) {
+    rounded.setHours(rounded.getHours() + 1);
+    rounded.setMinutes(0, 0, 0);
+  }
+
+  return rounded;
 }
 
 /**
@@ -501,12 +516,12 @@ async function processTrackingJob(
     // ── Next interval ──
     let newInterval: number;
     if (clip.status === "REJECTED") {
-      newInterval = 4320;
+      newInterval = 2880;
     } else if (clip.isOwnerOverride) {
-      newInterval = await getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt, job.lastCheckedAt, clip.id);
+      newInterval = await getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt, job.lastCheckedAt, clip.id, clip.status);
       newInterval = Math.min(newInterval, 480);
     } else {
-      newInterval = await getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt, job.lastCheckedAt, clip.id);
+      newInterval = await getNextInterval(job.checkIntervalMin, stats.views, prevViews, clip.createdAt, job.lastCheckedAt, clip.id, clip.status);
     }
     const nextCheck = roundToNextSlot(newInterval);
 
@@ -611,7 +626,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           },
         },
       },
-      take: campaignIds ? 50 : 100,
+      take: campaignIds ? 50 : 500,
     });
 
     console.log(`[TRACKING] Found ${dueJobs.length} due jobs`);
@@ -651,8 +666,8 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     console.log(`[TRACKING] ${dueJobs.length} jobs across ${campaignGroupIds.length} campaigns (${source}, campaignBatch=${CAMPAIGN_BATCH_SIZE})`);
 
     for (let i = 0; i < campaignGroupIds.length; i += CAMPAIGN_BATCH_SIZE) {
-      if (Date.now() - startTime > 250000) {
-        details.push(`Stopped early — 250s timeout. ${processed} processed.`);
+      if (Date.now() - startTime > 280_000) {
+        details.push(`Stopped early — 280s timeout. ${processed} processed.`);
         break;
       }
 
@@ -685,7 +700,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           // Parallel batches for both cron and manual
           // Budget is protected by Serializable transactions that retry on conflict
           for (let b = 0; b < jobs.length; b += CLIP_BATCH_SIZE) {
-            if (Date.now() - startTime > 250000) break;
+            if (Date.now() - startTime > 280_000) break;
             const batch = jobs.slice(b, b + CLIP_BATCH_SIZE);
             const batchResults = await Promise.allSettled(
               batch.map((job: any) => {

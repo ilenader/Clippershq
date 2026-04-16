@@ -119,9 +119,9 @@ export async function POST(req: NextRequest) {
         data: { clipId: newClip.id, views: fetchedStats.views, likes: fetchedStats.likes, comments: fetchedStats.comments, shares: fetchedStats.shares },
       });
 
-      // Tracking job: check immediately on next cron run, then every 2 hours
+      // Tracking job: first check in ~5 minutes (unaligned), subsequent checks align to full hours
       await tx.trackingJob.create({
-        data: { clipId: newClip.id, campaignId, nextCheckAt: roundToNextSlot(120), checkIntervalMin: 120, isActive: true },
+        data: { clipId: newClip.id, campaignId, nextCheckAt: new Date(Date.now() + 5 * 60_000), checkIntervalMin: 120, isActive: true },
       });
 
       return newClip;
