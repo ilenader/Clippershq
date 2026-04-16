@@ -89,6 +89,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const totalComments = approved.reduce((s: number, c: any) => s + (c.stats?.[0]?.comments || 0), 0);
     const totalShares = approved.reduce((s: number, c: any) => s + (c.stats?.[0]?.shares || 0), 0);
 
+    // Calculate total spend: clip earnings + agency earnings (matches /api/campaigns/spend logic)
+    const clipSpend = approved.reduce((s: number, c: any) => s + (c.earnings || 0), 0);
+    const agencyEarnings = await db.agencyEarning.aggregate({
+      where: { campaignId, clip: { videoUnavailable: false } },
+      _sum: { amount: true },
+    });
+    const totalSpent = Math.round((clipSpend + (agencyEarnings._sum.amount || 0)) * 100) / 100;
+
     return NextResponse.json({
       campaign,
       clips: clientClips,
@@ -101,6 +109,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         totalLikes,
         totalComments,
         totalShares,
+        totalSpent,
         avgViewsPerClip: approved.length > 0 ? Math.round(totalViews / approved.length) : 0,
         topViews: approved.reduce((max: number, c: any) => Math.max(max, c.stats?.[0]?.views || 0), 0),
       },

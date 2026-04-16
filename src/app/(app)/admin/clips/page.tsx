@@ -370,10 +370,14 @@ export default function AdminClipsPage() {
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.likes) : "0"}</span> <span className="text-[var(--text-muted)]">likes</span></span>
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.comments) : "0"}</span> <span className="text-[var(--text-muted)]">comments</span></span>
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.shares) : "0"}</span> <span className="text-[var(--text-muted)]">shares</span></span>
-                    {clip.earnings > 0 && (
-                      <span className="font-medium text-accent tabular-nums">
-                        {formatCurrency(clip.earnings)}
-                        {clip.bonusAmount > 0 && <span className="text-emerald-400 text-xs ml-1">(+{formatCurrency(clip.bonusAmount)} bonus)</span>}
+                    <span className="font-medium text-accent tabular-nums">
+                      {clip.earnings > 0 ? formatCurrency(clip.earnings) : "\u2014"}
+                      {clip.bonusAmount > 0 && <span className="text-emerald-400 text-xs ml-1">(+{formatCurrency(clip.bonusAmount)} bonus)</span>}
+                    </span>
+                    {clip.trackingJob?.isActive && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400" title={`Next check: ${clip.trackingJob.nextCheckAt ? formatRelative(clip.trackingJob.nextCheckAt) : "soon"}`}>
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />
+                        Next: {clip.trackingJob.nextCheckAt ? formatRelative(clip.trackingJob.nextCheckAt) : "soon"}
                       </span>
                     )}
                   </div>

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import type { SessionUser } from "@/lib/auth-types";
 import { useRouter } from "next/navigation";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -24,13 +25,16 @@ export default function ClientDashboard() {
     }
   }, [session, userRole, router]);
 
-  useEffect(() => {
-    fetch("/api/client/campaigns")
+  const loadCampaigns = useCallback(() => {
+    fetch(`/api/client/campaigns?_t=${Date.now()}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => setCampaigns(Array.isArray(data) ? data : []))
       .catch(() => { /* silent */ })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
+  useAutoRefresh(loadCampaigns, 30000);
 
   // Aggregate stats across all campaigns
   const totalViews = campaigns.reduce((s, c) => s + (c.totalViews || 0), 0);

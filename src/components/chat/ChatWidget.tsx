@@ -156,6 +156,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   const myId = userId;
   const isClipper = role === "CLIPPER" || role === "CLIENT";
   const isClientRole = role === "CLIENT";
+  const isClipperOnly = role === "CLIPPER";
 
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"list" | "thread" | "new">("list");
@@ -617,8 +618,17 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                 campaignChats.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full px-6 text-center">
                     <Megaphone className="h-12 w-12 text-[var(--text-muted)] mb-3 opacity-40" />
-                    <p className="text-sm text-[var(--text-muted)]">No campaigns joined yet</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Join a campaign to start chatting with support.</p>
+                    {isClientRole ? (
+                      <>
+                        <p className="text-sm text-[var(--text-muted)]">No campaigns assigned yet</p>
+                        <p className="text-xs text-[var(--text-muted)] mt-1">Contact the team to get access to your campaigns.</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-[var(--text-muted)]">No campaigns joined yet</p>
+                        <p className="text-xs text-[var(--text-muted)] mt-1">Join a campaign to start chatting with support.</p>
+                      </>
+                    )}
                   </div>
                 ) : (
                   campaignChats.map((chat) => (
@@ -811,12 +821,12 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
               </div>
             )}
 
-            {/* Waiting for agent — clipper view */}
+            {/* Waiting for agent — clipper/client view */}
             {isClipper && needsHumanSupport && (
               <div className="flex items-center gap-2.5 px-5 py-3 border-b border-accent/20 bg-accent/5">
                 <MessageCircle className="h-4 w-4 text-accent animate-pulse flex-shrink-0" />
                 <div>
-                  <p className="text-xs font-semibold text-[var(--text-primary)]">An agent will be with you shortly</p>
+                  <p className="text-xs font-semibold text-[var(--text-primary)]">{isClientRole ? "Your account manager will respond shortly" : "An agent will be with you shortly"}</p>
                   <p className="text-[10px] text-[var(--text-muted)]">We typically respond within a few minutes</p>
                 </div>
               </div>
@@ -830,7 +840,13 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                 </div>
               ) : messages.length === 0 ? (
                 <div className="flex flex-col h-full px-1">
-                  {isClipper ? (
+                  {isClientRole ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center">
+                      <MessageCircle className="h-12 w-12 text-accent mb-3 opacity-50" />
+                      <p className="text-sm font-medium text-[var(--text-primary)]">Connecting you with your account manager...</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1.5 max-w-[240px]">Send a message below and your account manager will respond shortly.</p>
+                    </div>
+                  ) : isClipperOnly ? (
                     <div className="flex-1 flex flex-col justify-center">
                       {/* Welcome message */}
                       <div className="flex justify-start mb-4">
@@ -934,7 +950,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                               </p>
                             </div>
                             {/* "Talk to a human" link — only show when AI is responding, hide when human is already connected */}
-                            {isClipper && !isMine && idx === messages.length - 1 && !needsHumanSupport && !threadInfo?.needsHumanSupport && (
+                            {isClipperOnly && !isMine && idx === messages.length - 1 && !needsHumanSupport && !threadInfo?.needsHumanSupport && (
                               <button
                                 onClick={() => {
                                   setNeedsHumanSupport(true);
@@ -961,7 +977,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                     );
                   })}
                   {/* Typing indicator while waiting for AI response */}
-                  {isClipper && sending && (
+                  {isClipperOnly && sending && (
                     <div className="flex justify-start">
                       <div className="flex items-end gap-2 max-w-[85%]">
                         <div className="flex-shrink-0 w-8">
@@ -981,7 +997,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
             </div>
 
             {/* Quick suggestion chips — only before first message in conversation */}
-            {isClipper && canSend && messages.length === 0 && !hasSentInThread && (
+            {isClipperOnly && canSend && messages.length === 0 && !hasSentInThread && (
               <div className="border-t border-[var(--border-subtle)] px-4 py-2.5 flex flex-wrap gap-2">
                 {QUICK_SUGGESTIONS.slice(0, 4).map((s) => (
                   <button key={s} onClick={() => handleSend(s)}
@@ -1024,7 +1040,7 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
               <div className="flex items-end gap-2.5">
                 <textarea ref={inputRef} value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)} onKeyDown={handleKeyDown}
-                  placeholder={isClipper ? "Ask about this campaign..." : "Type a message..."}
+                  placeholder={isClientRole ? "Message your account manager..." : isClipperOnly ? "Ask about this campaign..." : "Type a message..."}
                   rows={1}
                   disabled={!canSend}
                   className="flex-1 resize-none rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-4 py-3 text-[14.5px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-accent focus:ring-1 focus:ring-accent focus:outline-none transition-colors disabled:opacity-40"

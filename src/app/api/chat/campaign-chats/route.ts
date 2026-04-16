@@ -26,30 +26,47 @@ export async function GET() {
   const userId = session.user.id;
   const role = (session.user as any).role;
 
-  if (role !== "CLIPPER") {
+  if (role !== "CLIPPER" && role !== "CLIENT") {
     return NextResponse.json([], { status: 403 });
   }
 
   try {
-    // Get campaigns the clipper has joined
-    const joins = await db.campaignAccount.findMany({
-      where: { clipAccount: { userId } },
-      include: {
-        campaign: {
-          select: { id: true, name: true, platform: true, imageUrl: true, status: true, isArchived: true },
+    let uniqueCampaigns: any[];
+
+    if (role === "CLIENT") {
+      // CLIENT: get campaigns via CampaignClient assignments
+      const assignments = await db.campaignClient.findMany({
+        where: { userId },
+        include: {
+          campaign: {
+            select: { id: true, name: true, platform: true, imageUrl: true, status: true, isArchived: true },
+          },
         },
-      },
-    });
+        take: 100,
+      });
+      uniqueCampaigns = assignments
+        .map((a: any) => a.campaign)
+        .filter((c: any) => c && !c.isArchived);
+    } else {
+      // CLIPPER: get campaigns via CampaignAccount joins
+      const joins = await db.campaignAccount.findMany({
+        where: { clipAccount: { userId } },
+        include: {
+          campaign: {
+            select: { id: true, name: true, platform: true, imageUrl: true, status: true, isArchived: true },
+          },
+        },
+      });
 
-    // Only show active/paused, non-archived campaigns
-    const campaigns = joins
-      .map((j: any) => j.campaign)
-      .filter((c: any) => c && !c.isArchived);
+      const campaigns = joins
+        .map((j: any) => j.campaign)
+        .filter((c: any) => c && !c.isArchived);
 
-    // Deduplicate by campaign id (clipper may have joined with multiple accounts)
-    const uniqueCampaigns = Array.from(
-      new Map(campaigns.map((c: any) => [c.id, c])).values()
-    );
+      // Deduplicate by campaign id (clipper may have joined with multiple accounts)
+      uniqueCampaigns = Array.from(
+        new Map(campaigns.map((c: any) => [c.id, c])).values()
+      );
+    }
 
     // Find existing conversations for this clipper that are campaign-linked
     let existingConversations: any[] = [];

@@ -127,12 +127,21 @@ export async function POST(req: NextRequest) {
   // ── Mode 1: Campaign-based (clipper opens chat for a campaign) ──
   if (campaignId && !toUserId) {
     try {
-      // Verify clipper has joined this campaign
-      const membership = await db.campaignAccount.findFirst({
-        where: { campaignId, clipAccount: { userId: fromUserId } },
-      });
-      if (!membership && fromRole === "CLIPPER") {
-        return NextResponse.json({ error: "You have not joined this campaign" }, { status: 403 });
+      // Verify user has access to this campaign
+      if (fromRole === "CLIPPER") {
+        const membership = await db.campaignAccount.findFirst({
+          where: { campaignId, clipAccount: { userId: fromUserId } },
+        });
+        if (!membership) {
+          return NextResponse.json({ error: "You have not joined this campaign" }, { status: 403 });
+        }
+      } else if (fromRole === "CLIENT") {
+        const clientAccess = await db.campaignClient.findUnique({
+          where: { userId_campaignId: { userId: fromUserId, campaignId } },
+        });
+        if (!clientAccess) {
+          return NextResponse.json({ error: "You don't have access to this campaign" }, { status: 403 });
+        }
       }
 
       // Check for existing campaign conversation for this clipper

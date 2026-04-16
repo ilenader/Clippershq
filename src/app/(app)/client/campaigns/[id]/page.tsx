@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import type { SessionUser } from "@/lib/auth-types";
 import { useRouter, useParams } from "next/navigation";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,14 +28,17 @@ export default function ClientCampaignDetail() {
     }
   }, [session, userRole, router]);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     if (!campaignId) return;
-    fetch(`/api/client/campaigns/${campaignId}`)
+    fetch(`/api/client/campaigns/${campaignId}?_t=${Date.now()}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => { if (!d.error) setData(d); })
       .catch(() => { /* silent */ })
       .finally(() => setLoading(false));
   }, [campaignId]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+  useAutoRefresh(loadData, 30000);
 
   if (loading) {
     return (

@@ -68,6 +68,7 @@ export async function GET(req: NextRequest) {
         campaign: { select: { name: true, platform: true, createdById: true, isArchived: true } },
         clipAccount: { select: { username: true, platform: true } },
         stats: { orderBy: { checkedAt: "desc" }, take: 3 },
+        trackingJob: { select: { isActive: true, nextCheckAt: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 500,

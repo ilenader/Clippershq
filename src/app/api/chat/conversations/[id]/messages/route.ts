@@ -188,6 +188,22 @@ export async function POST(
       }),
     ]);
 
+    // CLIENT messages: immediately flag for human support, no AI response
+    if (role === "CLIENT") {
+      try {
+        await db.conversation.update({
+          where: { id: conversationId },
+          data: { needsHumanSupport: true },
+        });
+        // Notify owners
+        const { createNotification } = await import("@/lib/notifications");
+        const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true } });
+        for (const owner of owners) {
+          await createNotification(owner.id, "CLIP_FLAGGED", "Client message received", `A client sent a message and needs a response.`, { conversationId });
+        }
+      } catch {}
+    }
+
     // Auto-reply for clipper messages — AI chatbot with pattern fallback
     if (role === "CLIPPER") {
       try {
