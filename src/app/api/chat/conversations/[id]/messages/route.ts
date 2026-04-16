@@ -195,11 +195,39 @@ export async function POST(
           where: { id: conversationId },
           data: { needsHumanSupport: true },
         });
-        // Notify owners
         const { createNotification } = await import("@/lib/notifications");
-        const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true } });
-        for (const owner of owners) {
-          await createNotification(owner.id, "CLIP_FLAGGED", "Client message received", `A client sent a message and needs a response.`, { conversationId });
+
+        // Find the campaign team to notify
+        const convo = await db.conversation.findUnique({
+          where: { id: conversationId },
+          select: { campaignId: true },
+        });
+        let notifyUserIds: string[] = [];
+        if (convo?.campaignId) {
+          const teamCampaign = await db.teamCampaign.findFirst({
+            where: { campaignId: convo.campaignId },
+            include: {
+              team: {
+                include: {
+                  members: {
+                    include: { user: { select: { id: true } } },
+                    orderBy: { role: "asc" },
+                  },
+                },
+              },
+            },
+          });
+          if (teamCampaign?.team?.members?.length) {
+            notifyUserIds = teamCampaign.team.members.map((m: any) => m.userId);
+          }
+        }
+        // Fallback to owners if no team found
+        if (notifyUserIds.length === 0) {
+          const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true } });
+          notifyUserIds = owners.map((o: any) => o.id);
+        }
+        for (const uid of notifyUserIds) {
+          await createNotification(uid, "CLIP_FLAGGED", "Client message received", "A client sent a message and needs a response.", { conversationId });
         }
       } catch {}
     }
