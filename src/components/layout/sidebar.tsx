@@ -45,7 +45,6 @@ const clientNav: NavSection[] = [
   {
     items: [
       { label: "Dashboard", href: "/client", icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
-      { label: "Campaigns", href: "/client/campaigns", icon: <Megaphone className="h-[18px] w-[18px]" /> },
     ],
   },
 ];

@@ -142,6 +142,12 @@ function RoleBadge({ role }: { role: string }) {
   if (role === "ADMIN") {
     return <span className="inline-block rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">Admin</span>;
   }
+  if (role === "CLIENT") {
+    return <span className="inline-block rounded-md bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">Client</span>;
+  }
+  if (role === "CLIPPER") {
+    return <span className="inline-block rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-400">Clipper</span>;
+  }
   return null;
 }
 
@@ -909,9 +915,9 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                       || prev.senderId !== msg.senderId
                       || (!!prev.isAI !== !!msg.isAI);
                     const showAvatar = !isMine && isNewSenderGroup;
-                    // Human admin/owner message (NOT AI): show their name + role badge
+                    // Human message (NOT AI): show name + role badge for all roles
                     const senderRole = sender.role;
-                    const showRole = !isMine && isNewSenderGroup && !isAIMsg && (senderRole === "ADMIN" || senderRole === "OWNER");
+                    const showRole = !isMine && isNewSenderGroup && !isAIMsg;
                     return (
                       <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                         <div className={`flex items-end gap-2 max-w-[85%] ${isMine ? "flex-row-reverse" : ""}`}>
