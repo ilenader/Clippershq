@@ -3,8 +3,8 @@
  * Fetches real stats via Apify and saves new ClipStat snapshots.
  *
  * Tiered schedule:
- *   Phase 1 (0-72h after submission):  every 60 min
- *   Phase 2 (72h+): view-bracket + growth-per-hour based intervals, capped at 8h
+ *   Phase 1 (0-48h after submission):  every 60 min
+ *   Phase 2 (48h+): view-bracket + growth-per-hour based intervals, capped at 8h
  *
  *   Max interval: 8h (480 min) for all live clips.
  *   Actually-dead override: 12h (720 min).
@@ -20,7 +20,7 @@ import { logCampaignEvent } from "@/lib/campaign-events";
 
 /**
  * Determine the next check interval based on view bracket and growth per hour.
- * Phase 1 (0-72h): 60 min. Phase 2 (72h+): view-bracket + growthPerHour logic, capped at 8h.
+ * Phase 1 (0-48h): 60 min. Phase 2 (48h+): view-bracket + growthPerHour logic, capped at 8h.
  */
 async function getNextInterval(
   currentIntervalMin: number,
@@ -34,8 +34,8 @@ async function getNextInterval(
     ? (Date.now() - new Date(clipCreatedAt).getTime()) / 3_600_000
     : 999;
 
-  // Phase 1: first 72 hours → always 60 min (hourly checks for 3 days)
-  if (hoursSinceSubmission <= 72) return 60;
+  // Phase 1: first 48 hours → always 60 min (hourly checks for 2 days)
+  if (hoursSinceSubmission <= 48) return 60;
 
   // Phase 2: view-bracket + growth-per-hour
   const growthPercent = previousViews > 0
@@ -114,37 +114,43 @@ async function getNextInterval(
 
     // Resurrection check: was at the actually-dead interval (>=12h) and suddenly gained 5000+ views
     if (currentIntervalMin >= 720 && (currentViews - previousViews) >= 5000) {
-      interval = 120;
-      bracket = "resurrected";
-      console.log(`[TRACKING-INTERVAL] Clip ${clipId} resurrected: ${previousViews}→${currentViews} views, checking fraud`);
+      // Don't resurrect REJECTED clips — they stay at their long interval
+      const clipInfo = await db.clip.findUnique({ where: { id: clipId }, select: { status: true } });
+      if (clipInfo?.status === "REJECTED") {
+        console.log(`[TRACKING-INTERVAL] Clip ${clipId} gained ${currentViews - previousViews} views but is REJECTED — skipping resurrection`);
+      } else {
+        interval = 120;
+        bracket = "resurrected";
+        console.log(`[TRACKING-INTERVAL] Clip ${clipId} resurrected: ${previousViews}→${currentViews} views, checking fraud`);
 
-      // Run fraud check on resurrected clip
-      const allStats = await db.clipStat.findMany({
-        where: { clipId },
-        orderBy: { checkedAt: "desc" },
-        take: 10,
-        select: { views: true, likes: true, comments: true, shares: true },
-      });
-      const fraudResult = computeFraudLevel({ stats: allStats });
-      if (fraudResult.level === "FLAGGED" || fraudResult.level === "HIGH_RISK") {
-        await db.clip.update({
-          where: { id: clipId },
-          data: { status: "FLAGGED", fraudScore: fraudResult.score, fraudReasons: JSON.stringify(fraudResult.reasons), fraudCheckedAt: new Date() },
+        // Run fraud check on resurrected clip
+        const allStats = await db.clipStat.findMany({
+          where: { clipId },
+          orderBy: { checkedAt: "desc" },
+          take: 10,
+          select: { views: true, likes: true, comments: true, shares: true },
         });
-        try {
-          const { createNotification } = await import("@/lib/notifications");
-          const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true } });
-          for (const owner of owners) {
-            await createNotification(
-              owner.id,
-              "CLIP_FLAGGED",
-              "Resurrected clip flagged",
-              `Clip gained ${currentViews - previousViews} views after being dead. Fraud: ${fraudResult.level} (score: ${fraudResult.score})`,
-              { clipId, fraudScore: fraudResult.score },
-            );
-          }
-        } catch {}
-        console.log(`[TRACKING-INTERVAL] Clip ${clipId} resurrected and FLAGGED (fraud: ${fraudResult.level}, score: ${fraudResult.score})`);
+        const fraudResult = computeFraudLevel({ stats: allStats });
+        if (fraudResult.level === "FLAGGED" || fraudResult.level === "HIGH_RISK") {
+          await db.clip.update({
+            where: { id: clipId },
+            data: { status: "FLAGGED", fraudScore: fraudResult.score, fraudReasons: JSON.stringify(fraudResult.reasons), fraudCheckedAt: new Date() },
+          });
+          try {
+            const { createNotification } = await import("@/lib/notifications");
+            const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true } });
+            for (const owner of owners) {
+              await createNotification(
+                owner.id,
+                "CLIP_FLAGGED",
+                "Resurrected clip flagged",
+                `Clip gained ${currentViews - previousViews} views after being dead. Fraud: ${fraudResult.level} (score: ${fraudResult.score})`,
+                { clipId, fraudScore: fraudResult.score },
+              );
+            }
+          } catch {}
+          console.log(`[TRACKING-INTERVAL] Clip ${clipId} resurrected and FLAGGED (fraud: ${fraudResult.level}, score: ${fraudResult.score})`);
+        }
       }
     }
   } catch (err: any) {
