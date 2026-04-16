@@ -11,12 +11,14 @@ const TIMEFRAME_OPTIONS = [
 interface TimeframeSelectProps {
   value: number;
   onChange: (days: number) => void;
+  includeAll?: boolean;
 }
 
-export function TimeframeSelect({ value, onChange }: TimeframeSelectProps) {
+export function TimeframeSelect({ value, onChange, includeAll = false }: TimeframeSelectProps) {
+  const options = includeAll ? [{ value: 0, label: "All" }, ...TIMEFRAME_OPTIONS] : TIMEFRAME_OPTIONS;
   return (
     <div className="flex gap-1 rounded-xl border border-[var(--border-color)] p-0.5">
-      {TIMEFRAME_OPTIONS.map((opt) => (
+      {options.map((opt) => (
         <button
           key={opt.value}
           type="button"

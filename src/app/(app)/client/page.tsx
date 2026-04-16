@@ -57,7 +57,7 @@ export default function ClientDashboard() {
   const [exporting, setExporting] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(false);
-  const [timeframeDays, setTimeframeDays] = useState(15);
+  const [timeframeDays, setTimeframeDays] = useState(0);
 
   useEffect(() => {
     if (session && userRole && userRole !== "CLIENT" && userRole !== "OWNER") {
@@ -149,6 +149,7 @@ export default function ClientDashboard() {
   }
 
   const campaign = detail?.campaign || selectedCampaign;
+  const summary = detail?.summary; // Always all-time (from API) — used for budget, views, clips, avg
   const allClips = detail?.clips || [];
   const allDailyBreakdown = detail?.dailyBreakdown || [];
 
@@ -160,31 +161,27 @@ export default function ClientDashboard() {
     return `${y}-${m}-${dd}`;
   };
 
+  const isAllTime = timeframeDays === 0;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const cutoff = new Date(today);
   cutoff.setDate(cutoff.getDate() - (timeframeDays - 1));
   const cutoffIso = toLocalIso(cutoff);
 
-  // Filter clips and daily breakdown by timeframe
-  const filteredClips = allClips.filter((c: any) => {
-    if (!c.submitted) return false;
-    return toLocalIso(new Date(c.submitted)) >= cutoffIso;
-  });
-  const filteredDailyBreakdown = allDailyBreakdown.filter((d: any) => d.date && d.date >= cutoffIso);
+  // Filter clips and daily breakdown by timeframe (no filter when All)
+  const filteredClips = isAllTime
+    ? allClips
+    : allClips.filter((c: any) => c.submitted && toLocalIso(new Date(c.submitted)) >= cutoffIso);
+  const filteredDailyBreakdown = isAllTime
+    ? allDailyBreakdown
+    : allDailyBreakdown.filter((d: any) => d.date && d.date >= cutoffIso);
 
-  // Recompute summary from filtered clips
+  // Engagement totals (likes/comments/shares/topViews) reflect the filtered timeframe
   const approvedFiltered = filteredClips.filter((c: any) => c.status === "APPROVED");
-  const filteredTotalViews = approvedFiltered.reduce((s: number, c: any) => s + (c.views || 0), 0);
-  const summary = {
-    totalSpent: approvedFiltered.reduce((s: number, c: any) => s + (c.earnings || 0), 0),
-    totalViews: filteredTotalViews,
+  const engagement = {
     totalLikes: approvedFiltered.reduce((s: number, c: any) => s + (c.likes || 0), 0),
     totalComments: approvedFiltered.reduce((s: number, c: any) => s + (c.comments || 0), 0),
     totalShares: approvedFiltered.reduce((s: number, c: any) => s + (c.shares || 0), 0),
-    approvedClips: approvedFiltered.length,
-    pendingClips: filteredClips.filter((c: any) => c.status === "PENDING").length,
-    avgViewsPerClip: approvedFiltered.length > 0 ? Math.round(filteredTotalViews / approvedFiltered.length) : 0,
     topViews: approvedFiltered.reduce((max: number, c: any) => Math.max(max, c.views || 0), 0),
   };
 
@@ -193,15 +190,23 @@ export default function ClientDashboard() {
   const displayClips = sortedClips.slice(0, 50);
   const hasMoreClips = sortedClips.length > 50;
 
-  // Chart data: fill every day in the selected timeframe so gaps show as zeros
-  const byDate = new Map<string, any>(filteredDailyBreakdown.map((d: any) => [d.date, d]));
-  const chartData: { date: string; views: number }[] = [];
-  for (let i = timeframeDays - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const iso = toLocalIso(d);
-    const entry = byDate.get(iso);
-    chartData.push({ date: iso.slice(5), views: entry?.views || 0 });
+  // Chart data: when All, show raw daily breakdown; else fill every day in range so gaps show as zeros
+  let chartData: { date: string; views: number }[];
+  if (isAllTime) {
+    chartData = allDailyBreakdown.map((d: any) => ({
+      date: (d.date || "").slice(5),
+      views: d.views || 0,
+    }));
+  } else {
+    const byDate = new Map<string, any>(filteredDailyBreakdown.map((d: any) => [d.date, d]));
+    chartData = [];
+    for (let i = timeframeDays - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const iso = toLocalIso(d);
+      const entry = byDate.get(iso);
+      chartData.push({ date: iso.slice(5), views: entry?.views || 0 });
+    }
   }
 
   // Daily totals for filtered breakdown
@@ -341,13 +346,13 @@ export default function ClientDashboard() {
             </Card>
           </div>
 
-          {/* ─── C) ENGAGEMENT ROW ─── */}
+          {/* ─── C) ENGAGEMENT ROW (timeframe-filtered) ─── */}
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
             {[
-              { label: "Likes", value: summary?.totalLikes || 0, icon: <Heart className="h-4 w-4" /> },
-              { label: "Comments", value: summary?.totalComments || 0, icon: <MessageCircle className="h-4 w-4" /> },
-              { label: "Shares", value: summary?.totalShares || 0, icon: <Share2 className="h-4 w-4" /> },
-              { label: "Top Clip", value: summary?.topViews || 0, icon: <Trophy className="h-4 w-4" /> },
+              { label: "Likes", value: engagement.totalLikes, icon: <Heart className="h-4 w-4" /> },
+              { label: "Comments", value: engagement.totalComments, icon: <MessageCircle className="h-4 w-4" /> },
+              { label: "Shares", value: engagement.totalShares, icon: <Share2 className="h-4 w-4" /> },
+              { label: "Top Clip", value: engagement.topViews, icon: <Trophy className="h-4 w-4" /> },
             ].map((stat) => (
               <div key={stat.label} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3">
                 <div className="flex items-center justify-between">
@@ -363,7 +368,7 @@ export default function ClientDashboard() {
           <Card>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">Views Over Time</h3>
-              <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
+              <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} includeAll />
             </div>
             {chartData.some((d) => d.views > 0) ? (
               <div className="h-[220px] sm:h-[260px]">
