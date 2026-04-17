@@ -144,19 +144,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await db.$transaction(async (tx: any) => {
-      // Duplicate check: reject if a REQUESTED payout exists for this user+campaign in the last 10 seconds
-      const tenSecondsAgo = new Date(Date.now() - 10_000);
-      const recentDuplicate = await tx.payoutRequest.findFirst({
+      // Duplicate check: reject if ANY pending payout (REQUESTED / UNDER_REVIEW / APPROVED) exists
+      // for this user+campaign. Only one in-flight payout per user per campaign.
+      const pendingDuplicate = await tx.payoutRequest.findFirst({
         where: {
           userId,
           campaignId,
-          status: "REQUESTED",
-          createdAt: { gte: tenSecondsAgo },
+          status: { in: ["REQUESTED", "UNDER_REVIEW", "APPROVED"] },
         },
         select: { id: true },
       });
-      if (recentDuplicate) {
-        console.log(`[PAYOUT] Duplicate request blocked for user ${userId}`);
+      if (pendingDuplicate) {
+        console.log(`[PAYOUT] Pending payout already exists for user ${userId} on campaign ${campaignId}`);
         throw new Error("DUPLICATE_PAYOUT");
       }
 
@@ -214,7 +213,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result, { status: 201 });
   } catch (err: any) {
     if (err.message === "DUPLICATE_PAYOUT") {
-      return NextResponse.json({ error: "A payout request was just submitted. Please wait before trying again." }, { status: 409 });
+      return NextResponse.json({ error: "You already have a pending payout for this campaign. Wait for it to be reviewed before requesting another." }, { status: 409 });
     }
     if (err.message?.includes("Amount exceeds available balance")) {
       return NextResponse.json({ error: err.message }, { status: 400 });

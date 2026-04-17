@@ -39,8 +39,10 @@ async function getNextInterval(
   if (hoursSinceSubmission <= 48) return 60;
 
   // Phase 2: view-bracket + growth-per-hour
+  // Guard against negative growth (API glitches, view-count corrections) — treat as flat
+  const viewDelta = Math.max(0, currentViews - previousViews);
   const growthPercent = previousViews > 0
-    ? ((currentViews - previousViews) / previousViews) * 100
+    ? (viewDelta / previousViews) * 100
     : (currentViews > 0 ? 100 : 0);
 
   let hoursSinceLastCheck = lastCheckedAt
@@ -318,7 +320,13 @@ async function processTrackingJob(
       select: { status: true, budget: true, lastBudgetPauseAt: true },
     });
 
-    if (clip.status === "APPROVED" && clip.campaign && freshCampaign?.status !== "PAUSED" && freshCampaign?.status !== "ARCHIVED") {
+    // Banned users: still save stats (for view tracking), but skip earnings recalculation so they can't earn further
+    const userBanned = (clip as any).user?.status === "BANNED";
+    if (userBanned) {
+      console.log(`[TRACKING] Clip ${clip.id}: user is BANNED — stats saved but earnings frozen`);
+    }
+
+    if (!userBanned && clip.status === "APPROVED" && clip.campaign && freshCampaign?.status !== "PAUSED" && freshCampaign?.status !== "ARCHIVED") {
       // Budget-lock: old clips from before a budget pause keep their earnings
       const oldEarnings = clip.earnings || 0;
       const budgetPauseAt = freshCampaign?.lastBudgetPauseAt ? new Date(freshCampaign.lastBudgetPauseAt) : null;
@@ -645,7 +653,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
             id: true, userId: true, clipUrl: true, status: true, earnings: true,
             campaignId: true, createdAt: true, isOwnerOverride: true, videoUnavailable: true, savedEarnings: true,
             campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true } },
-            user: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true } },
+            user: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true, status: true } },
           },
         },
       },

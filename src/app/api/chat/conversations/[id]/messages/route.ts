@@ -155,8 +155,11 @@ export async function POST(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const content = (body.content || "").trim();
-  if (!content) return NextResponse.json({ error: "Message content is required" }, { status: 400 });
+  if (body.content != null && typeof body.content !== "string") {
+    return NextResponse.json({ error: "Message content must be a string" }, { status: 400 });
+  }
+  const content = (typeof body.content === "string" ? body.content : "").trim();
+  if (!content) return NextResponse.json({ error: "Message cannot be empty" }, { status: 400 });
   if (content.length > 5000) {
     return NextResponse.json({ error: "Message is too long (max 5000 chars)" }, { status: 400 });
   }

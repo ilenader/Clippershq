@@ -151,10 +151,13 @@ export async function POST(req: NextRequest) {
     // ── RULE: Max clips per user per day per campaign ──
     const campaign = await db.campaign.findUnique({
       where: { id: data.campaignId },
-      select: { maxClipsPerUserPerDay: true, status: true, budget: true, platform: true },
+      select: { maxClipsPerUserPerDay: true, status: true, budget: true, platform: true, isArchived: true },
     });
     if (!campaign || campaign.status === "DRAFT" || campaign.status === "COMPLETED") {
       return NextResponse.json({ error: "This campaign is not available for submissions right now." }, { status: 400 });
+    }
+    if (campaign.isArchived) {
+      return NextResponse.json({ error: "This campaign has been archived" }, { status: 400 });
     }
     if (campaign.status === "PAUSED") {
       return NextResponse.json({ error: "This campaign is paused — budget limit reached. Check out other active campaigns!" }, { status: 400 });

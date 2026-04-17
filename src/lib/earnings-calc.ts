@@ -97,7 +97,7 @@ export function calculateClipEarnings(input: EarningsInput): number {
   if (campaignMaxPayoutPerClip && campaignMaxPayoutPerClip > 0) {
     earnings = Math.min(earnings, campaignMaxPayoutPerClip);
   }
-  return Math.round(earnings * 100) / 100;
+  return Math.max(0, Math.round(earnings * 100) / 100);
 }
 
 // ─── Main earnings calculation ──────────────────────────────
@@ -173,14 +173,15 @@ export function calculateClipperEarnings(input: ClipperEarningsInput): EarningsB
   // Fee is applied once at payout time, not at earnings calculation time.
   const fee = grossClipper * (effectiveFee / 100);
 
+  // Floor all monetary outputs at 0 — never return negative earnings downstream
   return {
-    clipperEarnings: round2(grossClipper),       // GROSS earnings (base + bonus, before fee)
-    platformFee: round2(fee),                     // For reference only — not subtracted
+    clipperEarnings: Math.max(0, round2(grossClipper)),       // GROSS earnings (base + bonus, before fee)
+    platformFee: Math.max(0, round2(fee)),                     // For reference only — not subtracted
     bonusPercent: totalBonusPercent,
-    bonusAmount: round2(bonusAmount),
-    baseEarnings: round2(baseEarnings),
+    bonusAmount: Math.max(0, round2(bonusAmount)),
+    baseEarnings: Math.max(0, round2(baseEarnings)),
     effectiveFeePercent: effectiveFee,
-    grossClipperEarnings: round2(grossClipper),   // Same as clipperEarnings now
+    grossClipperEarnings: Math.max(0, round2(grossClipper)),   // Same as clipperEarnings now
   };
 }
 
@@ -253,7 +254,7 @@ export function recalculateClipEarnings(clip: {
     isReferred: !!clip.user?.referredById,
     isPWAUser: clip.user?.isPWAUser ?? false,
   });
-  return result.clipperEarnings;
+  return Math.max(0, result.clipperEarnings);
 }
 
 /** Full breakdown version of recalculateClipEarnings */
@@ -313,14 +314,14 @@ export function calculateOwnerEarnings(
 
   // If clipper earnings and CPM are provided, use proportional calculation
   if (clipperGrossEarnings != null && clipperCpm && clipperCpm > 0) {
-    return round2(clipperGrossEarnings * (ownerCpm / clipperCpm));
+    return Math.max(0, round2(clipperGrossEarnings * (ownerCpm / clipperCpm)));
   }
 
   // Fallback: raw views × ownerCpm (no cap context available).
   // This path only runs for display/reference when clipperGrossEarnings is not provided.
   // Actual earnings calculation always passes clipperGrossEarnings, so maxPayoutPerClip
   // is enforced through the proportional path above.
-  return round2((views / 1000) * ownerCpm);
+  return Math.max(0, round2((views / 1000) * ownerCpm));
 }
 
 function round2(n: number): number {
