@@ -26,6 +26,23 @@ const statusOptions = [
   { value: "FLAGGED", label: "Flagged" },
 ];
 
+/**
+ * Render `trackingJob.nextCheckAt` as a human-readable label.
+ * "just now" / "1 minute ago" from formatRelative was confusing — clips overdue by seconds
+ * look indistinguishable from clips checked moments ago. This is explicit about state.
+ */
+function formatNextCheck(nextCheckAt: string | Date | null | undefined): { text: string; color: string } {
+  if (!nextCheckAt) return { text: "Not scheduled", color: "text-[var(--text-muted)]" };
+  const next = new Date(nextCheckAt);
+  const diffMin = Math.round((next.getTime() - Date.now()) / 60000);
+  if (diffMin <= 0) return { text: "Checking soon", color: "text-amber-400" };
+  if (diffMin <= 60) return { text: `Next: ${diffMin}min`, color: "text-[var(--text-muted)]" };
+  return {
+    text: `Next: ${next.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+    color: "text-[var(--text-muted)]",
+  };
+}
+
 const fraudColors: Record<FraudLevel, { bg: string; text: string; border: string }> = {
   CLEAN: { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/20" },
   SUSPECT: { bg: "bg-yellow-500/10", text: "text-yellow-400", border: "border-yellow-500/20" },
@@ -372,14 +389,21 @@ export default function AdminClipsPage() {
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.shares) : "0"}</span> <span className="text-[var(--text-muted)]">shares</span></span>
                     <span className="font-medium text-accent tabular-nums">
                       {clip.earnings > 0 ? formatCurrency(clip.earnings) : "\u2014"}
-                      {clip.bonusAmount > 0 && <span className="text-emerald-400 text-xs ml-1">(+{formatCurrency(clip.bonusAmount)} bonus)</span>}
+                      {clip.bonusAmount > 0 && (
+                        <span className="text-emerald-400 text-xs ml-1">
+                          (+{formatCurrency(clip.bonusAmount)} bonus{clip.bonusPercent > 0 ? ` · ${clip.bonusPercent}%` : ""})
+                        </span>
+                      )}
                     </span>
-                    {clip.trackingJob?.isActive && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400" title={`Next check: ${clip.trackingJob.nextCheckAt ? formatRelative(clip.trackingJob.nextCheckAt) : "soon"}`}>
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />
-                        Next: {clip.trackingJob.nextCheckAt ? formatRelative(clip.trackingJob.nextCheckAt) : "soon"}
-                      </span>
-                    )}
+                    {clip.trackingJob?.isActive && (() => {
+                      const { text, color } = formatNextCheck(clip.trackingJob.nextCheckAt);
+                      return (
+                        <span className={`inline-flex items-center gap-1 text-[11px] ${color}`} title={clip.trackingJob.nextCheckAt ? new Date(clip.trackingJob.nextCheckAt).toString() : "soon"}>
+                          <span className={`h-1.5 w-1.5 rounded-full inline-block ${color === "text-amber-400" ? "bg-amber-400" : "bg-emerald-400"}`} />
+                          {text}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
 

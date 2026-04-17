@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import type { SessionUser } from "@/lib/auth-types";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatRelative } from "@/lib/utils";
@@ -73,6 +73,23 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchData([], true); }, [fetchData]);
   useAutoRefresh(() => fetchData(selectedCampaigns), 15000);
+
+  // Real-time: Ably pushes clip/earnings updates as window events. Debounce 500ms in case
+  // multiple events fire together (e.g., clip_updated + earnings_updated from the same action).
+  const sseDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const handler = () => {
+      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
+      sseDebounceRef.current = setTimeout(() => fetchData(selectedCampaigns), 500);
+    };
+    window.addEventListener("sse:clip_updated", handler);
+    window.addEventListener("sse:earnings_updated", handler);
+    return () => {
+      window.removeEventListener("sse:clip_updated", handler);
+      window.removeEventListener("sse:earnings_updated", handler);
+      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
+    };
+  }, [fetchData, selectedCampaigns]);
 
   const handleCampaignChange = useCallback((values: string[]) => {
     setSelectedCampaigns(values);

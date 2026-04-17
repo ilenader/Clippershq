@@ -831,5 +831,13 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
   }
 
   console.log(`[TRACKING] Completed: ${processed} processed, ${errors} errors`);
+  if (source === "manual") {
+    // Manual "Check Clips Now" reliability signal — if (due - processed - errors) > 0, we
+    // either hit the 280s timeout or processedCampaignIds starvation; check the details[].
+    // campaignIds filter (if set) already scopes this down — full-unfiltered manual runs over
+    // 500 clips are expected to partially-complete.
+    const due = (details.find((d) => d.startsWith("Found")) || "").match(/(\d+)/)?.[1] || "?";
+    console.log(`[TRACKING] Manual check summary: ${processed}/${due} processed, ${errors} errors, elapsed=${Math.round((Date.now() - startTime) / 1000)}s`);
+  }
   return { processed, errors, details };
 }

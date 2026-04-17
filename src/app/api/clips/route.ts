@@ -126,10 +126,15 @@ export async function POST(req: NextRequest) {
 
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
+  // Timing breakdown — helps diagnose slow submissions. Stage deltas logged on each step.
+  const tStart = Date.now();
+  const tMark = (label: string) => console.log(`[CLIP-SUBMIT-TIMING] ${label}: ${Date.now() - tStart}ms`);
+
   try {
     const account = await db.clipAccount.findFirst({
       where: { id: data.clipAccountId, userId: session.user.id, status: "APPROVED" },
     });
+    tMark("account lookup");
     if (!account) {
       return NextResponse.json({ error: "Your account must be approved before submitting clips. Check your Accounts page." }, { status: 400 });
     }
@@ -143,6 +148,7 @@ export async function POST(req: NextRequest) {
     const membership = await db.campaignAccount.findFirst({
       where: { campaignId: data.campaignId, clipAccountId: { in: userAccountIds } },
     });
+    tMark("membership check");
     if (!membership) {
       console.log(`[CLIPS] Join check failed: user=${session.user.id}, campaign=${data.campaignId}, account=${data.clipAccountId}, userAccountIds=${userAccountIds.join(",")}`);
       return NextResponse.json({ error: "You must join this campaign before submitting clips." }, { status: 403 });
@@ -153,6 +159,7 @@ export async function POST(req: NextRequest) {
       where: { id: data.campaignId },
       select: { maxClipsPerUserPerDay: true, status: true, budget: true, platform: true, isArchived: true },
     });
+    tMark("campaign lookup");
     if (!campaign || campaign.status === "DRAFT" || campaign.status === "COMPLETED") {
       return NextResponse.json({ error: "This campaign is not available for submissions right now." }, { status: 400 });
     }
@@ -221,7 +228,9 @@ export async function POST(req: NextRequest) {
       // Fetch REAL post time + stats from Apify — never trust user input
       try {
         console.log(`[CLIP-SUBMIT] Fetching stats for URL: ${data.clipUrl}`);
+        const tApify = Date.now();
         const stats = await fetchClipStats(data.clipUrl);
+        console.log(`[CLIP-SUBMIT-TIMING] Apify fetch (${platform}): ${Date.now() - tApify}ms`);
         console.log(`[CLIP-SUBMIT] Stats result: views=${stats.views} likes=${stats.likes} comments=${stats.comments} shares=${stats.shares} createdAt=${stats.createdAt || "null"}`);
         console.log(`[FRESHNESS] ${platform} createdAt: ${stats.createdAt || "null"}`);
         if (stats.createdAt) {
@@ -302,6 +311,8 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    tMark("freshness/verification");
+
     // Normalize URL for duplicate detection: strip protocol, www, query, hash, trailing slash
     const normalizedUrl = data.clipUrl.trim().toLowerCase()
       .split("?")[0]
@@ -333,6 +344,7 @@ export async function POST(req: NextRequest) {
     if (existingByUser) {
       return NextResponse.json({ error: "You've already submitted this clip URL to another campaign." }, { status: 400 });
     }
+    tMark("duplicate checks");
 
     // Create clip, first snapshot, and tracking job atomically
     const clip = await db.$transaction(async (tx: any) => {
@@ -384,6 +396,7 @@ export async function POST(req: NextRequest) {
     // Update clipper streak (non-blocking)
     import("@/lib/gamification").then(({ updateStreak }) => updateStreak(session.user.id)).catch(() => {});
 
+    tMark("TOTAL");
     return NextResponse.json(clip, { status: 201 });
   } catch (err: any) {
     console.error("DB clip create failed:", err?.message);
