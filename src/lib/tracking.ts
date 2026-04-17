@@ -343,11 +343,26 @@ async function processTrackingJob(
         console.log(`[BUDGET-LOCK] Clip ${clip.id} locked at $${clip.earnings} — submitted before budget pause`);
         // Still update stats below, but skip earnings recalculation
       } else {
-      // Normal earnings calculation
+      // Normal earnings calculation.
+      // Fetch current gamification state so the clip is recomputed with TODAY's bonus,
+      // not whatever was stored on the User row at the last write. getGamificationState
+      // is 30s-cached per instance and internally triggers streak eval — so if the streak
+      // just broke, recalculateUnpaidEarnings already fired for ALL unpaid clips before
+      // we reach here. Fall back to stored level/streak/PWA on any failure.
+      let currentBonusOverride: number | undefined;
+      try {
+        const { getGamificationState } = await import("@/lib/gamification");
+        const gamState = await getGamificationState(clip.userId);
+        if (gamState) currentBonusOverride = gamState.bonusPercent;
+      } catch (gamErr: any) {
+        console.error(`[TRACKING] getGamificationState failed for clip ${clip.id}:`, gamErr?.message);
+      }
+
       const breakdown = recalculateClipEarningsBreakdown({
         stats: [{ views: stats.views }],
         campaign: clip.campaign,
         user: clip.user,
+        bonusOverride: currentBonusOverride,
       });
       let newEarnings = breakdown.clipperEarnings;
 

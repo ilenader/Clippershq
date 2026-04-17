@@ -258,7 +258,12 @@ export function recalculateClipEarnings(clip: {
   return Math.max(0, result.clipperEarnings);
 }
 
-/** Full breakdown version of recalculateClipEarnings */
+/**
+ * Full breakdown version of recalculateClipEarnings.
+ * Pass `bonusOverride` to force a specific total bonus % (e.g., when tracking wants to use
+ * the user's CURRENT gamification bonus instead of recomputing from their stored level/streak/PWA,
+ * which may be stale if streak hasn't been re-evaluated yet).
+ */
 export function recalculateClipEarningsBreakdown(clip: {
   stats: { views: number }[];
   campaign: {
@@ -269,6 +274,7 @@ export function recalculateClipEarningsBreakdown(clip: {
     ownerCpm?: number | null;
   };
   user?: { level?: number; currentStreak?: number; referredById?: string | null; isPWAUser?: boolean };
+  bonusOverride?: number;
 }): EarningsBreakdown {
   const latestStat = clip.stats[0];
   const empty: EarningsBreakdown = { clipperEarnings: 0, platformFee: 0, bonusPercent: 0, bonusAmount: 0, baseEarnings: 0, effectiveFeePercent: 9, grossClipperEarnings: 0 };
@@ -284,6 +290,7 @@ export function recalculateClipEarningsBreakdown(clip: {
     clipperStreak: clip.user?.currentStreak || 0,
     isReferred: !!clip.user?.referredById,
     isPWAUser: clip.user?.isPWAUser ?? false,
+    manualBonusOverride: clip.bonusOverride ?? null,
   });
 }
 
