@@ -24,6 +24,7 @@ interface Campaign {
   imageUrl?: string | null;
   platform?: string | null;
   status?: string | null;
+  totalUnread?: number;
 }
 
 interface Channel {
@@ -90,30 +91,27 @@ export default function CommunityPage() {
   const isAdmin = viewerRole === "OWNER" || viewerRole === "ADMIN";
 
   // --- Campaign list -----------------------------------------------
+  // Uses the dedicated /api/community/campaigns endpoint — handles role-based filtering
+  // server-side AND returns per-campaign unread totals in one round-trip.
   const loadCampaigns = useCallback(async () => {
     try {
-      if (isAdmin) {
-        const res = await fetch("/api/campaigns?scope=manage");
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : [];
-        setCampaigns(list);
-        if (!selectedCampaignId && list.length > 0) setSelectedCampaignId(list[0].id);
-      } else {
-        const [joinsRes, campaignsRes] = await Promise.all([
-          fetch("/api/campaign-accounts"),
-          fetch("/api/campaigns"),
-        ]);
-        const [joins, all] = await Promise.all([joinsRes.json(), campaignsRes.json()]);
-        const joinedIds = new Set((Array.isArray(joins) ? joins : []).map((j: any) => j.campaignId));
-        const mine = (Array.isArray(all) ? all : []).filter((c: any) => joinedIds.has(c.id));
-        setCampaigns(mine);
-        if (!selectedCampaignId && mine.length > 0) setSelectedCampaignId(mine[0].id);
-      }
+      const res = await fetch("/api/community/campaigns");
+      const data = await res.json();
+      const list: Campaign[] = Array.isArray(data?.campaigns) ? data.campaigns : [];
+      setCampaigns(list);
+      if (!selectedCampaignId && list.length > 0) setSelectedCampaignId(list[0].id);
     } catch {}
     setLoadingCampaigns(false);
-  }, [isAdmin, selectedCampaignId]);
+  }, [selectedCampaignId]);
 
   useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
+
+  // Refresh campaign unread counts whenever a channel message arrives.
+  useEffect(() => {
+    const handler = () => { loadCampaigns(); };
+    window.addEventListener("sse:channel_message", handler);
+    return () => window.removeEventListener("sse:channel_message", handler);
+  }, [loadCampaigns]);
 
   // --- Channels for the selected campaign ---------------------------
   const loadChannels = useCallback(async (cid: string) => {
@@ -301,6 +299,11 @@ export default function CommunityPage() {
                 <p className="text-sm font-medium text-[var(--text-primary)] truncate">{c.name}</p>
                 <p className="text-xs text-[var(--text-muted)] truncate">{c.platform}</p>
               </div>
+              {(c.totalUnread || 0) > 0 && (
+                <span className="h-5 min-w-5 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center px-1.5 tabular-nums flex-shrink-0">
+                  {(c.totalUnread || 0) > 99 ? "99+" : c.totalUnread}
+                </span>
+              )}
               <ChevronRight className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
             </Link>
           ))
@@ -457,6 +460,7 @@ function CampaignRow({
   active: boolean;
   onSelect: () => void;
 }) {
+  const unread = campaign.totalUnread || 0;
   return (
     <button
       onClick={onSelect}
@@ -475,6 +479,11 @@ function CampaignRow({
         </p>
         <p className="text-[11px] text-[var(--text-muted)] truncate">{campaign.platform}</p>
       </div>
+      {unread > 0 && (
+        <span className="flex-shrink-0 h-5 min-w-5 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center px-1.5 tabular-nums">
+          {unread > 99 ? "99+" : unread}
+        </span>
+      )}
     </button>
   );
 }

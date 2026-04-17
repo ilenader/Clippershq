@@ -100,19 +100,54 @@ export async function getCampaignSubscriberIds(campaignId: string): Promise<stri
 }
 
 /**
- * Check if a clipper has access to a campaign's community (i.e. joined via CampaignAccount).
- * OWNER/ADMIN always pass. CLIENT always fails.
+ * Check if a user has access to a campaign's community.
+ *
+ * OWNER  → always true (global visibility).
+ * CLIENT → always false (brand UX only).
+ * ADMIN  → must be a member of one of the campaign's teams OR directly assigned via
+ *          CampaignAdmin. Previously ADMIN had implicit global access — that was too broad.
+ * CLIPPER → must have joined the campaign via CampaignAccount.
+ *
+ * This is THE source of truth for every community API route; legacy callers using
+ * `userHasCampaignCommunityAccess` still work (thin alias below).
  */
-export async function userHasCampaignCommunityAccess(
+export async function checkCommunityAccess(
   userId: string,
   role: string,
   campaignId: string,
 ): Promise<boolean> {
+  if (role === "OWNER") return true;
   if (role === "CLIENT") return false;
-  if (role === "OWNER" || role === "ADMIN") return true;
+
+  if (role === "ADMIN") {
+    const [teamAccess, directAdmin] = await Promise.all([
+      db.teamCampaign.findFirst({
+        where: { campaignId, team: { members: { some: { userId } } } },
+        select: { id: true },
+      }),
+      db.campaignAdmin.findFirst({
+        where: { campaignId, userId },
+        select: { id: true },
+      }),
+    ]);
+    return !!(teamAccess || directAdmin);
+  }
+
+  // CLIPPER (or any other role) — must have joined the campaign.
   const membership = await db.campaignAccount.findFirst({
     where: { campaignId, clipAccount: { userId } },
     select: { id: true },
   });
   return !!membership;
+}
+
+/** Legacy alias for the old helper name. Keep existing imports working. */
+export const userHasCampaignCommunityAccess = checkCommunityAccess;
+
+/** Validate a user-supplied channel name. Returns an error string or null. */
+export function validateChannelName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return "Channel name cannot be empty";
+  if (trimmed.length > 50) return "Channel name must be under 50 characters";
+  return null;
 }

@@ -25,12 +25,16 @@ export async function GET(req: NextRequest) {
   const campaignId = req.nextUrl.searchParams.get("campaignId");
   if (!campaignId) return NextResponse.json({ error: "campaignId required" }, { status: 400 });
   const statusFilter = req.nextUrl.searchParams.get("status");
+  const cursor = req.nextUrl.searchParams.get("cursor") || null;
+  const limitRaw = parseInt(req.nextUrl.searchParams.get("limit") || "30", 10);
+  const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 30, 1), 100);
 
   try {
     const where: any = { campaignId };
     if (statusFilter) where.status = statusFilter;
     if (role === "CLIPPER") where.userId = session.user.id;
 
+    // +1 trick to know if there's another page without a COUNT query.
     const tickets = await db.campaignTicket.findMany({
       where,
       include: {
@@ -38,12 +42,16 @@ export async function GET(req: NextRequest) {
         messages: { orderBy: { createdAt: "desc" }, take: 1 },
       },
       orderBy: [{ lastMessageAt: "desc" }, { createdAt: "desc" }],
-      take: 200,
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
+
+    const hasMore = tickets.length > limit;
+    const page = hasMore ? tickets.slice(0, limit) : tickets;
 
     // Unread count per ticket — messages not authored by the requester that are isRead=false.
     const enriched = await Promise.all(
-      tickets.map(async (t: any) => {
+      page.map(async (t: any) => {
         const unread = await db.ticketMessage.count({
           where: { ticketId: t.id, userId: { not: session.user.id }, isRead: false },
         });
@@ -55,7 +63,14 @@ export async function GET(req: NextRequest) {
       }),
     );
 
-    return NextResponse.json(enriched);
+    // Shape: backward-compatible with direct-array consumers (old clients still work).
+    // New clients use the .tickets / .hasMore / .nextCursor keys.
+    const nextCursor = hasMore ? enriched[enriched.length - 1].id : null;
+    const response: any = enriched;
+    response.tickets = enriched;
+    response.hasMore = hasMore;
+    response.nextCursor = nextCursor;
+    return NextResponse.json({ tickets: enriched, hasMore, nextCursor });
   } catch (err: any) {
     console.error("[COMMUNITY] tickets GET error:", err?.message);
     return NextResponse.json({ error: "Failed to load tickets" }, { status: 500 });

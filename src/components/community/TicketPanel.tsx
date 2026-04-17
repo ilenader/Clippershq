@@ -43,25 +43,40 @@ export function TicketPanel({ campaignId, viewerId, viewerRole }: Props) {
   const [loadedTicketsOnce, setLoadedTicketsOnce] = useState(false);
   const fetchingRef = useRef(false);
 
-  const loadTickets = useCallback(async () => {
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const loadTickets = useCallback(async (opts?: { append?: boolean; cursor?: string | null }) => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
+    const append = !!opts?.append;
+    if (append) setLoadingMore(true);
     try {
-      const res = await fetch(`/api/community/tickets?campaignId=${encodeURIComponent(campaignId)}`);
+      const url = new URL(`/api/community/tickets`, window.location.origin);
+      url.searchParams.set("campaignId", campaignId);
+      if (opts?.cursor) url.searchParams.set("cursor", opts.cursor);
+      const res = await fetch(url.toString());
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      const list: Ticket[] = Array.isArray(data) ? data : [];
-      setTickets(list);
+      const list: Ticket[] = Array.isArray(data) ? data : (data.tickets || []);
+      const more = !!data?.hasMore;
+      const cursor = data?.nextCursor || null;
+
+      setTickets((prev) => (append ? [...prev, ...list] : list));
+      setHasMore(more);
+      setNextCursor(cursor);
 
       // Select existing ticket if one exists. Never auto-CREATE — CLIPPER must click
       // "Start a Conversation" first (see the empty-state block in render). Avoids
       // empty tickets cluttering the admin inbox when a user just peeks at the tab.
-      if (!selectedId && list.length > 0) {
+      if (!append && !selectedId && list.length > 0) {
         const mine = !isAdminOrOwner ? list.find((t) => t.userId === viewerId) : list[0];
         if (mine) setSelectedId(mine.id);
       }
     } catch {}
     fetchingRef.current = false;
+    if (append) setLoadingMore(false);
     setLoading(false);
     setLoadedTicketsOnce(true);
   }, [campaignId, isAdminOrOwner, viewerId, selectedId]);
@@ -272,6 +287,17 @@ export function TicketPanel({ campaignId, viewerId, viewerRole }: Props) {
               </div>
             </button>
           ))}
+          {hasMore && (
+            <div className="p-3">
+              <button
+                onClick={() => loadTickets({ append: true, cursor: nextCursor })}
+                disabled={loadingMore}
+                className="w-full py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-accent hover:border-accent/30 transition-colors disabled:opacity-50"
+              >
+                {loadingMore ? "Loading…" : "Load more tickets"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

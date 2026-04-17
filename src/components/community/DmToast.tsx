@@ -13,27 +13,49 @@ interface Toast {
 }
 
 /**
- * Global listener for sse:ticket_message. When a CLIPPER receives a message they didn't send,
- * a slide-in toast appears top-right and auto-dismisses after 8s.
+ * Global listener for sse:ticket_message. Shows a slide-in toast top-right for any
+ * non-CLIENT role (CLIPPER sees admin replies; OWNER/ADMIN see clipper messages).
+ * Auto-dismisses after 8s. Muted campaigns are suppressed.
  */
 export function DmToast({ viewerId, viewerRole }: { viewerId: string; viewerRole: string }) {
   const [toast, setToast] = useState<Toast | null>(null);
+  const [mutedCampaigns, setMutedCampaigns] = useState<Set<string>>(new Set());
   const router = useRouter();
   const lastFetchRef = useRef(0);
 
+  // Role guard — CLIENT never gets DM toasts. Everyone else does.
+  const enabled = viewerRole !== "CLIENT";
+
+  // Load muted campaign IDs once so we can suppress toasts for them.
   useEffect(() => {
-    if (viewerRole !== "CLIPPER") return;
+    if (!enabled) return;
+    let cancelled = false;
+    fetch("/api/community/mute")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const ids: string[] = Array.isArray(data?.campaignIds) ? data.campaignIds : [];
+        setMutedCampaigns(new Set(ids));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
     const handler = async (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (!detail?.ticketId) return;
       if (detail.userId === viewerId) return; // don't toast yourself
+      if (detail.campaignId && mutedCampaigns.has(detail.campaignId)) return; // muted
+
       // Throttle — at most once per 3s, even if Ably redelivers or multiple tickets fire.
       const now = Date.now();
       if (now - lastFetchRef.current < 3000) return;
       lastFetchRef.current = now;
 
-      // Hydrate with a light message preview — we only have IDs from Ably payload.
-      // Fetch latest message for the ticket to build a nice preview.
+      // Hydrate a preview — Ably payload only carries ids.
       try {
         const res = await fetch(`/api/community/tickets/${detail.ticketId}/messages?limit=1`);
         if (!res.ok) throw new Error();
@@ -55,9 +77,26 @@ export function DmToast({ viewerId, viewerRole }: { viewerId: string; viewerRole
         });
       }
     };
+
+    // Keep the muted set fresh if the user toggles mute elsewhere.
+    const onMuteChanged = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.campaignId) return;
+      setMutedCampaigns((prev) => {
+        const next = new Set(prev);
+        if (detail.muted) next.add(detail.campaignId);
+        else next.delete(detail.campaignId);
+        return next;
+      });
+    };
+
     window.addEventListener("sse:ticket_message", handler);
-    return () => window.removeEventListener("sse:ticket_message", handler);
-  }, [viewerId, viewerRole]);
+    window.addEventListener("community:mute_changed", onMuteChanged);
+    return () => {
+      window.removeEventListener("sse:ticket_message", handler);
+      window.removeEventListener("community:mute_changed", onMuteChanged);
+    };
+  }, [viewerId, enabled, mutedCampaigns]);
 
   useEffect(() => {
     if (!toast) return;
@@ -65,7 +104,7 @@ export function DmToast({ viewerId, viewerRole }: { viewerId: string; viewerRole
     return () => clearTimeout(t);
   }, [toast]);
 
-  if (!toast) return null;
+  if (!toast || !enabled) return null;
 
   const preview = (toast.messagePreview || "").slice(0, 120);
 
@@ -82,7 +121,7 @@ export function DmToast({ viewerId, viewerRole }: { viewerId: string; viewerRole
       `}</style>
       <button
         onClick={() => {
-          router.push(`/community?ticketId=${encodeURIComponent(toast.ticketId)}`);
+          router.push(`/community?ticketId=${encodeURIComponent(toast.ticketId)}&tab=ticket`);
           setToast(null);
         }}
         className="w-full text-left flex items-start gap-3 p-4 rounded-xl border border-accent/20 bg-[var(--bg-card)] shadow-xl shadow-black/40 hover:border-accent/40 transition-colors cursor-pointer"

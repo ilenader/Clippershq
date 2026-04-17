@@ -90,6 +90,15 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
     loadInitial();
   }, [channelId, loadInitial]);
 
+  // On unmount or channel switch: poke the GET endpoint so server-side ChannelReadStatus
+  // advances to "now". GET handler already does an upsert — this is a cheap tail call.
+  useEffect(() => {
+    const id = channelId;
+    return () => {
+      fetch(`/api/community/channels/${id}/messages?limit=1`).catch(() => {});
+    };
+  }, [channelId]);
+
   // Load older (pagination triggered by scroll-to-top).
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
