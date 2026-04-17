@@ -51,7 +51,8 @@ export default function DashboardPage() {
   const fetchData = useCallback((campaignIds: string[], buildOptions = false) => {
     setLoading(true);
     const qs = campaignIds.length > 0 ? `?campaignIds=${campaignIds.join(",")}` : "";
-    Promise.all([
+    // Return the promise so callers can `await` (Ably listener relies on this for dedup).
+    return Promise.all([
       fetch(`/api/clips/mine${qs}`).then((r) => r.json()),
       fetch(`/api/earnings${qs}`).then((r) => r.json()),
     ])
@@ -74,20 +75,21 @@ export default function DashboardPage() {
   useEffect(() => { fetchData([], true); }, [fetchData]);
   useAutoRefresh(() => fetchData(selectedCampaigns), 15000);
 
-  // Real-time: Ably pushes clip/earnings updates as window events. Debounce 500ms in case
-  // multiple events fire together (e.g., clip_updated + earnings_updated from the same action).
-  const sseDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Real-time: Ably pushes clip/earnings updates as window events. Fire immediately.
+  // `fetchingRef` dedupes so clip_updated + earnings_updated from the same action don't
+  // both trigger a separate fetch — whoever arrives first claims the refresh.
+  const fetchingRef = useRef(false);
   useEffect(() => {
-    const handler = () => {
-      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
-      sseDebounceRef.current = setTimeout(() => fetchData(selectedCampaigns), 500);
+    const handler = async () => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+      try { await fetchData(selectedCampaigns); } finally { fetchingRef.current = false; }
     };
     window.addEventListener("sse:clip_updated", handler);
     window.addEventListener("sse:earnings_updated", handler);
     return () => {
       window.removeEventListener("sse:clip_updated", handler);
       window.removeEventListener("sse:earnings_updated", handler);
-      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
     };
   }, [fetchData, selectedCampaigns]);
 

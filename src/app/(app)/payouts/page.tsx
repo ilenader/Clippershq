@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import type { SessionUser } from "@/lib/auth-types";
 import { useRouter } from "next/navigation";
@@ -129,6 +129,22 @@ export default function PayoutsPage() {
 
   useEffect(() => { load(); }, [load]);
   useAutoRefresh(load, 20000);
+
+  // Ably real-time: available balance changes the moment a clip is approved/earnings recalc.
+  const fetchingRef = useRef(false);
+  useEffect(() => {
+    const handler = async () => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+      try { await load(); } finally { fetchingRef.current = false; }
+    };
+    window.addEventListener("sse:earnings_updated", handler);
+    window.addEventListener("sse:clip_updated", handler);
+    return () => {
+      window.removeEventListener("sse:earnings_updated", handler);
+      window.removeEventListener("sse:clip_updated", handler);
+    };
+  }, [load]);
 
   // Compute campaign-specific balances from earnings API data
   const campaignBalances: Record<string, { available: number; name: string }> = {};

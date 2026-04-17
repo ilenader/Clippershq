@@ -94,19 +94,20 @@ export default function ClipsPage() {
   useEffect(() => { load(); }, [load]);
   useAutoRefresh(load, 60000); // Fallback polling (SSE handles instant updates)
 
-  // SSE real-time: refresh when clip status or earnings change (debounced)
-  const sseDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  // Ably real-time: fire immediately, no debounce. `fetchingRef` dedupes overlapping
+  // fires when clip_updated + earnings_updated arrive back-to-back from the same action.
+  const fetchingRef = useRef(false);
   useEffect(() => {
-    const handler = () => {
-      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
-      sseDebounceRef.current = setTimeout(() => load(), 500);
+    const handler = async () => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+      try { await load(); } finally { fetchingRef.current = false; }
     };
     window.addEventListener("sse:clip_updated", handler);
     window.addEventListener("sse:earnings_updated", handler);
     return () => {
       window.removeEventListener("sse:clip_updated", handler);
       window.removeEventListener("sse:earnings_updated", handler);
-      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
     };
   }, [load]);
 

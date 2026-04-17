@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import type { SessionUser } from "@/lib/auth-types";
 import { useRouter } from "next/navigation";
@@ -66,7 +66,8 @@ export default function ClientDashboard() {
 
   // Load campaign list
   const loadCampaigns = useCallback(() => {
-    fetch(`/api/client/campaigns?_t=${Date.now()}`, { cache: "no-store" })
+    // Return the promise so the Ably handler can `await` and dedup overlapping fires.
+    return fetch(`/api/client/campaigns?_t=${Date.now()}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
@@ -83,8 +84,9 @@ export default function ClientDashboard() {
 
   // Load campaign detail
   const loadDetail = useCallback(() => {
-    if (!selectedId) return;
-    fetch(`/api/client/campaigns/${selectedId}?_t=${Date.now()}`, { cache: "no-store" })
+    if (!selectedId) return Promise.resolve();
+    // Return the promise so the Ably handler can `await` and dedup overlapping fires.
+    return fetch(`/api/client/campaigns/${selectedId}?_t=${Date.now()}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => { if (!d.error) setDetail(d); })
       .catch(() => {})
@@ -104,6 +106,23 @@ export default function ClientDashboard() {
     loadDetail();
   }, [loadCampaigns, loadDetail]);
   useAutoRefresh(refresh, 30000);
+
+  // Ably real-time: instant refresh when a clip status or earnings changes.
+  const fetchingRef = useRef(false);
+  useEffect(() => {
+    const handler = async () => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+      try { await Promise.all([loadCampaigns(), loadDetail()]); }
+      finally { fetchingRef.current = false; }
+    };
+    window.addEventListener("sse:clip_updated", handler);
+    window.addEventListener("sse:earnings_updated", handler);
+    return () => {
+      window.removeEventListener("sse:clip_updated", handler);
+      window.removeEventListener("sse:earnings_updated", handler);
+    };
+  }, [loadCampaigns, loadDetail]);
 
   const selectedCampaign = campaigns.find((c) => c.id === selectedId);
 

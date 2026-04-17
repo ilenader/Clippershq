@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import type { SessionUser } from "@/lib/auth-types";
 import { useRouter } from "next/navigation";
@@ -63,15 +63,35 @@ export default function ProgressPage() {
   const [showStreakHelp, setShowStreakHelp] = useState(false);
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0 });
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/gamification").then((r) => r.json()),
-      fetch("/api/gamification?leaderboard=true").then((r) => r.json()).catch(() => []),
-    ])
-      .then(([gamData, lbData]) => { setGam(gamData); if (Array.isArray(lbData)) setLeaderboard(lbData); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const loadProgress = useCallback(async () => {
+    try {
+      const [gamData, lbData] = await Promise.all([
+        fetch("/api/gamification").then((r) => r.json()),
+        fetch("/api/gamification?leaderboard=true").then((r) => r.json()).catch(() => []),
+      ]);
+      setGam(gamData);
+      if (Array.isArray(lbData)) setLeaderboard(lbData);
+    } catch {}
+    finally { setLoading(false); }
   }, []);
+
+  useEffect(() => { loadProgress(); }, [loadProgress]);
+
+  // Ably real-time: streak/level may change when a clip is approved or rejected.
+  const fetchingRef = useRef(false);
+  useEffect(() => {
+    const handler = async () => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+      try { await loadProgress(); } finally { fetchingRef.current = false; }
+    };
+    window.addEventListener("sse:clip_updated", handler);
+    window.addEventListener("sse:earnings_updated", handler);
+    return () => {
+      window.removeEventListener("sse:clip_updated", handler);
+      window.removeEventListener("sse:earnings_updated", handler);
+    };
+  }, [loadProgress]);
 
   // Countdown timer — update every minute
   useEffect(() => {

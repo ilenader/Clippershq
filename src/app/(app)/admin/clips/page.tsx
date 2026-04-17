@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,7 +68,7 @@ export default function AdminClipsPage() {
   const [overriding, setOverriding] = useState(false);
   const [trackingClip, setTrackingClip] = useState<any | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const ts = Date.now();
       const [clipsRes, campaignRes] = await Promise.all([
@@ -85,10 +85,27 @@ export default function AdminClipsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
   useAutoRefresh(load, 10000);
+
+  // Instant refresh when a clip status/earnings changes in another tab or via cron.
+  // Owner's own approve/reject already optimistically updates local state (see handleReview).
+  const fetchingRef = useRef(false);
+  useEffect(() => {
+    const handler = async () => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+      try { await load(); } finally { fetchingRef.current = false; }
+    };
+    window.addEventListener("sse:clip_updated", handler);
+    window.addEventListener("sse:earnings_updated", handler);
+    return () => {
+      window.removeEventListener("sse:clip_updated", handler);
+      window.removeEventListener("sse:earnings_updated", handler);
+    };
+  }, [load]);
 
   const campaignOptions = campaigns.map((c: any) => ({ value: c.id, label: c.name }));
 

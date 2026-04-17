@@ -41,7 +41,8 @@ export default function EarningsPage() {
   const fetchData = useCallback((campaignIds: string[], buildOptions = false) => {
     setLoading(true);
     const qs = campaignIds.length > 0 ? `?campaignIds=${campaignIds.join(",")}` : "";
-    Promise.all([
+    // Return the promise so callers can `await` (Ably listener relies on this for dedup).
+    return Promise.all([
       fetch(`/api/earnings${qs}`).then((r) => r.json()),
       fetch(`/api/clips/mine${qs}`).then((r) => r.json()),
     ])
@@ -69,19 +70,20 @@ export default function EarningsPage() {
   }, [fetchData]);
   useAutoRefresh(useCallback(() => fetchData(selectedCampaigns), [fetchData, selectedCampaigns]), 120000); // Fallback polling
 
-  // SSE real-time: refresh when earnings change (debounced)
-  const sseDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  // Ably real-time: fire immediately. `fetchingRef` dedupes when clip_updated +
+  // earnings_updated arrive back-to-back from the same server action.
+  const fetchingRef = useRef(false);
   useEffect(() => {
-    const handler = () => {
-      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
-      sseDebounceRef.current = setTimeout(() => fetchData(selectedCampaigns), 500);
+    const handler = async () => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+      try { await fetchData(selectedCampaigns); } finally { fetchingRef.current = false; }
     };
     window.addEventListener("sse:earnings_updated", handler);
     window.addEventListener("sse:clip_updated", handler);
     return () => {
       window.removeEventListener("sse:earnings_updated", handler);
       window.removeEventListener("sse:clip_updated", handler);
-      if (sseDebounceRef.current) clearTimeout(sseDebounceRef.current);
     };
   }, [fetchData, selectedCampaigns]);
 
