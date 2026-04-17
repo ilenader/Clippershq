@@ -55,7 +55,7 @@ export default function ClientDashboard() {
   const [exporting, setExporting] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(false);
-  const [timeframeDays, setTimeframeDays] = useState(0);
+  const [timeframeDays, setTimeframeDays] = useState(15);
   const [chartMetric, setChartMetric] = useState<"views" | "clips" | "earnings">("views");
 
   useEffect(() => {
@@ -388,7 +388,7 @@ export default function ClientDashboard() {
                   ))}
                 </div>
               </div>
-              <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} includeAll />
+              <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} />
             </div>
             <AreaGradientChart
               data={chartData}
