@@ -256,7 +256,13 @@ export default function CampaignsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={(e) => handleQuickJoin(e, campaign)}
+                        onClick={(e) => {
+                          // Route to the detail page instead of auto-joining — the detail page
+                          // has the "I've read the requirements" gate that must be ticked first.
+                          e.preventDefault();
+                          e.stopPropagation();
+                          router.push(`/campaigns/${campaign.id}`);
+                        }}
                         icon={<UserPlus className="h-3.5 w-3.5" />}
                       >
                         Join Campaign

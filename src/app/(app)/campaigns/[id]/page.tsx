@@ -79,15 +79,15 @@ function InfoCard({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl bg-[var(--bg-card-hover)] border border-[var(--border-color)] p-4">
+    <div className="rounded-xl bg-[var(--bg-card-hover)] border border-[var(--border-color)] p-5 lg:p-6">
       <div className="flex items-center gap-2 mb-2">
-        <Icon className="h-4 w-4 text-accent" />
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
+        <Icon className="h-4 w-4 lg:h-5 lg:w-5 text-accent" />
+        <p className="text-[11px] lg:text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
       </div>
       {value !== undefined && (
-        <p className="text-lg font-bold text-[var(--text-primary)] leading-tight">{value}</p>
+        <p className="text-xl lg:text-2xl font-bold text-[var(--text-primary)] leading-tight">{value}</p>
       )}
-      {sub && <p className="text-xs text-[var(--text-muted)] mt-1">{sub}</p>}
+      {sub && <p className="text-xs lg:text-sm text-[var(--text-muted)] mt-1">{sub}</p>}
       {children}
     </div>
   );
@@ -226,7 +226,7 @@ export default function CampaignDetailPage() {
   const approvedClipCount = myClips.filter((c) => c.status === "APPROVED").length;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 pb-8">
+    <div className="mx-auto max-w-5xl space-y-5 pb-8">
       <button
         onClick={() => router.back()}
         className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
@@ -242,7 +242,7 @@ export default function CampaignDetailPage() {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] leading-tight truncate">{campaign.name}</h1>
+            <h1 className="text-2xl lg:text-3xl font-bold text-[var(--text-primary)] leading-tight truncate">{campaign.name}</h1>
             <Badge variant={campaign.status.toLowerCase() as any}>{campaign.status}</Badge>
           </div>
           {platforms.length > 0 && (
@@ -317,14 +317,14 @@ export default function CampaignDetailPage() {
         />
         {budget != null && budget > 0 ? (
           <InfoCard icon={Target} label="Budget">
-            <p className="text-lg font-bold text-[var(--text-primary)] leading-tight">
+            <p className="text-xl lg:text-2xl font-bold text-[var(--text-primary)] leading-tight">
               {formatCurrency(spent)}
-              <span className="text-sm font-normal text-[var(--text-muted)]"> of {formatCurrency(budget)}</span>
+              <span className="text-sm lg:text-base font-normal text-[var(--text-muted)]"> of {formatCurrency(budget)}</span>
             </p>
             <div className="mt-2 h-1.5 rounded-full bg-[var(--bg-input)] overflow-hidden">
               <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${budgetPct}%` }} />
             </div>
-            <p className="text-xs text-[var(--text-muted)] mt-1">{budgetPct.toFixed(0)}% used</p>
+            <p className="text-xs lg:text-sm text-[var(--text-muted)] mt-1">{budgetPct.toFixed(0)}% used</p>
           </InfoCard>
         ) : (
           <InfoCard icon={Target} label="Budget" value="Unlimited" sub="No cap set" />
@@ -349,14 +349,14 @@ export default function CampaignDetailPage() {
       {/* ── 3. REQUIREMENTS (collapsible) ────────────────────── */}
       {requirementLines.length > 0 && (
         <div ref={requirementsRef} className="scroll-mt-24">
-          <Card>
+          <Card className="overflow-hidden">
             <button
               onClick={() => setRequirementsOpen((o) => !o)}
               className="flex w-full items-center justify-between text-left cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-accent" />
-                <h2 className="text-sm font-semibold text-[var(--text-primary)]">Campaign Requirements</h2>
+                <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Campaign Requirements</h2>
               </div>
               {requirementsOpen ? (
                 <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
@@ -368,22 +368,29 @@ export default function CampaignDetailPage() {
               <>
                 <ul className="mt-4 space-y-2">
                   {requirementLines.map((req, i) => (
-                    <li key={i} className="flex items-start gap-2.5">
+                    <li key={i} className="flex items-start gap-2.5 min-w-0">
                       <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent" />
-                      <span className="text-[15px] text-[var(--text-primary)]">{req}</span>
+                      <span className="text-[15px] text-[var(--text-primary)] break-words [overflow-wrap:anywhere] min-w-0 flex-1">{req}</span>
                     </li>
                   ))}
                 </ul>
                 {/* Confirmation gate — the sticky Join button below won't fire until this is checked. */}
                 {isClipper && campaign.status === "ACTIVE" && joinedAccounts.length === 0 && (
-                  <label className="mt-5 flex items-start gap-3 cursor-pointer rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-hover)] p-3 hover:border-accent/30 transition-colors">
+                  <label
+                    className={`mt-5 flex items-start gap-3 cursor-pointer rounded-xl border p-3 lg:p-4 hover:border-accent/40 transition-colors ${
+                      confirmedRequirements
+                        ? "border-accent/40 bg-accent/10"
+                        : "border-accent/20 bg-accent/5"
+                    }`}
+                  >
                     <input
                       type="checkbox"
                       checked={confirmedRequirements}
                       onChange={(e) => setConfirmedRequirements(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-[var(--border-color)] accent-accent cursor-pointer"
+                      className="mt-0.5 h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0 rounded border-[var(--border-color)] accent-accent cursor-pointer"
                     />
-                    <span className="text-sm text-[var(--text-primary)] select-none">
+                    <CheckCircle className={`mt-0.5 h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0 transition-colors ${confirmedRequirements ? "text-accent" : "text-[var(--text-muted)]"}`} />
+                    <span className={`text-sm lg:text-base select-none font-medium transition-colors ${confirmedRequirements ? "text-accent" : "text-[var(--text-primary)]"}`}>
                       I have read and understood the campaign requirements
                     </span>
                   </label>
@@ -399,7 +406,7 @@ export default function CampaignDetailPage() {
         <Card>
           <div className="flex items-center gap-2 mb-3">
             <Type className="h-4 w-4 text-accent" />
-            <h2 className="text-sm font-semibold text-[var(--text-primary)]">Content Rules</h2>
+            <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Content Rules</h2>
           </div>
           <div className="space-y-4">
             {campaign.captionRules && (
@@ -433,7 +440,7 @@ export default function CampaignDetailPage() {
         <Card>
           <div className="flex items-center gap-2 mb-3">
             <DollarSign className="h-4 w-4 text-accent" />
-            <h2 className="text-sm font-semibold text-[var(--text-primary)]">Payout Rules</h2>
+            <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Payout Rules</h2>
           </div>
           <p className="text-[15px] text-[var(--text-secondary)] whitespace-pre-wrap">{campaign.payoutRule}</p>
         </Card>
@@ -443,7 +450,7 @@ export default function CampaignDetailPage() {
       <Card>
         <div className="flex items-center gap-2 mb-4">
           <LinkIcon className="h-4 w-4 text-accent" />
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">Campaign Resources</h2>
+          <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Campaign Resources</h2>
         </div>
         {resourceEntries.length === 0 && !exampleText ? (
           <p className="text-sm text-[var(--text-muted)]">No resources provided.</p>
@@ -453,7 +460,7 @@ export default function CampaignDetailPage() {
               <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap mb-4">{exampleText}</p>
             )}
             {resourceEntries.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {resourceEntries.map((r, i) => (
                   <ResourceCard key={`${r.url}-${i}`} url={r.url} label={r.label} />
                 ))}
@@ -469,9 +476,9 @@ export default function CampaignDetailPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Film className="h-4 w-4 text-accent" />
-              <h2 className="text-sm font-semibold text-[var(--text-primary)]">Your Clips</h2>
+              <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Your Clips</h2>
               {myClips.length > 0 && (
-                <span className="text-xs text-[var(--text-muted)]">({myClips.length})</span>
+                <span className="text-xs lg:text-sm text-[var(--text-muted)]">({myClips.length})</span>
               )}
             </div>
           </div>
