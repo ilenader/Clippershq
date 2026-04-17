@@ -1,7 +1,7 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
-import { SimpleLineChart } from "@/components/ui/simple-chart";
+import { AreaGradientChart } from "@/components/ui/area-gradient-chart";
 import { buildEarningsChart, type Clip, type EarningsFilterKey } from "@/lib/earnings";
 
 interface EarningsChartProps {
@@ -27,7 +27,7 @@ export function EarningsChart({
 
   return (
     <Card>
-      <SimpleLineChart
+      <AreaGradientChart
         data={data}
         title="Daily earnings"
         color="#2596be"

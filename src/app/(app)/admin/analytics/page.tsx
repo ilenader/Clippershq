@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
-import { SimpleLineChart, SimpleMultiLineChart } from "@/components/ui/simple-chart";
+import { AreaGradientChart, MultiAreaGradientChart } from "@/components/ui/area-gradient-chart";
 import { TimeframeSelect, filterByTimeframe } from "@/components/ui/timeframe-select";
 import { TrendingUp, Eye, Users, Film, Megaphone, Heart, CheckCircle, Clock, DollarSign, Download } from "lucide-react";
 import { toast } from "@/lib/toast";
@@ -381,20 +381,21 @@ export default function AdminAnalyticsPage() {
               </button>
             ))}
           </div>
-          <SimpleLineChart
+          <AreaGradientChart
             data={leftChartData}
             title={leftChartMode === "earnings" ? "Earnings per day" : "Clips submitted per day"}
             color="#2596be"
-            height={200}
-            valueSuffix={leftChartMode === "earnings" ? "" : " clips"}
+            height={220}
+            valuePrefix={leftChartMode === "earnings" ? "$" : ""}
+            valueSuffix={leftChartMode === "earnings" ? "" : ""}
           />
           {filteredClips.length === 0 && <p className="mt-3 text-sm text-[var(--text-muted)]">No clips submitted yet.</p>}
         </Card>
         <Card>
-          <SimpleMultiLineChart
+          <MultiAreaGradientChart
             series={chartSeries}
             title="Metrics by clip submission date"
-            height={200}
+            height={220}
           />
           {filteredClips.length === 0 && <p className="mt-3 text-sm text-[var(--text-muted)]">No data yet.</p>}
         </Card>
