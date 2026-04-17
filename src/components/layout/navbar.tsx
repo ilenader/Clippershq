@@ -33,7 +33,6 @@ export function Navbar() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
   const bellBtnRef = useRef<HTMLButtonElement>(null);
-  const sseRef = useRef<EventSource | null>(null);
   const [notifPos, setNotifPos] = useState<{ top: number; right: number } | null>(null);
 
   // Fetch notification list — plays sound only for genuinely new notifications
@@ -62,39 +61,34 @@ export function Navbar() {
     } catch {}
   }, []);
 
-  // SSE connection — silent count/data updates only
+  // Notification polling — 15s fallback that runs alongside Ably real-time.
+  // Ably (initialized in AppLayout via useAbly) re-dispatches server events as window
+  // CustomEvents like `sse:notif_refresh`, `sse:clip_updated`, etc. so existing page
+  // listeners work without changes. This interval is the safety net if Ably is down
+  // or the tab is backgrounded long enough for the connection to drop.
+  const userId = effectiveUser && "id" in effectiveUser ? (effectiveUser as any).id : null;
   useEffect(() => {
+    if (!userId) return;
     fetchNotifList();
-
-    const es = new EventSource("/api/notifications/sse");
-    sseRef.current = es;
-
-    es.addEventListener("notif", (e) => {
+    const fetchCount = async () => {
       try {
-        const { count } = JSON.parse(e.data);
-        setNotifCount(count);
-        // Fetch full list (sound decision happens inside fetchNotifList)
-        if (count > 0) fetchNotifList();
+        const res = await fetch("/api/notifications/count");
+        if (res.ok) {
+          const data = await res.json();
+          setNotifCount(data.count || 0);
+        }
       } catch {}
-    });
-
-    // Forward data-update events to window so page components can listen
-    es.addEventListener("clip_updated", (e) => {
-      try { window.dispatchEvent(new CustomEvent("sse:clip_updated", { detail: JSON.parse(e.data) })); } catch {}
-    });
-    es.addEventListener("earnings_updated", (e) => {
-      try { window.dispatchEvent(new CustomEvent("sse:earnings_updated", { detail: JSON.parse(e.data) })); } catch {}
-    });
-    es.addEventListener("tracking_progress", (e) => {
-      try { window.dispatchEvent(new CustomEvent("sse:tracking_progress", { detail: JSON.parse(e.data) })); } catch {}
-    });
-
-    es.onerror = () => {};
-
-    return () => {
-      es.close();
-      sseRef.current = null;
     };
+    const interval = setInterval(fetchCount, 15000);
+    return () => clearInterval(interval);
+  }, [userId, fetchNotifList]);
+
+  // Ably-pushed "notif_refresh" event → re-fetch full list (so the dropdown and sound logic
+  // see the new item immediately). Dispatched by src/lib/notifications.ts on creation.
+  useEffect(() => {
+    const handler = () => { fetchNotifList(); };
+    window.addEventListener("sse:notif_refresh", handler);
+    return () => window.removeEventListener("sse:notif_refresh", handler);
   }, [fetchNotifList]);
 
   // PWA app badge — shows notification count on the home screen icon

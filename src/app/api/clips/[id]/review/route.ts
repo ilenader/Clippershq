@@ -9,7 +9,7 @@ import { sendClipApproved, sendClipRejected, sendStreakRejectionWarning, sendCon
 import { updateUserLevel } from "@/lib/gamification";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
-import { broadcastToUser } from "@/lib/sse-broadcast";
+import { publishToUser } from "@/lib/ably";
 import { NextRequest, NextResponse } from "next/server";
 
 export const maxDuration = 30;
@@ -232,8 +232,8 @@ export async function POST(
 
       // Broadcast IMMEDIATELY after save — before slow operations (email, stats sync)
       try {
-        broadcastToUser(clip.userId, "clip_updated", { clipId: id, status: action, earnings: finalClipperEarnings });
-        broadcastToUser(clip.userId, "earnings_updated", { reason: action.toLowerCase() });
+        publishToUser(clip.userId, "clip_updated", { clipId: id, status: action, earnings: finalClipperEarnings }).catch(() => {});
+        publishToUser(clip.userId, "earnings_updated", { reason: action.toLowerCase() }).catch(() => {});
       } catch {}
 
       // Ensure tracking job exists for approved clip
@@ -285,8 +285,8 @@ export async function POST(
       try { await db.agencyEarning.delete({ where: { clipId: id } }); } catch {}
       // Broadcast immediately
       try {
-        broadcastToUser(clip.userId, "clip_updated", { clipId: id, status: action, earnings: 0 });
-        broadcastToUser(clip.userId, "earnings_updated", { reason: action.toLowerCase() });
+        publishToUser(clip.userId, "clip_updated", { clipId: id, status: action, earnings: 0 }).catch(() => {});
+        publishToUser(clip.userId, "earnings_updated", { reason: action.toLowerCase() }).catch(() => {});
       } catch {}
       if (action === "REJECTED") {
         try {
@@ -414,7 +414,7 @@ export async function POST(
           reviewedAt: new Date(),
         },
       });
-      try { broadcastToUser(clip.userId, "clip_updated", { clipId: id, status: action }); } catch {}
+      publishToUser(clip.userId, "clip_updated", { clipId: id, status: action }).catch(() => {});
     }
 
     // ── Sync user totalEarnings, totalViews, and level ──

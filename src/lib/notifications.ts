@@ -23,6 +23,12 @@ export async function createNotification(
       data: { userId, type, title, body, metadata: metadata ? JSON.stringify(metadata) : null },
     });
   } catch {}
+  // Real-time push — tell the user's open tabs to refetch count + list.
+  // Silent if Ably not configured; the 15s navbar polling catches the update either way.
+  try {
+    const { publishToUser } = await import("@/lib/ably");
+    await publishToUser(userId, "notif_refresh", {});
+  } catch {}
 }
 
 export async function getUnreadCount(userId: string): Promise<number> {

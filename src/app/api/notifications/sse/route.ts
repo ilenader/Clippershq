@@ -1,3 +1,7 @@
+// DEPRECATED: Replaced by Ably real-time + /api/notifications/count polling.
+// Kept for backward compatibility during transition. Safe to remove after confirming Ably works.
+// The navbar no longer opens an EventSource to this endpoint as of the Ably migration —
+// any client still hitting it will get a working-but-unused stream.
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";

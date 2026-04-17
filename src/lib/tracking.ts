@@ -15,7 +15,7 @@ import { db } from "@/lib/db";
 import { fetchClipStats, fetchClipStatsBatch, detectPlatform } from "@/lib/apify";
 import { recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
 import { computeFraudLevel } from "@/lib/fraud";
-import { broadcastToUser } from "@/lib/sse-broadcast";
+import { publishToUser, publishToUsers } from "@/lib/ably";
 import { logCampaignEvent } from "@/lib/campaign-events";
 
 /**
@@ -559,8 +559,8 @@ async function processTrackingJob(
       // Broadcast real-time update
       if (earningsChanged && clip.userId) {
         try {
-          broadcastToUser(clip.userId, "clip_updated", { clipId: clip.id, views: stats.views, earnings: newEarnings });
-          broadcastToUser(clip.userId, "earnings_updated", { reason: "tracking" });
+          publishToUser(clip.userId, "clip_updated", { clipId: clip.id, views: stats.views, earnings: newEarnings }).catch(() => {});
+          publishToUser(clip.userId, "earnings_updated", { reason: "tracking" }).catch(() => {});
         } catch {}
       }
     } // end budget-lock else
@@ -712,13 +712,9 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
         ownerIds = owners.map((o: any) => o.id);
         if (dueJobs.length === 0) {
           // No clips to check — broadcast completed immediately
-          for (const oid of ownerIds) {
-            broadcastToUser(oid, "tracking_progress", { status: "completed", total: 0, processed: 0, errors: 0 });
-          }
+          publishToUsers(ownerIds, "tracking_progress", { status: "completed", total: 0, processed: 0, errors: 0 }).catch(() => {});
         } else {
-          for (const oid of ownerIds) {
-            broadcastToUser(oid, "tracking_progress", { status: "started", total: dueJobs.length, processed: 0 });
-          }
+          publishToUsers(ownerIds, "tracking_progress", { status: "started", total: dueJobs.length, processed: 0 }).catch(() => {});
         }
       } catch {}
     }
@@ -786,9 +782,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
               else campaignErrors++;
               progressCounter++;
               if (source === "manual") {
-                for (const oid of ownerIds) {
-                  try { broadcastToUser(oid, "tracking_progress", { status: "processing", total: dueJobs.length, processed: progressCounter }); } catch {}
-                }
+                publishToUsers(ownerIds, "tracking_progress", { status: "processing", total: dueJobs.length, processed: progressCounter }).catch(() => {});
               }
             }
           }
@@ -833,9 +827,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
 
   // Broadcast completion to owners for manual checks
   if (source === "manual" && ownerIds.length > 0) {
-    for (const oid of ownerIds) {
-      try { broadcastToUser(oid, "tracking_progress", { status: "completed", total: progressCounter, processed: progressCounter, errors }); } catch {}
-    }
+    publishToUsers(ownerIds, "tracking_progress", { status: "completed", total: progressCounter, processed: progressCounter, errors }).catch(() => {});
   }
 
   console.log(`[TRACKING] Completed: ${processed} processed, ${errors} errors`);

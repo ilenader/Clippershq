@@ -1,15 +1,12 @@
 /**
- * SSE broadcast registry — allows server-side code to push events
- * to specific users' open SSE connections in real time.
+ * DEPRECATED: No longer used. Ably (src/lib/ably.ts) handles all real-time broadcasting.
+ * The legacy /api/notifications/sse endpoint still imports registerSSEClient/unregisterSSEClient
+ * from this module, so the file is kept for reference during the Ably transition.
+ * Safe to delete once the old SSE route is removed.
  *
- * Usage:
- *   import { broadcastToUser, registerSSEClient, unregisterSSEClient } from "@/lib/sse-broadcast";
- *
- *   // In SSE endpoint: register the stream controller
- *   registerSSEClient(userId, controller);
- *
- *   // In any server route: push an event to a user
- *   broadcastToUser(userId, "clip_updated", { clipId: "abc", status: "APPROVED" });
+ * Original SSE broadcast registry — pushed events to in-memory ReadableStream controllers
+ * keyed by userId. Fine at 1 server instance / <200 users; doesn't survive horizontal scaling
+ * because each instance has its own map. Ably's user-channel model replaces this cleanly.
  */
 
 const encoder = new TextEncoder();

@@ -13,6 +13,7 @@ import { Menu, X, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PWAInstallPopup } from "@/components/pwa-install-popup";
 import { useIsPWA } from "@/hooks/use-pwa";
+import { useAbly } from "@/hooks/use-ably";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -48,6 +49,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     ? "ACTIVE"
     : (session?.user as SessionUser)?.status || "ACTIVE";
   const isAuthenticated = isDevMode ? !!devRole : status === "authenticated";
+
+  // Real-time channel — subscribes once per session. No-op if Ably isn't configured
+  // or the connection can't establish; pages fall back to useAutoRefresh polling.
+  const ablyUserId =
+    (isDevMode && devSession ? (devSession as any).user?.id : null) ||
+    (session?.user as any)?.id ||
+    null;
+  useAbly(ablyUserId);
 
   useEffect(() => {
     if (isLoading) return;
