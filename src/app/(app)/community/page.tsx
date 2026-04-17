@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   MessageCircle, Megaphone, Trophy, Phone, Bell, BellOff,
-  Loader2, ChevronRight, Settings,
+  Loader2, ChevronRight, Settings, AlertCircle,
 } from "lucide-react";
 import { CampaignImage } from "@/components/ui/campaign-image";
 import { ChannelChat } from "@/components/community/ChannelChat";
@@ -15,6 +15,7 @@ import { Leaderboard } from "@/components/community/Leaderboard";
 import { TicketPanel } from "@/components/community/TicketPanel";
 import { CallScheduler } from "@/components/community/CallScheduler";
 import { VoiceRoom } from "@/components/community/VoiceRoom";
+import { CommunityErrorBoundary } from "@/components/community/CommunityErrorBoundary";
 import { toast } from "@/lib/toast";
 
 interface Campaign {
@@ -73,6 +74,7 @@ export default function CommunityPage() {
   const [selectedChannelId, setSelectedChannelId] = useState<string>("");
   const [viewMode, setViewMode] = useState<"channel" | "ticket" | "call">("channel");
   const [upcomingCall, setUpcomingCall] = useState<Call | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // URL-driven initial tab (e.g., ?tab=ticket from "transfer to human" flow).
   useEffect(() => {
@@ -117,9 +119,15 @@ export default function CommunityPage() {
   const loadChannels = useCallback(async (cid: string) => {
     if (!cid) return;
     setLoadingChannels(true);
+    setError(null);
     try {
       const res = await fetch(`/api/community/channels?campaignId=${encodeURIComponent(cid)}`);
-      if (!res.ok) {
+      if (res.status === 403) {
+        setError("You don't have access to this campaign's community.");
+        setChannels([]);
+        setMuted(false);
+      } else if (!res.ok) {
+        setError("Couldn't load this campaign's community. Try again in a moment.");
         setChannels([]);
         setMuted(false);
       } else {
@@ -139,6 +147,7 @@ export default function CommunityPage() {
         }
       }
     } catch {
+      setError("Network error. Please refresh.");
       setChannels([]);
     }
     setLoadingChannels(false);
@@ -398,27 +407,41 @@ export default function CommunityPage() {
 
             {/* Content area */}
             <div className="flex-1 min-h-0 overflow-hidden">
-              {viewMode === "call" && upcomingCall ? (
-                <VoiceRoom call={upcomingCall} />
-              ) : viewMode === "ticket" ? (
-                <TicketPanel campaignId={selectedCampaignId} viewerId={viewerId} viewerRole={viewerRole} />
-              ) : selectedChannel ? (
-                selectedChannel.type === "leaderboard" ? (
-                  <Leaderboard channelId={selectedChannel.id} viewerId={viewerId} />
+              <CommunityErrorBoundary>
+                {error ? (
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center h-full">
+                    <AlertCircle className="h-10 w-10 text-red-400 mb-3 opacity-80" />
+                    <p className="text-sm text-[var(--text-primary)] font-medium mb-1">Can't open this community</p>
+                    <p className="text-xs text-[var(--text-muted)] max-w-xs mb-4">{error}</p>
+                    <button
+                      onClick={() => router.push("/community")}
+                      className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/85 transition-colors"
+                    >
+                      Back to Community
+                    </button>
+                  </div>
+                ) : viewMode === "call" && upcomingCall ? (
+                  <VoiceRoom call={upcomingCall} />
+                ) : viewMode === "ticket" ? (
+                  <TicketPanel campaignId={selectedCampaignId} viewerId={viewerId} viewerRole={viewerRole} />
+                ) : selectedChannel ? (
+                  selectedChannel.type === "leaderboard" ? (
+                    <Leaderboard channelId={selectedChannel.id} viewerId={viewerId} />
+                  ) : (
+                    <ChannelChat
+                      channelId={selectedChannel.id}
+                      channelType={selectedChannel.type}
+                      channelName={selectedChannel.name}
+                      viewerId={viewerId}
+                      viewerRole={viewerRole}
+                    />
+                  )
                 ) : (
-                  <ChannelChat
-                    channelId={selectedChannel.id}
-                    channelType={selectedChannel.type}
-                    channelName={selectedChannel.name}
-                    viewerId={viewerId}
-                    viewerRole={viewerRole}
-                  />
-                )
-              ) : (
-                <div className="flex items-center justify-center py-20">
-                  <p className="text-sm text-[var(--text-muted)]">No channel selected</p>
-                </div>
-              )}
+                  <div className="flex items-center justify-center py-20">
+                    <p className="text-sm text-[var(--text-muted)]">No channel selected</p>
+                  </div>
+                )}
+              </CommunityErrorBoundary>
             </div>
           </>
         )}

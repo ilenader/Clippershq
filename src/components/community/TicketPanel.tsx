@@ -53,19 +53,10 @@ export function TicketPanel({ campaignId, viewerId, viewerRole }: Props) {
       const list: Ticket[] = Array.isArray(data) ? data : [];
       setTickets(list);
 
-      // CLIPPER: ensure own ticket exists and auto-select it.
-      if (!isAdminOrOwner && list.length === 0) {
-        const created = await fetch("/api/community/tickets", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ campaignId }),
-        });
-        if (created.ok) {
-          const t = await created.json();
-          setTickets([{ ...t, unread: 0 }]);
-          setSelectedId(t.id);
-        }
-      } else if (!selectedId && list.length > 0) {
+      // Select existing ticket if one exists. Never auto-CREATE — CLIPPER must click
+      // "Start a Conversation" first (see the empty-state block in render). Avoids
+      // empty tickets cluttering the admin inbox when a user just peeks at the tab.
+      if (!selectedId && list.length > 0) {
         const mine = !isAdminOrOwner ? list.find((t) => t.userId === viewerId) : list[0];
         if (mine) setSelectedId(mine.id);
       }
@@ -74,6 +65,22 @@ export function TicketPanel({ campaignId, viewerId, viewerRole }: Props) {
     setLoading(false);
     setLoadedTicketsOnce(true);
   }, [campaignId, isAdminOrOwner, viewerId, selectedId]);
+
+  const startConversation = useCallback(async () => {
+    try {
+      const res = await fetch("/api/community/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaignId }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const t = await res.json();
+      setTickets([{ ...t, unread: 0 }]);
+      setSelectedId(t.id);
+    } catch {
+      toast.error("Could not start conversation");
+    }
+  }, [campaignId]);
 
   useEffect(() => {
     setLoading(true);
@@ -113,15 +120,38 @@ export function TicketPanel({ campaignId, viewerId, viewerRole }: Props) {
     // CLIPPER: single ticket view, no list.
     if (loading) {
       return (
-        <div className="flex items-center justify-center py-16 h-full">
-          <Loader2 className="h-6 w-6 animate-spin text-accent" />
+        <div className="flex flex-col gap-3 p-4 h-full">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex gap-3 animate-pulse">
+              <div className="h-8 w-8 rounded-full bg-[var(--bg-card-hover)] flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-24 rounded bg-[var(--bg-card-hover)]" />
+                <div className="h-3 rounded bg-[var(--bg-card-hover)]" style={{ width: `${50 + i * 15}%` }} />
+              </div>
+            </div>
+          ))}
         </div>
       );
     }
     if (!selected) {
+      // No ticket yet — explicit opt-in button (nothing's created on mere page-visit).
       return (
-        <div className="flex items-center justify-center py-16 h-full">
-          <p className="text-sm text-[var(--text-muted)]">Opening your ticket…</p>
+        <div className="flex flex-col items-center justify-center py-16 px-4 h-full text-center">
+          <div className="h-14 w-14 rounded-2xl bg-accent/10 flex items-center justify-center mb-4">
+            <MessageCircle className="h-7 w-7 text-accent" />
+          </div>
+          <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)] mb-1">
+            Need help with this campaign?
+          </p>
+          <p className="text-xs text-[var(--text-muted)] max-w-xs mb-5">
+            Start a private conversation with the team. We'll get back to you as soon as we can.
+          </p>
+          <button
+            onClick={startConversation}
+            className="px-6 py-2.5 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/85 active:scale-[0.98] transition-all"
+          >
+            Start a Conversation
+          </button>
         </div>
       );
     }
@@ -178,13 +208,29 @@ export function TicketPanel({ campaignId, viewerId, viewerRole }: Props) {
         {/* List */}
         <div className="flex-1 overflow-y-auto min-h-0">
           {loading && (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
+            <div className="p-2 space-y-1">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-center gap-3 px-3 py-3 animate-pulse">
+                  <div className="h-9 w-9 rounded-full bg-[var(--bg-card-hover)] flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-24 rounded bg-[var(--bg-card-hover)]" />
+                    <div className="h-2.5 rounded bg-[var(--bg-card-hover)]" style={{ width: `${40 + i * 10}%` }} />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-          {!loading && filtered.length === 0 && (
+          {!loading && filtered.length === 0 && tickets.length === 0 && (
             <div className="p-6 text-center">
-              <MessageCircle className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2 opacity-50" />
+              <div className="h-12 w-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
+                <MessageCircle className="h-6 w-6 text-accent" />
+              </div>
+              <p className="text-sm font-medium text-[var(--text-primary)] mb-1">No tickets yet</p>
+              <p className="text-xs text-[var(--text-muted)]">Clippers will reach out when they need help.</p>
+            </div>
+          )}
+          {!loading && filtered.length === 0 && tickets.length > 0 && (
+            <div className="p-6 text-center">
               <p className="text-xs text-[var(--text-muted)]">No tickets match this filter.</p>
             </div>
           )}

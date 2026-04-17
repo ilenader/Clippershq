@@ -63,13 +63,25 @@ export function Leaderboard({ channelId, viewerId }: Props) {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-accent" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-hover)] animate-pulse">
+              <div className="h-9 w-9 rounded-lg bg-[var(--bg-input)]" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-32 rounded bg-[var(--bg-input)]" />
+                <div className="h-2.5 w-20 rounded bg-[var(--bg-input)]" />
+              </div>
+              <div className="h-4 w-12 rounded bg-[var(--bg-input)]" />
+            </div>
+          ))}
         </div>
       ) : top.length === 0 ? (
         <div className="text-center py-12 px-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]">
-          <Trophy className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3 opacity-50" />
-          <p className="text-sm text-[var(--text-muted)]">No approved clips yet. Submit one to get on the board.</p>
+          <div className="h-12 w-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
+            <Trophy className="h-6 w-6 text-accent" />
+          </div>
+          <p className="text-sm font-medium text-[var(--text-primary)] mb-1">No clips submitted yet</p>
+          <p className="text-xs text-[var(--text-muted)]">Be the first to get on the board.</p>
         </div>
       ) : (
         <div className="space-y-2">

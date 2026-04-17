@@ -16,6 +16,9 @@ interface Call {
 }
 
 const DISMISS_KEY = "community_call_banner_dismissed_until";
+const CACHE_KEY = "community_calls_cache";
+const CACHE_TIME_KEY = "community_calls_cache_time";
+const CACHE_TTL = 5 * 60_000; // 5 minutes
 
 function readDismissedUntil(): number {
   if (typeof window === "undefined") return 0;
@@ -23,6 +26,31 @@ function readDismissedUntil(): number {
     const raw = localStorage.getItem(DISMISS_KEY);
     return raw ? parseInt(raw, 10) : 0;
   } catch { return 0; }
+}
+
+function readCachedCalls(): { upcoming: Call[] } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    const t = sessionStorage.getItem(CACHE_TIME_KEY);
+    if (!raw || !t) return null;
+    if (Date.now() - Number(t) > CACHE_TTL) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function writeCachedCalls(data: { upcoming: Call[] }): void {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    sessionStorage.setItem(CACHE_TIME_KEY, String(Date.now()));
+  } catch {}
+}
+
+function invalidateCache(): void {
+  try {
+    sessionStorage.removeItem(CACHE_KEY);
+    sessionStorage.removeItem(CACHE_TIME_KEY);
+  } catch {}
 }
 
 /**
@@ -35,24 +63,42 @@ export function CallBanner() {
   const [dismissedUntil, setDismissedUntil] = useState<number>(() => readDismissedUntil());
   const router = useRouter();
 
-  const load = useCallback(async () => {
+  const pickActive = (data: { upcoming: Call[] } | null | undefined): Call | null => {
+    const upcoming: Call[] = data?.upcoming || [];
+    return (
+      upcoming
+        .filter((c) => c.status !== "cancelled")
+        .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0] || null
+    );
+  };
+
+  const load = useCallback(async (opts?: { skipCache?: boolean }) => {
+    // Serve from sessionStorage cache (5 min TTL) unless forced to skip.
+    if (!opts?.skipCache) {
+      const cached = readCachedCalls();
+      if (cached) { setCall(pickActive(cached)); return; }
+    }
     try {
       const res = await fetch("/api/community/calls");
       if (!res.ok) return;
       const data = await res.json();
-      const upcoming: Call[] = data.upcoming || [];
-      // pick the soonest non-cancelled
-      const active = upcoming
-        .filter((c) => c.status !== "cancelled")
-        .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0];
-      setCall(active || null);
+      writeCachedCalls({ upcoming: data.upcoming || [] });
+      setCall(pickActive(data));
     } catch {}
   }, []);
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 2 * 60_000); // refresh every 2min
-    return () => clearInterval(interval);
+    const interval = setInterval(() => load({ skipCache: true }), 2 * 60_000); // fresh fetch every 2min
+    // Invalidate cache + refetch when a new call is scheduled or cancelled.
+    const invalidate = () => { invalidateCache(); load({ skipCache: true }); };
+    window.addEventListener("sse:voice_call_scheduled", invalidate);
+    window.addEventListener("sse:voice_call_cancelled", invalidate);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("sse:voice_call_scheduled", invalidate);
+      window.removeEventListener("sse:voice_call_cancelled", invalidate);
+    };
   }, [load]);
 
   // Tick for countdown

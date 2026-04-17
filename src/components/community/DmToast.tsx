@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -19,6 +19,7 @@ interface Toast {
 export function DmToast({ viewerId, viewerRole }: { viewerId: string; viewerRole: string }) {
   const [toast, setToast] = useState<Toast | null>(null);
   const router = useRouter();
+  const lastFetchRef = useRef(0);
 
   useEffect(() => {
     if (viewerRole !== "CLIPPER") return;
@@ -26,6 +27,10 @@ export function DmToast({ viewerId, viewerRole }: { viewerId: string; viewerRole
       const detail = (e as CustomEvent).detail;
       if (!detail?.ticketId) return;
       if (detail.userId === viewerId) return; // don't toast yourself
+      // Throttle — at most once per 3s, even if Ably redelivers or multiple tickets fire.
+      const now = Date.now();
+      if (now - lastFetchRef.current < 3000) return;
+      lastFetchRef.current = now;
 
       // Hydrate with a light message preview — we only have IDs from Ably payload.
       // Fetch latest message for the ticket to build a nice preview.
