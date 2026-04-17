@@ -210,31 +210,36 @@ export async function POST(
         });
         const { createNotification } = await import("@/lib/notifications");
 
-        // Find the campaign team to notify
+        // Find the campaign team to notify — team lookup is best-effort; we always fall
+        // back to notifying OWNERs on any failure so a CLIENT message never goes unread.
         const convo = await db.conversation.findUnique({
           where: { id: conversationId },
           select: { campaignId: true },
         });
         let notifyUserIds: string[] = [];
         if (convo?.campaignId) {
-          const teamCampaign = await db.teamCampaign.findFirst({
-            where: { campaignId: convo.campaignId },
-            include: {
-              team: {
-                include: {
-                  members: {
-                    include: { user: { select: { id: true } } },
-                    orderBy: { role: "asc" },
+          try {
+            const teamCampaign = await db.teamCampaign.findFirst({
+              where: { campaignId: convo.campaignId },
+              include: {
+                team: {
+                  include: {
+                    members: {
+                      include: { user: { select: { id: true } } },
+                      orderBy: { role: "asc" },
+                    },
                   },
                 },
               },
-            },
-          });
-          if (teamCampaign?.team?.members?.length) {
-            notifyUserIds = teamCampaign.team.members.map((m: any) => m.userId);
+            });
+            if (teamCampaign?.team?.members?.length) {
+              notifyUserIds = teamCampaign.team.members.map((m: any) => m.userId);
+            }
+          } catch (teamErr: any) {
+            console.error("[CHAT] Team lookup failed, falling back to owners:", teamErr?.message);
           }
         }
-        // Fallback to owners if no team found
+        // Fallback to owners if no team found OR team lookup errored
         if (notifyUserIds.length === 0) {
           const owners = await db.user.findMany({ where: { role: "OWNER" }, select: { id: true } });
           notifyUserIds = owners.map((o: any) => o.id);

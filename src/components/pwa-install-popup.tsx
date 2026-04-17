@@ -230,7 +230,10 @@ export function PWAInstallPopup() {
       const success = await triggerNativeInstall();
       if (success) {
         setShow(false);
-        fetch("/api/user/pwa-status", { method: "POST" }).catch(() => {});
+        fetch("/api/user/pwa-status", {
+          method: "POST",
+          headers: { "X-PWA-Mode": "standalone" },
+        }).catch(() => {});
         return;
       }
     }
@@ -329,7 +332,10 @@ export function PWAInstallInstructions({ open, onClose }: { open: boolean; onClo
       const success = await triggerNativeInstall();
       if (success) {
         onClose();
-        fetch("/api/user/pwa-status", { method: "POST" }).catch(() => {});
+        fetch("/api/user/pwa-status", {
+          method: "POST",
+          headers: { "X-PWA-Mode": "standalone" },
+        }).catch(() => {});
         return;
       }
     }

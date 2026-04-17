@@ -110,12 +110,15 @@ export async function GET(req: NextRequest) {
       }
       const inviterIds = Array.from(inviterMap.keys());
       if (inviterIds.length === 0) return NextResponse.json([]);
+      // Only CLIPPERs appear in the referral leaderboard — CLIENT/ADMIN/OWNER may refer internally
+      // but shouldn't show up on a clipper-facing leaderboard.
       const inviters = await db.user.findMany({
-        where: { id: { in: inviterIds } },
+        where: { id: { in: inviterIds }, role: "CLIPPER" },
         select: { id: true, username: true },
       });
       const nameMap = Object.fromEntries(inviters.map((u: any) => [u.id, u.username]));
       const leaderboard = Array.from(inviterMap.entries())
+        .filter(([id]) => nameMap[id] != null) // drop non-CLIPPER inviters
         .map(([id, data]) => ({
           userId: id,
           username: nameMap[id] || "User",

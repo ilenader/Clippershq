@@ -182,7 +182,8 @@ export async function POST(req: NextRequest) {
         .reduce((s: number, p: any) => s + (p.amount || 0), 0);
       const available = Math.round(Math.max(earned - paidOut - locked, 0) * 100) / 100;
 
-      if (roundedAmount > available) {
+      // Compare at integer-cents to avoid float-precision edge cases ($50.00000000001 > $50)
+      if (Math.round(roundedAmount * 100) > Math.round(available * 100)) {
         throw new Error(`Amount exceeds available balance for this campaign (${formatCurrency(available)} available)`);
       }
 

@@ -161,7 +161,8 @@ async function getNextInterval(
 
   console.log(`[TRACKING-INTERVAL] clipId=${clipId} views=${currentViews} prev=${previousViews} growthPerHour=${growthPerHour.toFixed(2)}% bracket=${bracket} interval=${interval}min`);
 
-  return interval;
+  // Absolute safety floor — no code path should ever return < 5 min
+  return Math.max(interval, 5);
 }
 
 /**
@@ -214,6 +215,14 @@ async function processTrackingJob(
     }
 
     console.log(`[TRACKING] Processing clip ${clip.id} (${clip.clipUrl})`);
+
+    // Stale-job recovery logging: flag jobs overdue by 2h+ (server was down, cron crashed, etc.)
+    if (job.nextCheckAt) {
+      const overdueMs = Date.now() - new Date(job.nextCheckAt).getTime();
+      if (overdueMs > 2 * 60 * 60 * 1000) {
+        console.log(`[TRACKING] Recovering stale job ${job.id} — overdue by ${Math.round(overdueMs / 60_000)}min`);
+      }
+    }
 
     // If batch returned no data for this clip: skip, retry next cron (don't flag unavailable)
     if (prefetchedStats === null) {

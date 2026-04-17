@@ -88,7 +88,8 @@ export async function POST(
 
       const campaignAvailable = Math.round(Math.max(campaignEarned - campaignPaidAndLocked, 0) * 100) / 100;
 
-      if (existing.amount > campaignAvailable) {
+      // Integer-cent compare — avoid float-precision false positives/negatives at the boundary
+      if (Math.round(existing.amount * 100) > Math.round(campaignAvailable * 100)) {
         return NextResponse.json({
           error: `Cannot ${action.toLowerCase()} — campaign earnings (${formatCurrency(campaignEarned)}) are less than total payouts (${formatCurrency(campaignPaidAndLocked + existing.amount)}). Earnings may have changed since this payout was requested.`,
         }, { status: 400 });

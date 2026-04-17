@@ -139,6 +139,26 @@ export async function POST(req: NextRequest) {
   if (!campaignId && !toUserId) {
     return NextResponse.json({ error: "toUserId or campaignId is required" }, { status: 400 });
   }
+  // Explicit self-conversation guard (canMessage also rejects this, but belt-and-suspenders)
+  if (toUserId && toUserId === fromUserId) {
+    return NextResponse.json({ error: "Cannot create conversation with yourself" }, { status: 400 });
+  }
+
+  // Per-user conversation cap — applies to CLIPPER/CLIENT only. OWNER/ADMIN reply to many users
+  // and legitimately accumulate conversations.
+  if (fromRole === "CLIPPER" || fromRole === "CLIENT") {
+    try {
+      const userConvoCount = await db.conversation.count({
+        where: { participants: { some: { userId: fromUserId } } },
+      });
+      if (userConvoCount >= 100) {
+        return NextResponse.json(
+          { error: "Conversation limit reached (max 100). Ask an admin to archive old chats." },
+          { status: 429 },
+        );
+      }
+    } catch {}
+  }
 
   // ── Mode 1: Campaign-based (clipper opens chat for a campaign) ──
   if (campaignId && !toUserId) {

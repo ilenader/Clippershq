@@ -64,6 +64,21 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
   }
 }
 
+/**
+ * One-retry wrapper for critical transactional emails (clip approval/rejection, chat replies,
+ * client invites). Resend occasionally hits 429/5xx; a single 2s delayed retry catches most
+ * transient failures without making failing emails slow.
+ */
+async function sendEmailWithRetry(params: EmailParams): Promise<boolean> {
+  const ok = await sendEmail(params);
+  if (ok) return true;
+  console.log(`[EMAIL RETRY] First attempt failed for ${params.to} — retrying in 2s`);
+  await new Promise((r) => setTimeout(r, 2000));
+  const retry = await sendEmail(params);
+  if (!retry) console.error(`[EMAIL RETRY FAIL] Both attempts failed for ${params.to}`);
+  return retry;
+}
+
 // ─── Template wrapper ────────────────────────────────────────
 
 function wrap(content: string): string {
@@ -149,7 +164,7 @@ export async function sendWelcomeEmail(email: string, username: string): Promise
 }
 
 export async function sendClipApproved(email: string, campaignName: string, earnings: number): Promise<boolean> {
-  return sendEmail({
+  return sendEmailWithRetry({
     to: email,
     subject: "Your clip was approved",
     html: wrap(`
@@ -162,7 +177,7 @@ export async function sendClipApproved(email: string, campaignName: string, earn
 }
 
 export async function sendClipRejected(email: string, campaignName: string, reason?: string): Promise<boolean> {
-  return sendEmail({
+  return sendEmailWithRetry({
     to: email,
     subject: "Clip update",
     html: wrap(`
@@ -316,7 +331,7 @@ export async function sendChatReplyEmail(params: {
   const truncated = messagePreview.length > 200 ? "…" : "";
   const safeSender = esc(senderName);
   const safeRecipient = esc(recipientName);
-  return sendEmail({
+  return sendEmailWithRetry({
     to,
     subject: `New message from ${safeSender} — Clippers HQ`,
     html: wrap(`
@@ -335,7 +350,7 @@ export async function sendChatReplyEmail(params: {
 }
 
 export async function sendClientInviteEmail(email: string, link: string): Promise<boolean> {
-  return sendEmail({
+  return sendEmailWithRetry({
     to: email,
     subject: "You're invited to view your campaign on Clippers HQ",
     html: wrap(`

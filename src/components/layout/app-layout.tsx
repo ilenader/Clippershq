@@ -32,7 +32,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     if (isPWA && (!lastSync || Date.now() - parseInt(lastSync) > oneHour)) {
       localStorage.setItem("pwa_last_sync", Date.now().toString());
       localStorage.setItem("pwa_installed", "true");
-      fetch("/api/user/pwa-status", { method: "POST" }).catch(() => {});
+      fetch("/api/user/pwa-status", {
+        method: "POST",
+        headers: { "X-PWA-Mode": "standalone" },
+      }).catch(() => {});
     }
   }, [isPWA]);
 

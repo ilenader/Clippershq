@@ -27,6 +27,14 @@ export async function POST(req: Request) {
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
 
+  // Basic PWA-context signal: the app sets X-PWA-Mode: standalone from installed contexts.
+  // Not cryptographically bulletproof (headers can be forged with curl), but blocks casual
+  // abuse from someone just hitting the endpoint from a normal browser tab.
+  const pwaHeader = req.headers.get("x-pwa-mode");
+  if (pwaHeader !== "standalone") {
+    return NextResponse.json({ error: "Invalid request context" }, { status: 400 });
+  }
+
   // Parse body — default to { installed: true } for backward compatibility
   let installed = true;
   try {

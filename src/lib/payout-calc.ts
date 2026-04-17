@@ -30,8 +30,12 @@ export function calculatePayoutBreakdown(
 ): PayoutBreakdown {
   const feeAmount = round2(requestedAmount * feePercent / 100);
   // Bonus is already included in the requested amount (baked into clip.earnings)
-  // bonusAmount here is for display/reference only
-  const bonusAmount = round2(requestedAmount * bonusPercent / (100 + bonusPercent));
+  // bonusAmount here is for display/reference only.
+  // Guard: if bonusPercent ≤ -100 (nonsensical DB value), divisor (100+bonusPercent) could be 0/negative.
+  const divisor = 100 + bonusPercent;
+  const bonusAmount = divisor > 0 && bonusPercent > 0
+    ? round2(requestedAmount * bonusPercent / divisor)
+    : 0;
   const finalAmount = round2(requestedAmount - feeAmount);
 
   return {

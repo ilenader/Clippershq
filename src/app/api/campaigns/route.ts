@@ -149,6 +149,24 @@ export async function POST(req: NextRequest) {
 
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
+  // Reject duplicate active/draft campaign with same name from the same creator.
+  // Archived campaigns don't block re-use of the name.
+  try {
+    const existing = await db.campaign.findFirst({
+      where: {
+        name: campaignData.name.trim(),
+        createdById: session.user.id,
+        isArchived: false,
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      return NextResponse.json({ error: "A campaign with this name already exists" }, { status: 400 });
+    }
+  } catch {
+    // Non-fatal — continue with create; DB errors will surface below if real.
+  }
+
   try {
     // Build clean create data — only include non-null values
     // ADMIN-created campaigns go to DRAFT for owner review; OWNER campaigns go ACTIVE

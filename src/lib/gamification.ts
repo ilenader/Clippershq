@@ -22,6 +22,13 @@ import {
 } from "@/lib/earnings-calc";
 import { getCampaignBudgetStatus } from "@/lib/balance";
 
+// Per-instance in-memory cache for getGamificationState results.
+// 30s TTL — short enough that streak/level changes appear fast, long enough to absorb
+// back-to-back dashboard page loads. Different Vercel instances have different caches;
+// that's fine — we only need to shed the thundering herd within a single instance.
+const gamificationCache = new Map<string, { data: GamificationState; timestamp: number }>();
+const GAMIFICATION_CACHE_TTL = 30_000;
+
 export interface GamificationState {
   level: number;
   totalEarnings: number;
@@ -396,6 +403,28 @@ export async function updateUserLevel(userId: string): Promise<void> {
 export async function getGamificationState(userId: string): Promise<GamificationState | null> {
   if (!db) return null;
 
+  // Cache hit — return in-memory snapshot from this Vercel instance
+  const cached = gamificationCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < GAMIFICATION_CACHE_TTL) {
+    return cached.data;
+  }
+
+  try {
+    const result = await computeGamificationState(userId);
+    if (result) {
+      gamificationCache.set(userId, { data: result, timestamp: Date.now() });
+    }
+    return result;
+  } catch (err: any) {
+    console.error(`[GAMIFICATION] getGamificationState failed for user ${userId}:`, err?.message);
+    // Return null on error — pages already handle null gracefully (empty state).
+    return null;
+  }
+}
+
+async function computeGamificationState(userId: string): Promise<GamificationState | null> {
+  if (!db) return null;
+
   const user = await db.user.findUnique({
     where: { id: userId },
     select: {
@@ -406,11 +435,12 @@ export async function getGamificationState(userId: string): Promise<Gamification
   });
   if (!user) return null;
 
-  // PWA 14-day expiry check
+  // PWA expiry — 14 days + 1 day buffer for clock skew between server and user device.
+  // If the user opens the PWA on day 14 but either clock drifts, we don't want to yank the bonus.
   if (user.isPWAUser && user.lastPWAOpenAt) {
     const daysSinceLastOpen = (Date.now() - new Date(user.lastPWAOpenAt).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceLastOpen > 14) {
-      console.log(`[PWA] User ${userId} lost PWA bonus — no standalone access in 14 days`);
+    if (daysSinceLastOpen > 15) {
+      console.log(`[PWA] User ${userId} lost PWA bonus — no standalone access in 15 days`);
       await db.user.update({
         where: { id: userId },
         data: { isPWAUser: false },
