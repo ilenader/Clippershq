@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { canMessage } from "@/lib/chat-access";
 import { getUserCampaignIds } from "@/lib/campaign-access";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -115,6 +116,10 @@ export async function POST(req: NextRequest) {
 
   if (!db || !db.conversation) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
+  // Rate limit: 30 new conversations per hour per user (prevents spam)
+  const rl = checkRateLimit(`chat-convo:${session.user.id}`, 30, 60 * 60_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   let body: any;
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
@@ -123,6 +128,17 @@ export async function POST(req: NextRequest) {
   const { toUserId, campaignId } = body;
   const fromUserId = session.user.id;
   const fromRole = (session.user as any).role;
+
+  // Input validation
+  if (campaignId != null && (typeof campaignId !== "string" || campaignId.length > 100)) {
+    return NextResponse.json({ error: "Invalid campaignId" }, { status: 400 });
+  }
+  if (toUserId != null && (typeof toUserId !== "string" || toUserId.length > 100)) {
+    return NextResponse.json({ error: "Invalid toUserId" }, { status: 400 });
+  }
+  if (!campaignId && !toUserId) {
+    return NextResponse.json({ error: "toUserId or campaignId is required" }, { status: 400 });
+  }
 
   // ── Mode 1: Campaign-based (clipper opens chat for a campaign) ──
   if (campaignId && !toUserId) {

@@ -60,6 +60,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email and campaignId are required" }, { status: 400 });
     }
 
+    // Input validation
+    if (typeof email !== "string" || email.length > 254 || !email.includes("@")) {
+      return NextResponse.json({ error: "Invalid email (max 254 chars, must contain @)" }, { status: 400 });
+    }
+    if (typeof campaignId !== "string" || campaignId.length > 100) {
+      return NextResponse.json({ error: "Invalid campaignId" }, { status: 400 });
+    }
+
     // Find or create client user
     let user = await db.user.findUnique({ where: { email: email.trim().toLowerCase() } });
     if (!user) {

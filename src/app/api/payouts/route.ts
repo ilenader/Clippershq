@@ -103,11 +103,26 @@ export async function POST(req: NextRequest) {
   if (amount < 10) {
     return NextResponse.json({ error: "You need at least $10 to request a payout." }, { status: 400 });
   }
+  if (amount > 100_000) {
+    return NextResponse.json({ error: "Amount is too large (max $100,000)." }, { status: 400 });
+  }
   if (!data.walletAddress?.trim()) {
     return NextResponse.json({ error: "Please enter your wallet address." }, { status: 400 });
   }
+  if (data.walletAddress.length > 200) {
+    return NextResponse.json({ error: "Wallet address is too long (max 200 chars)." }, { status: 400 });
+  }
+  if (typeof data.walletAsset === "string" && data.walletAsset.length > 50) {
+    return NextResponse.json({ error: "Wallet asset is too long (max 50 chars)." }, { status: 400 });
+  }
+  if (typeof data.walletChain === "string" && data.walletChain.length > 50) {
+    return NextResponse.json({ error: "Wallet chain is too long (max 50 chars)." }, { status: 400 });
+  }
   if (!data.discordUsername?.trim()) {
     return NextResponse.json({ error: "Please enter your Discord username." }, { status: 400 });
+  }
+  if (data.discordUsername.length > 100) {
+    return NextResponse.json({ error: "Discord username is too long (max 100 chars)." }, { status: 400 });
   }
 
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });

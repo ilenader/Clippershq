@@ -1,4 +1,5 @@
 import { runDueTrackingJobs } from "@/lib/tracking";
+import { db } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,27 @@ export async function GET(req: NextRequest) {
   const start = Date.now();
 
   const result = await runDueTrackingJobs();
+
+  // Opportunistic cleanup: remove used/expired magic-link tokens older than 7 days.
+  // Table grows unbounded otherwise — no dedicated cleanup cron exists.
+  try {
+    if (db) {
+      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const deleted = await db.magicLinkToken.deleteMany({
+        where: {
+          OR: [
+            { used: true, createdAt: { lt: cutoff } },
+            { expiresAt: { lt: cutoff } },
+          ],
+        },
+      });
+      if (deleted.count > 0) {
+        console.log(`[CRON] Cleaned up ${deleted.count} expired/used magic-link tokens`);
+      }
+    }
+  } catch (cleanupErr: any) {
+    console.error("[CRON] Magic-link cleanup failed:", cleanupErr?.message);
+  }
 
   const elapsed = Date.now() - start;
   console.log(`[Tracking Cron] Done in ${elapsed}ms: ${result.processed} processed, ${result.errors} errors`);

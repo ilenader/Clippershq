@@ -74,6 +74,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Platform and username are required" }, { status: 400 });
   }
 
+  // Platform allowlist — match casing used elsewhere in the app (TikTok/Instagram/YouTube)
+  const ALLOWED_PLATFORMS = ["TikTok", "Instagram", "YouTube"];
+  if (typeof data.platform !== "string" || !ALLOWED_PLATFORMS.includes(data.platform)) {
+    return NextResponse.json({ error: "Platform must be one of: TikTok, Instagram, YouTube" }, { status: 400 });
+  }
+
+  if (typeof data.username !== "string" || data.username.length > 100) {
+    return NextResponse.json({ error: "Username is too long (max 100 chars)" }, { status: 400 });
+  }
+
   // Strip @ prefix from username
   data.username = data.username.replace(/^@/, "").trim();
   if (!data.username) {
