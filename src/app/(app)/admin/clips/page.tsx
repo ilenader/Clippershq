@@ -88,7 +88,8 @@ export default function AdminClipsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  useAutoRefresh(load, 10000);
+  // Ably pushes clip/earnings updates instantly, so reduce polling to a safety-net interval.
+  useAutoRefresh(load, 30000);
 
   // Instant refresh when a clip status/earnings changes in another tab or via cron.
   // Owner's own approve/reject already optimistically updates local state (see handleReview).
