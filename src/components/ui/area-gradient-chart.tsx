@@ -17,6 +17,8 @@ interface AreaGradientChartProps {
   height?: number;
   valuePrefix?: string;
   valueSuffix?: string;
+  /** Tooltip label prefix (e.g. "Earnings", "Views"). If omitted, the tooltip shows just the value. */
+  label?: string;
   /** Override the default "Nk" formatter for the Y-axis. */
   yAxisFormatter?: (value: number) => string;
 }
@@ -45,6 +47,7 @@ export function AreaGradientChart({
   height = 220,
   valuePrefix = "",
   valueSuffix = "",
+  label: seriesLabel,
   yAxisFormatter,
 }: AreaGradientChartProps) {
   const gradientId = `area-grad-${useId().replace(/:/g, "")}`;
@@ -91,9 +94,15 @@ export function AreaGradientChart({
                   const v = Number((payload[0] as any).value);
                   return (
                     <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-xs">
-                      <p className="whitespace-nowrap">
+                      <p className="whitespace-nowrap flex items-center gap-1.5">
                         <span className="text-[var(--text-muted)]">{label}</span>
-                        <span className="text-[var(--text-muted)]"> — </span>
+                        <span className="text-[var(--text-muted)]">—</span>
+                        {seriesLabel ? (
+                          <>
+                            <span className="inline-block h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                            <span className="text-[var(--text-secondary)]">{seriesLabel}:</span>
+                          </>
+                        ) : null}
                         <span className="font-semibold text-[var(--text-primary)] tabular-nums">{formatTooltip(v, valuePrefix, valueSuffix)}</span>
                       </p>
                     </div>

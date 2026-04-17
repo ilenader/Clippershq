@@ -51,11 +51,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       take: 5000,
     });
 
-    // Build daily breakdown
-    const dayMap: Record<string, { clips: number; views: number; likes: number; comments: number; shares: number }> = {};
+    // Agency earnings keyed by clipId — so per-day "earnings" reflects the FULL campaign spend
+    // (clipper payout + owner/agency portion), not just the clipper slice.
+    const agencyRows = await db.agencyEarning.findMany({
+      where: { campaignId, clip: { videoUnavailable: false } },
+      select: { clipId: true, amount: true },
+    });
+    const agencyByClip: Record<string, number> = {};
+    for (const ae of agencyRows) {
+      agencyByClip[ae.clipId] = (agencyByClip[ae.clipId] || 0) + (ae.amount || 0);
+    }
+
+    // Build daily breakdown (includes both clip + agency earnings as "earnings")
+    const dayMap: Record<string, { clips: number; views: number; likes: number; comments: number; shares: number; earnings: number }> = {};
     for (const clip of clips) {
       const day = new Date(clip.createdAt).toISOString().split("T")[0];
-      if (!dayMap[day]) dayMap[day] = { clips: 0, views: 0, likes: 0, comments: 0, shares: 0 };
+      if (!dayMap[day]) dayMap[day] = { clips: 0, views: 0, likes: 0, comments: 0, shares: 0, earnings: 0 };
       dayMap[day].clips++;
       const stat = clip.stats?.[0];
       if (clip.status === "APPROVED" && !clip.videoUnavailable && stat) {
@@ -63,11 +74,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         dayMap[day].likes += stat.likes || 0;
         dayMap[day].comments += stat.comments || 0;
         dayMap[day].shares += stat.shares || 0;
+        const clipperPortion = clip.earnings || 0;
+        const agencyPortion = agencyByClip[clip.id] || 0;
+        dayMap[day].earnings += clipperPortion + agencyPortion;
       }
     }
     const dailyBreakdown = Object.entries(dayMap)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, data]) => ({ date, ...data }));
+      .map(([date, data]) => ({ date, ...data, earnings: Math.round(data.earnings * 100) / 100 }));
 
     // Clean clips for client view (no sensitive data)
     const clientClips = clips.map((c: any, i: number) => ({
@@ -89,13 +103,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const totalComments = approved.reduce((s: number, c: any) => s + (c.stats?.[0]?.comments || 0), 0);
     const totalShares = approved.reduce((s: number, c: any) => s + (c.stats?.[0]?.shares || 0), 0);
 
-    // Calculate total spend: clip earnings + agency earnings (matches /api/campaigns/spend logic)
+    // Calculate total spend: clip earnings + agency earnings (matches /api/campaigns/spend logic).
+    // Reuses the agencyByClip map built above — no extra DB round-trip.
     const clipSpend = approved.reduce((s: number, c: any) => s + (c.earnings || 0), 0);
-    const agencyEarnings = await db.agencyEarning.aggregate({
-      where: { campaignId, clip: { videoUnavailable: false } },
-      _sum: { amount: true },
-    });
-    const totalSpent = Math.round((clipSpend + (agencyEarnings._sum.amount || 0)) * 100) / 100;
+    const agencyTotal = Object.values(agencyByClip).reduce((s: number, v: number) => s + v, 0);
+    const totalSpent = Math.round((clipSpend + agencyTotal) * 100) / 100;
 
     return NextResponse.json({
       campaign,

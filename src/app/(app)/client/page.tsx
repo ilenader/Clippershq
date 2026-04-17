@@ -16,9 +16,7 @@ import {
 } from "lucide-react";
 import { formatNumber, formatCurrency } from "@/lib/utils";
 import { toast } from "@/lib/toast";
-import {
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
-} from "recharts";
+import { AreaGradientChart } from "@/components/ui/area-gradient-chart";
 
 function PlatformDot({ platform }: { platform: string }) {
   return <span className="inline-block h-2 w-2 rounded-full bg-accent flex-shrink-0" title={platform} />;
@@ -58,6 +56,7 @@ export default function ClientDashboard() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(false);
   const [timeframeDays, setTimeframeDays] = useState(0);
+  const [chartMetric, setChartMetric] = useState<"views" | "clips" | "earnings">("views");
 
   useEffect(() => {
     if (session && userRole && userRole !== "CLIENT" && userRole !== "OWNER") {
@@ -190,12 +189,14 @@ export default function ClientDashboard() {
   const displayClips = sortedClips.slice(0, 50);
   const hasMoreClips = sortedClips.length > 50;
 
-  // Chart data: when All, show raw daily breakdown; else fill every day in range so gaps show as zeros
-  let chartData: { date: string; views: number }[];
+  // Chart data: when All, show raw daily breakdown; else fill every day in range so gaps show as zeros.
+  // Metric is dynamic — "views" | "clips" | "earnings" — pulled from filteredDailyBreakdown fields.
+  const metricKey = chartMetric;
+  let chartData: { label: string; value: number }[];
   if (isAllTime) {
     chartData = allDailyBreakdown.map((d: any) => ({
-      date: (d.date || "").slice(5),
-      views: d.views || 0,
+      label: (d.date || "").slice(5),
+      value: Number(d[metricKey] || 0),
     }));
   } else {
     const byDate = new Map<string, any>(filteredDailyBreakdown.map((d: any) => [d.date, d]));
@@ -205,7 +206,7 @@ export default function ClientDashboard() {
       d.setDate(d.getDate() - i);
       const iso = toLocalIso(d);
       const entry = byDate.get(iso);
-      chartData.push({ date: iso.slice(5), views: entry?.views || 0 });
+      chartData.push({ label: iso.slice(5), value: Number(entry?.[metricKey] || 0) });
     }
   }
 
@@ -364,56 +365,38 @@ export default function ClientDashboard() {
             ))}
           </div>
 
-          {/* ─── D) VIEWS CHART ─── */}
+          {/* ─── D) METRIC CHART ─── */}
           <Card>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-              <h3 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Views Over Time</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">
+                  {chartMetric === "views" ? "Views" : chartMetric === "clips" ? "Clips" : "Earnings"} Over Time
+                </h3>
+                <div className="flex gap-1.5">
+                  {(["views", "clips", "earnings"] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setChartMetric(m)}
+                      className={`px-3 py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-colors cursor-pointer ${
+                        chartMetric === m
+                          ? "bg-accent text-white"
+                          : "bg-[var(--bg-input)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                      }`}
+                    >
+                      {m === "views" ? "Views" : m === "clips" ? "Clips" : "Earnings"}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} includeAll />
             </div>
-            {chartData.some((d) => d.views > 0) ? (
-              <div className="h-[220px] sm:h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="viewsGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2596be" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#2596be" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }}
-                      axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                      tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)}
-                    />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: "8px", color: "var(--text-primary)" }}
-                      labelStyle={{ color: "var(--text-muted)" }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="views"
-                      stroke="#2596be"
-                      strokeWidth={2}
-                      fill="url(#viewsGradient)"
-                      dot={false}
-                      activeDot={{ r: 4, fill: "#2596be", stroke: "#fff", strokeWidth: 2 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-[220px] sm:h-[260px] flex items-center justify-center">
-                <p className="text-sm text-[var(--text-muted)]">No views data yet</p>
-              </div>
-            )}
+            <AreaGradientChart
+              data={chartData}
+              color="#2596be"
+              height={260}
+              valuePrefix={chartMetric === "earnings" ? "$" : ""}
+              label={chartMetric === "views" ? "Views" : chartMetric === "clips" ? "Clips" : "Earnings"}
+            />
           </Card>
 
           {/* ─── E) CLIP PERFORMANCE TABLE ─── */}

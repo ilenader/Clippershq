@@ -33,6 +33,7 @@ export function EarningsChart({
         color="#2596be"
         height={height}
         valuePrefix="$"
+        label="Earnings"
       />
       {!hasEarnings && showEmptyMessage && (
         <p className="mt-3 text-sm text-[var(--text-muted)]">

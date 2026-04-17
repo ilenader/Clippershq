@@ -387,7 +387,7 @@ export default function AdminAnalyticsPage() {
             color="#2596be"
             height={220}
             valuePrefix={leftChartMode === "earnings" ? "$" : ""}
-            valueSuffix={leftChartMode === "earnings" ? "" : ""}
+            label={leftChartMode === "earnings" ? "Earnings" : "Clips"}
           />
           {filteredClips.length === 0 && <p className="mt-3 text-sm text-[var(--text-muted)]">No clips submitted yet.</p>}
         </Card>
