@@ -436,14 +436,14 @@ async function computeGamificationState(userId: string): Promise<GamificationSta
   if (!user) return null;
 
   // PWA validity — the +2% bonus requires BOTH `isPWAUser=true` AND a `lastPWAOpenAt`
-  // within the last 15 days (14-day target + 1 day clock-skew buffer). A missing timestamp
-  // is treated the same as expired: no evidence of recent app use → no bonus. This self-heals
-  // legacy rows from before `lastPWAOpenAt` existed, so users can't keep the bonus forever
-  // without using the PWA.
+  // within the last 2 days. The PWA app syncs hourly when open, so anyone who launches the
+  // app even once every 2 days keeps the bonus; stop using it for 48h and the bonus drops.
+  // A missing timestamp is treated the same as expired: no evidence of recent app use → no
+  // bonus. This self-heals legacy rows from before `lastPWAOpenAt` existed.
   if (user.isPWAUser) {
     const lastOpenMs = user.lastPWAOpenAt ? new Date(user.lastPWAOpenAt).getTime() : 0;
     const daysSinceLastOpen = lastOpenMs ? (Date.now() - lastOpenMs) / (1000 * 60 * 60 * 24) : Infinity;
-    if (!user.lastPWAOpenAt || daysSinceLastOpen > 15) {
+    if (!user.lastPWAOpenAt || daysSinceLastOpen > 2) {
       const reason = !user.lastPWAOpenAt ? "no lastPWAOpenAt recorded" : `no standalone access in ${Math.round(daysSinceLastOpen)} days`;
       console.log(`[PWA] User ${userId} lost PWA bonus — ${reason}`);
       await db.user.update({
@@ -561,10 +561,10 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
   // Effective PWA flag — must match the rule in computeGamificationState so any entry point
   // (tracking, streak break, level change, PWA toggle) pays the correct bonus regardless of
   // whether the dashboard self-heal has run yet. Requires both isPWAUser=true AND a
-  // lastPWAOpenAt within 15 days.
+  // lastPWAOpenAt within 2 days.
   const lastOpenMs = user.lastPWAOpenAt ? new Date(user.lastPWAOpenAt).getTime() : 0;
   const daysSinceLastOpen = lastOpenMs ? (Date.now() - lastOpenMs) / (1000 * 60 * 60 * 24) : Infinity;
-  const isPWAUserEffective = !!user.isPWAUser && !!user.lastPWAOpenAt && daysSinceLastOpen <= 15;
+  const isPWAUserEffective = !!user.isPWAUser && !!user.lastPWAOpenAt && daysSinceLastOpen <= 2;
 
   // Get IDs of clips already included in PAID payouts (their earnings are locked)
   const paidPayouts = await db.payoutRequest.findMany({
