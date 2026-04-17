@@ -435,12 +435,17 @@ async function computeGamificationState(userId: string): Promise<GamificationSta
   });
   if (!user) return null;
 
-  // PWA expiry — 14 days + 1 day buffer for clock skew between server and user device.
-  // If the user opens the PWA on day 14 but either clock drifts, we don't want to yank the bonus.
-  if (user.isPWAUser && user.lastPWAOpenAt) {
-    const daysSinceLastOpen = (Date.now() - new Date(user.lastPWAOpenAt).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceLastOpen > 15) {
-      console.log(`[PWA] User ${userId} lost PWA bonus — no standalone access in 15 days`);
+  // PWA validity — the +2% bonus requires BOTH `isPWAUser=true` AND a `lastPWAOpenAt`
+  // within the last 15 days (14-day target + 1 day clock-skew buffer). A missing timestamp
+  // is treated the same as expired: no evidence of recent app use → no bonus. This self-heals
+  // legacy rows from before `lastPWAOpenAt` existed, so users can't keep the bonus forever
+  // without using the PWA.
+  if (user.isPWAUser) {
+    const lastOpenMs = user.lastPWAOpenAt ? new Date(user.lastPWAOpenAt).getTime() : 0;
+    const daysSinceLastOpen = lastOpenMs ? (Date.now() - lastOpenMs) / (1000 * 60 * 60 * 24) : Infinity;
+    if (!user.lastPWAOpenAt || daysSinceLastOpen > 15) {
+      const reason = !user.lastPWAOpenAt ? "no lastPWAOpenAt recorded" : `no standalone access in ${Math.round(daysSinceLastOpen)} days`;
+      console.log(`[PWA] User ${userId} lost PWA bonus — ${reason}`);
       await db.user.update({
         where: { id: userId },
         data: { isPWAUser: false },
@@ -453,7 +458,6 @@ async function computeGamificationState(userId: string): Promise<GamificationSta
       }
     }
   }
-  // If isPWAUser but lastPWAOpenAt is null — existing user, give benefit of the doubt
 
   // Run streak evaluation (handles 48h grace)
   await updateStreak(userId);
@@ -516,7 +520,10 @@ async function computeGamificationState(userId: string): Promise<GamificationSta
 
   const levelBonusPct = config.levelBonuses[level] || 0;
   const streakBonusPct = currentReward?.bonusPercent || 0;
-  const pwaBonusPct = user.isPWAUser ? PWA_BONUS_PERCENT : 0;
+  // Belt-and-suspenders: the block above already sets isPWAUser=false when lastPWAOpenAt is
+  // missing or stale, but we keep the second guard here so display can never award a bonus
+  // without both flags healthy.
+  const pwaBonusPct = (user.isPWAUser && user.lastPWAOpenAt) ? PWA_BONUS_PERCENT : 0;
 
   return {
     level,
@@ -547,9 +554,17 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
 
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { level: true, currentStreak: true, referredById: true, isPWAUser: true, manualBonusOverride: true },
+    select: { level: true, currentStreak: true, referredById: true, isPWAUser: true, lastPWAOpenAt: true, manualBonusOverride: true },
   });
   if (!user) return { clipsUpdated: 0, oldTotal: 0, newTotal: 0 };
+
+  // Effective PWA flag — must match the rule in computeGamificationState so any entry point
+  // (tracking, streak break, level change, PWA toggle) pays the correct bonus regardless of
+  // whether the dashboard self-heal has run yet. Requires both isPWAUser=true AND a
+  // lastPWAOpenAt within 15 days.
+  const lastOpenMs = user.lastPWAOpenAt ? new Date(user.lastPWAOpenAt).getTime() : 0;
+  const daysSinceLastOpen = lastOpenMs ? (Date.now() - lastOpenMs) / (1000 * 60 * 60 * 24) : Infinity;
+  const isPWAUserEffective = !!user.isPWAUser && !!user.lastPWAOpenAt && daysSinceLastOpen <= 15;
 
   // Get IDs of clips already included in PAID payouts (their earnings are locked)
   const paidPayouts = await db.payoutRequest.findMany({
@@ -652,7 +667,7 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
         levelBonuses: config.levelBonuses,
         streakBonuses: config.streakBonuses,
         isReferred: !!user.referredById,
-        isPWAUser: user.isPWAUser,
+        isPWAUser: isPWAUserEffective,
         manualBonusOverride: user.manualBonusOverride,
       });
 
