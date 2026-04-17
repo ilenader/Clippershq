@@ -29,6 +29,7 @@ import {
 import { useState } from "react";
 import { useInstallPrompt } from "@/hooks/use-pwa";
 import { PWAInstallInstructions } from "@/components/pwa-install-popup";
+import { CommunitySidebarNav } from "@/components/community/CommunitySidebarNav";
 
 interface NavItem {
   label: string;
@@ -54,7 +55,6 @@ const clipperNav: NavSection[] = [
     items: [
       { label: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
       { label: "Campaigns", href: "/campaigns", icon: <Megaphone className="h-[18px] w-[18px]" /> },
-      { label: "Community", href: "/community", icon: <MessageCircle className="h-[18px] w-[18px]" /> },
       { label: "Accounts", href: "/accounts", icon: <UserCircle className="h-[18px] w-[18px]" /> },
       { label: "Clips", href: "/clips", icon: <Film className="h-[18px] w-[18px]" /> },
       { label: "Earnings", href: "/earnings", icon: <DollarSign className="h-[18px] w-[18px]" /> },
@@ -78,7 +78,6 @@ const adminNav: NavSection[] = [
     title: "Manage",
     items: [
       { label: "Campaigns", href: "/admin/campaigns", icon: <Megaphone className="h-[18px] w-[18px]" /> },
-      { label: "Community", href: "/community", icon: <MessageCircle className="h-[18px] w-[18px]" /> },
       { label: "Clips", href: "/admin/clips", icon: <Film className="h-[18px] w-[18px]" /> },
       { label: "Analytics", href: "/admin/analytics", icon: <Activity className="h-[18px] w-[18px]" /> },
       { label: "Referrals", href: "/admin/referrals", icon: <Users className="h-[18px] w-[18px]" /> },
@@ -178,6 +177,11 @@ export function Sidebar({ role }: SidebarProps) {
                   </Link>
                 );
               })}
+              {/* Community expandable block — inserts after the first nav section
+                  (for CLIPPER this is the only section; for ADMIN/OWNER it's "Overview"). */}
+              {i === 0 && !isClient && (
+                <CommunitySidebarNav role={role} />
+              )}
             </div>
           </div>
         ))}

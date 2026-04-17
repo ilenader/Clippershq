@@ -47,10 +47,17 @@ export async function GET(
   const cursor = req.nextUrl.searchParams.get("cursor");
   const limitRaw = parseInt(req.nextUrl.searchParams.get("limit") || "50", 10);
   const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 50, 1), 100);
+  const rawSearch = req.nextUrl.searchParams.get("search");
+  // Content-ILIKE filter — only OWNER/ADMIN may search; enforced at the query layer
+  // so a clipper can't leak non-visible content by crafting a search=foo param.
+  const searchClause =
+    rawSearch && (role === "OWNER" || role === "ADMIN") && rawSearch.trim().length >= 2
+      ? { content: { contains: rawSearch.trim(), mode: "insensitive" as const } }
+      : null;
 
   try {
     const messages = await db.channelMessage.findMany({
-      where: { channelId },
+      where: { channelId, ...(searchClause || {}) },
       include: { user: { select: { id: true, username: true, role: true, image: true } } },
       orderBy: { createdAt: "desc" },
       take: limit + 1,

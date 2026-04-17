@@ -10,6 +10,8 @@ interface Props {
   placeholder?: string;
   /** If set, shows a read-only state with an "only admins can post" notice */
   lockedReason?: string;
+  /** Optional typing-signal callback — invoked (debounced to once per 2s) while user types. */
+  onTyping?: () => void;
 }
 
 export function MessageInput({
@@ -18,10 +20,20 @@ export function MessageInput({
   maxLength = 2000,
   placeholder = "Type a message…",
   lockedReason,
+  onTyping,
 }: Props) {
   const [value, setValue] = useState("");
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const typingThrottleRef = useRef<number>(0);
+
+  const signalTyping = () => {
+    if (!onTyping) return;
+    const now = Date.now();
+    if (now - typingThrottleRef.current < 2000) return;
+    typingThrottleRef.current = now;
+    onTyping();
+  };
 
   // Auto-grow up to ~4 lines, then scroll.
   useEffect(() => {
@@ -64,7 +76,10 @@ export function MessageInput({
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={(e) => setValue(e.target.value.slice(0, maxLength))}
+            onChange={(e) => {
+              setValue(e.target.value.slice(0, maxLength));
+              if (e.target.value.length > 0) signalTyping();
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();

@@ -200,7 +200,8 @@ export default function CommunityPage() {
     [channels, selectedChannelId],
   );
 
-  // Mute toggle
+  // Mute toggle — also fires a local window event so DmToast (and any future listener)
+  // updates its mute set without a refetch.
   const toggleMute = async () => {
     if (!selectedCampaignId) return;
     try {
@@ -211,6 +212,7 @@ export default function CommunityPage() {
           body: JSON.stringify({ campaignId: selectedCampaignId }),
         });
         setMuted(false);
+        window.dispatchEvent(new CustomEvent("community:mute_changed", { detail: { campaignId: selectedCampaignId, muted: false } }));
         toast.success("Unmuted");
       } else {
         await fetch("/api/community/mute", {
@@ -219,6 +221,7 @@ export default function CommunityPage() {
           body: JSON.stringify({ campaignId: selectedCampaignId }),
         });
         setMuted(true);
+        window.dispatchEvent(new CustomEvent("community:mute_changed", { detail: { campaignId: selectedCampaignId, muted: true } }));
         toast.success("Muted announcements");
       }
     } catch { toast.error("Could not update mute"); }
@@ -426,7 +429,7 @@ export default function CommunityPage() {
                 ) : viewMode === "call" && upcomingCall ? (
                   <VoiceRoom call={upcomingCall} />
                 ) : viewMode === "ticket" ? (
-                  <TicketPanel campaignId={selectedCampaignId} viewerId={viewerId} viewerRole={viewerRole} />
+                  <TicketPanel campaignId={selectedCampaignId} viewerId={viewerId} viewerRole={viewerRole} campaignName={selectedCampaign?.name} />
                 ) : selectedChannel ? (
                   selectedChannel.type === "leaderboard" ? (
                     <Leaderboard channelId={selectedChannel.id} viewerId={viewerId} />

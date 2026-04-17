@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageBubble, type Message } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { toast } from "@/lib/toast";
-import { ArrowDown, Loader2, Megaphone, MessageCircle } from "lucide-react";
+import { ArrowDown, Loader2, Megaphone, MessageCircle, Search, X } from "lucide-react";
 
 function MessageSkeleton() {
   return (
@@ -37,11 +37,16 @@ interface Props {
 const PAGE_SIZE = 50;
 
 export function ChannelChat({ channelId, channelType, channelName, viewerId, viewerRole }: Props) {
+  const isAdminOrOwner = viewerRole === "OWNER" || viewerRole === "ADMIN";
   const [messages, setMessages] = useState<Message[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchResults, setSearchResults] = useState<Message[] | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Map<string, { username: string; until: number }>>(new Map());
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomAnchorRef = useRef<HTMLDivElement>(null);
@@ -184,6 +189,77 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
     };
   }, [channelId, viewerId, scrollToBottom]);
 
+  // Typing indicator — listen for `typing` events, add/refresh per-user entries,
+  // auto-evict after 4s. Filter out the viewer's own typing pings.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || detail.channelId !== channelId) return;
+      if (detail.userId === viewerId) return;
+      setTypingUsers((prev) => {
+        const next = new Map(prev);
+        next.set(detail.userId, { username: detail.username || "user", until: Date.now() + 4000 });
+        return next;
+      });
+    };
+    const sweep = setInterval(() => {
+      setTypingUsers((prev) => {
+        const now = Date.now();
+        const next = new Map(prev);
+        let changed = false;
+        for (const [uid, entry] of next) {
+          if (entry.until <= now) { next.delete(uid); changed = true; }
+        }
+        return changed ? next : prev;
+      });
+    }, 1000);
+    window.addEventListener("sse:typing", handler);
+    return () => {
+      window.removeEventListener("sse:typing", handler);
+      clearInterval(sweep);
+    };
+  }, [channelId, viewerId]);
+
+  // OWNER/ADMIN search — debounce 500ms, query server-side ILIKE, render results in place.
+  useEffect(() => {
+    if (!isAdminOrOwner) return;
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSearchActive(false);
+      setSearchResults(null);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        setSearchActive(true);
+        const res = await fetch(
+          `/api/community/channels/${channelId}/messages?search=${encodeURIComponent(q)}&limit=100`,
+        );
+        if (!res.ok) { setSearchResults([]); return; }
+        const data = await res.json();
+        setSearchResults((data.messages || []).reverse());
+      } catch {
+        setSearchResults([]);
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [searchQuery, channelId, isAdminOrOwner]);
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setSearchActive(false);
+    setSearchResults(null);
+  };
+
+  // Client-side typing ping — sends to /api/community/typing, server-side throttled.
+  const pingTyping = useCallback(() => {
+    fetch("/api/community/typing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channelId }),
+    }).catch(() => {});
+  }, [channelId]);
+
   const handleSend = useCallback(
     async (content: string) => {
       // Immediate optimistic append with a temporary id. Replaced by either the POST response
@@ -257,11 +333,43 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
     return gap > 5 * 60_000;
   };
 
+  const displayMessages = searchActive && searchResults ? searchResults : messages;
+  const typingList = Array.from(typingUsers.values()).map((t) => t.username);
+
   return (
     <div className="relative flex flex-col h-full min-h-0">
+      {isAdminOrOwner && (
+        <div className="px-3 sm:px-4 py-2 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
+            <input
+              type="text"
+              placeholder="Search messages…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-9 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] text-xs lg:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-accent/40 focus:outline-none transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded flex items-center justify-center hover:bg-[var(--bg-card-hover)] transition-colors"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+              </button>
+            )}
+          </div>
+          {searchActive && searchResults && (
+            <p className="text-[10px] text-[var(--text-muted)] mt-1.5">
+              {searchResults.length} match{searchResults.length === 1 ? "" : "es"}
+              <button onClick={clearSearch} className="ml-2 text-accent hover:underline">Clear</button>
+            </p>
+          )}
+        </div>
+      )}
       <div
         ref={scrollRef}
-        onScroll={handleScroll}
+        onScroll={searchActive ? undefined : handleScroll}
         className="flex-1 overflow-y-auto min-h-0"
       >
         {loadingMore && (
@@ -272,6 +380,25 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
 
         {loading ? (
           <MessageSkeleton />
+        ) : searchActive && searchResults ? (
+          searchResults.length === 0 ? (
+            <div className="flex items-center justify-center py-20 px-4">
+              <p className="text-sm text-[var(--text-muted)]">No messages match "{searchQuery}"</p>
+            </div>
+          ) : (
+            <div className="py-2">
+              {searchResults.map((m) => (
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  viewerId={viewerId}
+                  viewerRole={viewerRole}
+                  onDelete={handleDelete}
+                  showAvatar={true}
+                />
+              ))}
+            </div>
+          )
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center py-20 px-4">
             <div className="text-center max-w-xs">
@@ -317,8 +444,19 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
         </button>
       )}
 
+      {typingList.length > 0 && !searchActive && (
+        <div className="px-4 pb-0.5">
+          <p className="text-xs text-[var(--text-muted)] italic animate-pulse">
+            {typingList.slice(0, 3).join(", ")}
+            {typingList.length > 3 && ` +${typingList.length - 3} more`}
+            {typingList.length === 1 ? " is typing…" : " are typing…"}
+          </p>
+        </div>
+      )}
+
       <MessageInput
         onSend={handleSend}
+        onTyping={channelType === "leaderboard" ? undefined : pingTyping}
         lockedReason={locked}
         placeholder={
           channelType === "announcement"

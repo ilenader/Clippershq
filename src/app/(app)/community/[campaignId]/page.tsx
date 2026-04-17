@@ -104,6 +104,7 @@ export default function CampaignCommunityPage() {
           body: JSON.stringify({ campaignId }),
         });
         setMuted(false);
+        window.dispatchEvent(new CustomEvent("community:mute_changed", { detail: { campaignId, muted: false } }));
         toast.success("Unmuted");
       } else {
         await fetch("/api/community/mute", {
@@ -112,6 +113,7 @@ export default function CampaignCommunityPage() {
           body: JSON.stringify({ campaignId }),
         });
         setMuted(true);
+        window.dispatchEvent(new CustomEvent("community:mute_changed", { detail: { campaignId, muted: true } }));
         toast.success("Muted");
       }
     } catch {}
@@ -226,7 +228,7 @@ export default function CampaignCommunityPage() {
           {viewMode === "call" && upcomingCall ? (
             <VoiceRoom call={upcomingCall} />
           ) : viewMode === "ticket" ? (
-            <TicketPanel campaignId={campaignId} viewerId={viewerId} viewerRole={viewerRole} />
+            <TicketPanel campaignId={campaignId} viewerId={viewerId} viewerRole={viewerRole} campaignName={campaign?.name} />
           ) : selectedChannel ? (
             selectedChannel.type === "leaderboard" ? (
               <Leaderboard channelId={selectedChannel.id} viewerId={viewerId} />

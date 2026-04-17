@@ -24,6 +24,8 @@ interface Props {
   campaignId: string;
   viewerId: string;
   viewerRole: "CLIPPER" | "ADMIN" | "OWNER" | "CLIENT";
+  /** Campaign display name — used in the CLIPPER welcome banner. */
+  campaignName?: string;
 }
 
 const statusColors: Record<TicketStatus, { dot: string; active: string }> = {
@@ -33,7 +35,7 @@ const statusColors: Record<TicketStatus, { dot: string; active: string }> = {
   resolved: { dot: "bg-emerald-400", active: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" },
 };
 
-export function TicketPanel({ campaignId, viewerId, viewerRole }: Props) {
+export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName }: Props) {
   const isAdminOrOwner = viewerRole === "OWNER" || viewerRole === "ADMIN";
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -156,7 +158,7 @@ export function TicketPanel({ campaignId, viewerId, viewerRole }: Props) {
             <MessageCircle className="h-7 w-7 text-accent" />
           </div>
           <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)] mb-1">
-            Need help with this campaign?
+            Need help with {campaignName || "this campaign"}?
           </p>
           <p className="text-xs text-[var(--text-muted)] max-w-xs mb-5">
             Start a private conversation with the team. We'll get back to you as soon as we can.
@@ -176,7 +178,7 @@ export function TicketPanel({ campaignId, viewerId, viewerRole }: Props) {
           <p className="text-xs text-[var(--text-muted)] uppercase tracking-widest font-semibold">Direct message</p>
           <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">One-on-one with the team</p>
         </div>
-        <TicketThread ticket={selected} viewerId={viewerId} viewerRole={viewerRole} onUpdate={loadTickets} />
+        <TicketThread ticket={selected} viewerId={viewerId} viewerRole={viewerRole} campaignName={campaignName} onUpdate={loadTickets} />
       </div>
     );
   }
@@ -328,10 +330,11 @@ interface ThreadProps {
   ticket: Ticket;
   viewerId: string;
   viewerRole: "CLIPPER" | "ADMIN" | "OWNER" | "CLIENT";
+  campaignName?: string;
   onUpdate: () => void;
 }
 
-function TicketThread({ ticket, viewerId, viewerRole, onUpdate }: ThreadProps) {
+function TicketThread({ ticket, viewerId, viewerRole, campaignName, onUpdate }: ThreadProps) {
   const isAdminOrOwner = viewerRole === "OWNER" || viewerRole === "ADMIN";
   const [messages, setMessages] = useState<Message[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -488,8 +491,16 @@ function TicketThread({ ticket, viewerId, viewerRole, onUpdate }: ThreadProps) {
             <Loader2 className="h-6 w-6 animate-spin text-accent" />
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-[var(--text-muted)]">No messages yet. Say hi.</p>
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <div className="h-14 w-14 rounded-2xl bg-accent/10 flex items-center justify-center mb-4">
+              <MessageCircle className="h-7 w-7 text-accent" />
+            </div>
+            <h3 className="text-base font-semibold text-[var(--text-primary)] mb-1">Welcome!</h3>
+            <p className="text-sm text-[var(--text-muted)] max-w-sm">
+              {viewerRole === "CLIPPER"
+                ? `This is your private chat with the ${campaignName || "campaign"} team. Ask questions, report issues, or get help here.`
+                : "No messages yet. Send the first one to get things rolling."}
+            </p>
           </div>
         ) : (
           <div className="py-2">

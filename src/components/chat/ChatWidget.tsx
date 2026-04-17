@@ -829,11 +829,23 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
 
             {/* Waiting for agent — clipper/client view */}
             {isClipper && needsHumanSupport && (
-              <div className="flex items-center gap-2.5 px-5 py-3 border-b border-accent/20 bg-accent/5">
-                <MessageCircle className="h-4 w-4 text-accent animate-pulse flex-shrink-0" />
-                <div>
+              <div className="flex items-start gap-2.5 px-5 py-3 border-b border-accent/20 bg-accent/5">
+                <MessageCircle className="h-4 w-4 text-accent animate-pulse flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-[var(--text-primary)]">{isClientRole ? "Your account manager will respond shortly" : "An agent will be with you shortly"}</p>
                   <p className="text-[10px] text-[var(--text-muted)]">We typically respond within a few minutes</p>
+                  {!isClientRole && (
+                    <button
+                      onClick={() => {
+                        const cid = (threadInfo as any)?.campaignId;
+                        const url = cid ? `/community?campaignId=${cid}&tab=ticket` : "/community";
+                        window.location.href = url;
+                      }}
+                      className="mt-2 px-3 py-1.5 rounded-lg bg-accent text-white text-[11px] font-semibold hover:bg-accent/85 transition-colors"
+                    >
+                      Open in Community
+                    </button>
+                  )}
                 </div>
               </div>
             )}
