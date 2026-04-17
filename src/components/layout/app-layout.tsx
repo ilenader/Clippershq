@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { PWAInstallPopup } from "@/components/pwa-install-popup";
 import { useIsPWA } from "@/hooks/use-pwa";
 import { useAbly } from "@/hooks/use-ably";
+import { DmToast } from "@/components/community/DmToast";
+import { CallBanner } from "@/components/community/CallBanner";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -263,6 +265,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
       <ChatWidget userId={effectiveSession.user.id} role={effectiveRole} />
       {!isPWA && effectiveRole !== "CLIENT" && <PWAInstallPopup />}
+      {/* Community: DM toast (CLIPPER only) + top-of-page call banner (all non-CLIENT roles) */}
+      {effectiveRole !== "CLIENT" && <DmToast viewerId={effectiveSession.user.id} viewerRole={effectiveRole} />}
+      {effectiveRole !== "CLIENT" && <CallBanner />}
     </div>
   );
 }

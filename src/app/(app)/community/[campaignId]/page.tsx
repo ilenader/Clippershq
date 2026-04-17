@@ -1,0 +1,224 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import type { SessionUser } from "@/lib/auth-types";
+import {
+  ArrowLeft, Loader2, Megaphone, MessageCircle, Phone, Trophy,
+  Bell, BellOff,
+} from "lucide-react";
+import { CampaignImage } from "@/components/ui/campaign-image";
+import { ChannelChat } from "@/components/community/ChannelChat";
+import { Leaderboard } from "@/components/community/Leaderboard";
+import { TicketPanel } from "@/components/community/TicketPanel";
+import { VoiceRoom } from "@/components/community/VoiceRoom";
+import { CallScheduler } from "@/components/community/CallScheduler";
+import { toast } from "@/lib/toast";
+
+interface Channel { id: string; name: string; type: string; unread: number; sortOrder: number; }
+interface Call { id: string; title: string; description?: string | null; scheduledAt: string; duration: number; status: string; isGlobal: boolean; campaignId?: string | null; }
+
+const channelIconFor = (type: string) => type === "announcement" ? Megaphone : type === "leaderboard" ? Trophy : type === "voice" ? Phone : MessageCircle;
+
+export default function CampaignCommunityPage() {
+  const { campaignId: campaignIdRaw } = useParams();
+  const router = useRouter();
+  const campaignId = Array.isArray(campaignIdRaw) ? campaignIdRaw[0] : (campaignIdRaw as string);
+  const { data: session } = useSession();
+  const viewerId = (session?.user as SessionUser | undefined)?.id || "";
+  const viewerRole = ((session?.user as SessionUser | undefined)?.role || "CLIPPER") as
+    "CLIPPER" | "ADMIN" | "OWNER" | "CLIENT";
+  const isAdmin = viewerRole === "OWNER" || viewerRole === "ADMIN";
+
+  useEffect(() => {
+    if (session && viewerRole === "CLIENT") router.replace("/client");
+  }, [session, viewerRole, router]);
+
+  const [campaign, setCampaign] = useState<any>(null);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [muted, setMuted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [selectedChannelId, setSelectedChannelId] = useState("");
+  const [viewMode, setViewMode] = useState<"channel" | "ticket" | "call">("channel");
+  const [upcomingCall, setUpcomingCall] = useState<Call | null>(null);
+
+  const loadAll = useCallback(async () => {
+    try {
+      const [campRes, channelsRes, callsRes] = await Promise.all([
+        fetch(`/api/campaigns/${campaignId}`).catch(() => null),
+        fetch(`/api/community/channels?campaignId=${encodeURIComponent(campaignId)}`),
+        fetch(`/api/community/calls?campaignId=${encodeURIComponent(campaignId)}`),
+      ]);
+      if (campRes && campRes.ok) setCampaign(await campRes.json());
+      if (channelsRes.ok) {
+        const data = await channelsRes.json();
+        const list: Channel[] = data.channels || [];
+        setChannels(list);
+        setMuted(!!data.muted);
+        setSelectedChannelId((prev) => {
+          if (list.some((c) => c.id === prev)) return prev;
+          return (list.find((c) => c.type === "general") || list[0])?.id || "";
+        });
+      }
+      if (callsRes.ok) {
+        const data = await callsRes.json();
+        const next = (data.upcoming || [])
+          .filter((c: any) => c.status !== "cancelled")
+          .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0];
+        setUpcomingCall(next || null);
+      }
+    } catch {}
+    setLoading(false);
+  }, [campaignId]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  useEffect(() => {
+    const handler = () => loadAll();
+    window.addEventListener("sse:channel_message", handler);
+    return () => window.removeEventListener("sse:channel_message", handler);
+  }, [loadAll]);
+
+  const selectedChannel = useMemo(
+    () => channels.find((c) => c.id === selectedChannelId) || null,
+    [channels, selectedChannelId],
+  );
+
+  const toggleMute = async () => {
+    try {
+      if (muted) {
+        await fetch("/api/community/mute", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ campaignId }),
+        });
+        setMuted(false);
+        toast.success("Unmuted");
+      } else {
+        await fetch("/api/community/mute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ campaignId }),
+        });
+        setMuted(true);
+        toast.success("Muted");
+      }
+    } catch {}
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-accent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="-m-4 lg:-m-6 flex flex-col h-[calc(100vh-56px)] min-h-0 bg-[var(--bg-primary)]">
+      {/* Top bar with back */}
+      <header className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+        <Link
+          href="/community"
+          className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-[var(--bg-input)] transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4 text-[var(--text-muted)]" />
+        </Link>
+        {campaign?.imageUrl != null && (
+          <div className="h-8 w-8 rounded-lg overflow-hidden border border-[var(--border-subtle)] flex-shrink-0">
+            <CampaignImage src={campaign.imageUrl} name={campaign.name} />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
+            {campaign?.name || "Campaign"}
+          </p>
+          <p className="text-[11px] text-[var(--text-muted)] truncate">{campaign?.platform}</p>
+        </div>
+        {isAdmin && (
+          <CallScheduler campaignId={campaignId} onScheduled={() => loadAll()} />
+        )}
+        <button
+          onClick={toggleMute}
+          className={`h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
+            muted ? "bg-amber-500/10 text-amber-400" : "hover:bg-[var(--bg-input)] text-[var(--text-muted)]"
+          }`}
+        >
+          {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+        </button>
+      </header>
+
+      {/* Tabs */}
+      <div className="flex gap-1 items-center border-b border-[var(--border-color)] px-2 py-2 bg-[var(--bg-card)] overflow-x-auto">
+        {channels.map((ch) => {
+          const Icon = channelIconFor(ch.type);
+          const active = viewMode === "channel" && selectedChannelId === ch.id;
+          return (
+            <button
+              key={ch.id}
+              onClick={() => { setViewMode("channel"); setSelectedChannelId(ch.id); }}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                active ? "bg-accent text-white" : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)]"
+              }`}
+            >
+              <Icon className="h-3 w-3" />
+              {ch.name}
+              {ch.unread > 0 && !active && (
+                <span className="h-3.5 min-w-3.5 rounded-full bg-accent text-white text-[8px] font-bold flex items-center justify-center px-1 tabular-nums">
+                  {ch.unread > 99 ? "99+" : ch.unread}
+                </span>
+              )}
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setViewMode("ticket")}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+            viewMode === "ticket" ? "bg-accent text-white" : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)]"
+          }`}
+        >
+          <MessageCircle className="h-3 w-3" />
+          {isAdmin ? "Tickets" : "Direct"}
+        </button>
+        {upcomingCall && (
+          <button
+            onClick={() => setViewMode("call")}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+              viewMode === "call" ? "bg-accent text-white" : "text-amber-400 hover:bg-amber-500/10"
+            }`}
+          >
+            <Phone className="h-3 w-3" />
+            Call
+          </button>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {viewMode === "call" && upcomingCall ? (
+          <VoiceRoom call={upcomingCall} />
+        ) : viewMode === "ticket" ? (
+          <TicketPanel campaignId={campaignId} viewerId={viewerId} viewerRole={viewerRole} />
+        ) : selectedChannel ? (
+          selectedChannel.type === "leaderboard" ? (
+            <Leaderboard channelId={selectedChannel.id} viewerId={viewerId} />
+          ) : (
+            <ChannelChat
+              channelId={selectedChannel.id}
+              channelType={selectedChannel.type}
+              channelName={selectedChannel.name}
+              viewerId={viewerId}
+              viewerRole={viewerRole}
+            />
+          )
+        ) : (
+          <div className="flex items-center justify-center py-20">
+            <p className="text-sm text-[var(--text-muted)]">No channels</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
