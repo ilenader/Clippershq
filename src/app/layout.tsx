@@ -15,20 +15,35 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://clipershq.com"),
-  title: "Clippers HQ — The #1 Content Clipping Platform for Creators & Brands",
-  description: "Connect with brand campaigns, create short-form video clips for TikTok, Instagram Reels & YouTube Shorts, and earn money based on your views. The leading platform for content clippers, clipping agencies, and brands.",
+  applicationName: "Clippers HQ",
+  title: "Clippers HQ — Get Paid to Clip",
+  description: "The #1 platform for content clippers. Join campaigns, create short-form clips for TikTok, Instagram & YouTube, and earn real money from your views.",
   keywords: "clippers hq, content clipping, clipping platform, clipping agency, short form video, tiktok clipping, instagram reels, youtube shorts, creator economy, ugc platform, clip tracking, cpm earnings, brand campaigns, hire clippers, clipping jobs, best clipping platform",
+  icons: {
+    icon: [
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-48.png", sizes: "48x48", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: { url: "/icon-192.png", sizes: "192x192" },
+  },
   openGraph: {
     type: "website",
     siteName: "Clippers HQ",
-    title: "Clippers HQ — The #1 Content Clipping Platform for Creators & Brands",
-    description: "Connect with brand campaigns, create short-form video clips for TikTok, Instagram Reels & YouTube Shorts, and earn money based on your views.",
+    title: "Clippers HQ — Get Paid to Clip",
+    description: "The #1 platform for content clippers. Join campaigns, create short-form clips for TikTok, Instagram & YouTube, and earn real money from your views.",
     url: "https://clipershq.com",
+    images: [{ url: "https://clipershq.com/icon-512.png", width: 512, height: 512 }],
   },
   twitter: {
-    card: "summary_large_image",
-    title: "Clippers HQ — The #1 Content Clipping Platform",
-    description: "Connect with brand campaigns, create short-form clips, earn from views. The leading platform for content clippers and brands.",
+    card: "summary",
+    title: "Clippers HQ — Get Paid to Clip",
+    description: "Join campaigns, create clips, earn money. The #1 clipping platform.",
+    images: ["https://clipershq.com/icon-512.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
   alternates: {
     canonical: "https://clipershq.com",
@@ -81,6 +96,14 @@ const organizationSchema = {
   ],
 };
 
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Clippers HQ",
+  "url": "https://clipershq.com",
+  "description": "The #1 platform for content clippers. Join campaigns, create clips, earn money.",
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -108,6 +131,10 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
         />
         <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').then(function(r){console.log('[PWA] SW registered, scope:',r.scope)}).catch(function(e){console.error('[PWA] SW failed:',e)})}` }} />
       </head>
