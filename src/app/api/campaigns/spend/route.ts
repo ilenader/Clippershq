@@ -24,6 +24,12 @@ export async function GET() {
 
   const role = (session.user as any).role;
 
+  // CLIENT has its own per-campaign spend data via /api/client/campaigns.
+  // This endpoint exposes cross-campaign totals + owner/agency earnings — not for CLIENT.
+  if (role === "CLIENT") {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
   if (!db) return NextResponse.json({});
 
   try {

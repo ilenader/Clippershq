@@ -165,12 +165,19 @@ export async function POST(
   }
 
   try {
-    // If owner is jumping into a conversation they're not a participant of, add them
+    // Owner auto-join: only if the conversation has NO existing OWNER/ADMIN participant.
+    // Prevents a removed owner from silently re-adding themselves on next reply.
+    // If another owner/admin is already on the conversation, this owner must be explicitly invited.
     if (role === "OWNER") {
-      const isParticipant = await db.conversationParticipant.findUnique({
-        where: { conversationId_userId: { conversationId, userId } },
+      const existingParticipants = await db.conversationParticipant.findMany({
+        where: { conversationId },
+        include: { user: { select: { role: true } } },
       });
-      if (!isParticipant) {
+      const isParticipant = existingParticipants.some((p: any) => p.userId === userId);
+      const hasOwnerOrAdmin = existingParticipants.some(
+        (p: any) => p.user?.role === "OWNER" || p.user?.role === "ADMIN",
+      );
+      if (!isParticipant && !hasOwnerOrAdmin) {
         await db.conversationParticipant.create({
           data: { conversationId, userId },
         });

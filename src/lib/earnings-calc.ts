@@ -152,22 +152,23 @@ export function calculateClipperEarnings(input: ClipperEarningsInput): EarningsB
 
   const effectiveFee = isReferred ? Math.max(baseFee, DEFAULT_REFERRED_FEE) : baseFee;
 
+  // IMPORTANT: maxPayoutPerClip caps BASE earnings BEFORE bonus is applied.
+  // Bonus is calculated on the CAPPED base and added on top — NOT re-capped afterward.
+  // A clipper with +10% bonus on a $5-capped clip earns $5.50, not $5.00.
+  // This is intentional: level/streak bonuses are rewards earned on top of the per-clip ceiling,
+  // paid from the campaign budget as an incentive. Do not re-cap grossClipper.
+
   // Base earnings from clipper CPM
   let baseEarnings = (views / 1000) * cpm;
 
-  // Cap before bonus
+  // Cap the BASE only (before bonus). Bonus is free to exceed the per-clip cap.
   if (campaignMaxPayoutPerClip && campaignMaxPayoutPerClip > 0) {
     baseEarnings = Math.min(baseEarnings, campaignMaxPayoutPerClip);
   }
 
-  // Apply bonus (level + streak + PWA) — bonus comes from campaign budget
+  // Apply bonus (level + streak + PWA) on the capped base — bonus comes from campaign budget
   const bonusAmount = baseEarnings * (totalBonusPercent / 100);
-  let grossClipper = baseEarnings + bonusAmount;
-
-  // Cap again after bonus
-  if (campaignMaxPayoutPerClip && campaignMaxPayoutPerClip > 0) {
-    grossClipper = Math.min(grossClipper, campaignMaxPayoutPerClip);
-  }
+  const grossClipper = baseEarnings + bonusAmount;
 
   // Platform fee is calculated for reference but NOT subtracted from clipperEarnings.
   // Fee is applied once at payout time, not at earnings calculation time.
