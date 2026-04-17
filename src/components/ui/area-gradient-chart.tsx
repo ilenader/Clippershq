@@ -21,13 +21,20 @@ interface AreaGradientChartProps {
   yAxisFormatter?: (value: number) => string;
 }
 
-function formatWithPrefix(v: number, prefix: string, suffix: string): string {
+// Axis label — compact form ("73k", "1.2m") so the Y-axis doesn't overflow.
+function formatAxis(v: number, prefix: string, suffix: string): string {
   const abs = Math.abs(v);
   let core: string;
   if (abs >= 1_000_000) core = `${(v / 1_000_000).toFixed(1).replace(/\.0$/, "")}m`;
   else if (abs >= 1000) core = `${(v / 1000).toFixed(0)}k`;
   else core = String(v);
   return `${prefix}${core}${suffix}`;
+}
+
+// Tooltip label — full precision with comma separators, integer money (no .00 tail).
+function formatTooltip(v: number, prefix: string, suffix: string): string {
+  const rounded = Math.round(v);
+  return `${prefix}${rounded.toLocaleString()}${suffix}`;
 }
 
 /** Single-series gradient area chart — mirrors the client-dashboard recharts config. */
@@ -45,7 +52,7 @@ export function AreaGradientChart({
 
   const tickFormatter = yAxisFormatter
     ? yAxisFormatter
-    : (v: number) => formatWithPrefix(v, valuePrefix, valueSuffix);
+    : (v: number) => formatAxis(v, valuePrefix, valueSuffix);
 
   return (
     <div>
@@ -78,9 +85,20 @@ export function AreaGradientChart({
                 tickFormatter={tickFormatter}
               />
               <Tooltip
-                contentStyle={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: "8px", color: "var(--text-primary)" }}
-                labelStyle={{ color: "var(--text-muted)" }}
-                formatter={(value: any) => [formatWithPrefix(Number(value), valuePrefix, valueSuffix), ""]}
+                cursor={{ stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 }}
+                content={({ active, payload, label }) => {
+                  if (!active || !payload || payload.length === 0) return null;
+                  const v = Number((payload[0] as any).value);
+                  return (
+                    <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-xs">
+                      <p className="whitespace-nowrap">
+                        <span className="text-[var(--text-muted)]">{label}</span>
+                        <span className="text-[var(--text-muted)]"> — </span>
+                        <span className="font-semibold text-[var(--text-primary)] tabular-nums">{formatTooltip(v, valuePrefix, valueSuffix)}</span>
+                      </p>
+                    </div>
+                  );
+                }}
               />
               <Area
                 type="monotone"
@@ -178,11 +196,25 @@ export function MultiAreaGradientChart({ series, title, height = 220 }: MultiAre
                 tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(v: number) => formatWithPrefix(v, "", "")}
+                tickFormatter={(v: number) => formatAxis(v, "", "")}
               />
               <Tooltip
-                contentStyle={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: "8px", color: "var(--text-primary)" }}
-                labelStyle={{ color: "var(--text-muted)" }}
+                cursor={{ stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 }}
+                content={({ active, payload, label }) => {
+                  if (!active || !payload || payload.length === 0) return null;
+                  return (
+                    <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-xs">
+                      <p className="text-[var(--text-muted)] mb-1 whitespace-nowrap">{label}</p>
+                      {payload.map((entry: any) => (
+                        <p key={entry.dataKey} className="whitespace-nowrap flex items-center gap-1.5">
+                          <span className="inline-block h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+                          <span className="text-[var(--text-secondary)]">{entry.dataKey}:</span>
+                          <span className="font-semibold text-[var(--text-primary)] tabular-nums">{formatTooltip(Number(entry.value), "", "")}</span>
+                        </p>
+                      ))}
+                    </div>
+                  );
+                }}
               />
               {series.map((s, i) => (
                 <Area

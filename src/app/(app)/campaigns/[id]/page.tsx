@@ -346,56 +346,42 @@ export default function CampaignDetailPage() {
         )}
       </div>
 
-      {/* ── 3. REQUIREMENTS (collapsible) ────────────────────── */}
+      {/* ── 3. REQUIREMENTS (always open for clippers) ──────── */}
       {requirementLines.length > 0 && (
         <div ref={requirementsRef} className="scroll-mt-24">
           <Card className="overflow-hidden">
-            <button
-              onClick={() => setRequirementsOpen((o) => !o)}
-              className="flex w-full items-center justify-between text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-accent" />
-                <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Campaign Requirements</h2>
-              </div>
-              {requirementsOpen ? (
-                <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />
-              )}
-            </button>
-            {requirementsOpen && (
-              <>
-                <ul className="mt-4 space-y-2">
-                  {requirementLines.map((req, i) => (
-                    <li key={i} className="flex items-start gap-2.5 min-w-0">
-                      <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent" />
-                      <span className="text-[15px] text-[var(--text-primary)] break-words [overflow-wrap:anywhere] min-w-0 flex-1">{req}</span>
-                    </li>
-                  ))}
-                </ul>
-                {/* Confirmation gate — the sticky Join button below won't fire until this is checked. */}
-                {isClipper && campaign.status === "ACTIVE" && joinedAccounts.length === 0 && (
-                  <label
-                    className={`mt-5 flex items-start gap-3 cursor-pointer rounded-xl border p-3 lg:p-4 hover:border-accent/40 transition-colors ${
-                      confirmedRequirements
-                        ? "border-accent/40 bg-accent/10"
-                        : "border-accent/20 bg-accent/5"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={confirmedRequirements}
-                      onChange={(e) => setConfirmedRequirements(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0 rounded border-[var(--border-color)] accent-accent cursor-pointer"
-                    />
-                    <CheckCircle className={`mt-0.5 h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0 transition-colors ${confirmedRequirements ? "text-accent" : "text-[var(--text-muted)]"}`} />
-                    <span className={`text-sm lg:text-base select-none font-medium transition-colors ${confirmedRequirements ? "text-accent" : "text-[var(--text-primary)]"}`}>
-                      I have read and understood the campaign requirements
-                    </span>
-                  </label>
-                )}
-              </>
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-accent" />
+              <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Campaign Requirements</h2>
+            </div>
+            <ul className="mt-4 space-y-2">
+              {requirementLines.map((req, i) => (
+                <li key={i} className="flex items-start gap-2.5 min-w-0">
+                  <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent" />
+                  <span className="text-[15px] text-[var(--text-primary)] break-words [overflow-wrap:anywhere] min-w-0 flex-1">{req}</span>
+                </li>
+              ))}
+            </ul>
+            {/* Confirmation gate — the sticky Join button below won't fire until this is checked. */}
+            {isClipper && campaign.status === "ACTIVE" && joinedAccounts.length === 0 && (
+              <label
+                className={`mt-5 flex items-start gap-3 cursor-pointer rounded-xl border p-3 lg:p-4 hover:border-accent/40 transition-colors ${
+                  confirmedRequirements
+                    ? "border-accent/40 bg-accent/10"
+                    : "border-accent/20 bg-accent/5"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={confirmedRequirements}
+                  onChange={(e) => setConfirmedRequirements(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0 rounded border-[var(--border-color)] accent-accent cursor-pointer"
+                />
+                <CheckCircle className={`mt-0.5 h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0 transition-colors ${confirmedRequirements ? "text-accent" : "text-[var(--text-muted)]"}`} />
+                <span className={`text-sm lg:text-base select-none font-medium transition-colors ${confirmedRequirements ? "text-accent" : "text-[var(--text-primary)]"}`}>
+                  I have read and understood the campaign requirements
+                </span>
+              </label>
             )}
           </Card>
         </div>

@@ -355,10 +355,10 @@ export default function AdminAnalyticsPage() {
         ].map((stat) => (
           <Card key={stat.label}>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">{stat.label}</p>
+              <p className="text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">{stat.label}</p>
               <span className={stat.color}>{stat.icon}</span>
             </div>
-            <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{stat.value}</p>
+            <p className="mt-2 text-2xl lg:text-3xl font-bold text-[var(--text-primary)]">{stat.value}</p>
           </Card>
         ))}
       </div>

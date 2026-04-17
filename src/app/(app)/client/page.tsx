@@ -228,7 +228,7 @@ export default function ClientDashboard() {
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)] mb-1">Clippers HQ</p>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] truncate">
+            <h1 className="text-2xl lg:text-3xl font-bold text-[var(--text-primary)] truncate">
               {campaign?.name || "Campaign"}
             </h1>
             {campaign?.status && (
@@ -291,15 +291,15 @@ export default function ClientDashboard() {
             {/* Budget card */}
             <Card className="col-span-2 sm:col-span-1">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Budget</p>
-                <DollarSign className="h-5 w-5 text-accent" />
+                <p className="text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Budget</p>
+                <DollarSign className="h-5 w-5 lg:h-6 lg:w-6 text-accent" />
               </div>
-              <p className="text-2xl font-bold text-accent tabular-nums">
+              <p className="text-2xl lg:text-3xl font-bold text-accent tabular-nums">
                 {formatCurrency(summary?.totalSpent || 0)}
               </p>
               {campaign?.budget != null && campaign.budget > 0 && (
                 <>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">of {formatCurrency(campaign.budget)} budget</p>
+                  <p className="text-xs lg:text-sm text-[var(--text-muted)] mt-1">of {formatCurrency(campaign.budget)} budget</p>
                   <div className="mt-2 h-2 rounded-full bg-[var(--bg-input)] border border-[var(--border-subtle)]">
                     <div
                       className="h-full rounded-full bg-accent transition-all duration-500"
@@ -313,36 +313,36 @@ export default function ClientDashboard() {
             {/* Views */}
             <Card>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Views</p>
-                <Eye className="h-5 w-5 text-accent" />
+                <p className="text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Views</p>
+                <Eye className="h-5 w-5 lg:h-6 lg:w-6 text-accent" />
               </div>
-              <p className="mt-2 text-2xl font-bold text-[var(--text-primary)] tabular-nums">{formatNumber(summary?.totalViews || 0)}</p>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">total views</p>
+              <p className="mt-2 text-2xl lg:text-3xl font-bold text-[var(--text-primary)] tabular-nums">{formatNumber(summary?.totalViews || 0)}</p>
+              <p className="text-xs lg:text-sm text-[var(--text-muted)] mt-0.5">total views</p>
             </Card>
 
             {/* Approved clips */}
             <Card>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Clips</p>
-                <Film className="h-5 w-5 text-accent" />
+                <p className="text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Clips</p>
+                <Film className="h-5 w-5 lg:h-6 lg:w-6 text-accent" />
               </div>
-              <p className="mt-2 text-2xl font-bold text-[var(--text-primary)] tabular-nums">{summary?.approvedClips || 0}</p>
+              <p className="mt-2 text-2xl lg:text-3xl font-bold text-[var(--text-primary)] tabular-nums">{summary?.approvedClips || 0}</p>
               {(summary?.pendingClips || 0) > 0 && (
-                <p className="text-xs text-amber-400 mt-0.5">{summary.pendingClips} pending</p>
+                <p className="text-xs lg:text-sm text-amber-400 mt-0.5">{summary.pendingClips} pending</p>
               )}
               {(summary?.pendingClips || 0) === 0 && (
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">approved</p>
+                <p className="text-xs lg:text-sm text-[var(--text-muted)] mt-0.5">approved</p>
               )}
             </Card>
 
             {/* Avg views */}
             <Card>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Avg Views</p>
-                <TrendingUp className="h-5 w-5 text-accent" />
+                <p className="text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Avg Views</p>
+                <TrendingUp className="h-5 w-5 lg:h-6 lg:w-6 text-accent" />
               </div>
-              <p className="mt-2 text-2xl font-bold text-[var(--text-primary)] tabular-nums">{formatNumber(summary?.avgViewsPerClip || 0)}</p>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">per clip</p>
+              <p className="mt-2 text-2xl lg:text-3xl font-bold text-[var(--text-primary)] tabular-nums">{formatNumber(summary?.avgViewsPerClip || 0)}</p>
+              <p className="text-xs lg:text-sm text-[var(--text-muted)] mt-0.5">per clip</p>
             </Card>
           </div>
 
@@ -354,12 +354,12 @@ export default function ClientDashboard() {
               { label: "Shares", value: engagement.totalShares, icon: <Share2 className="h-4 w-4" /> },
               { label: "Top Clip", value: engagement.topViews, icon: <Trophy className="h-4 w-4" /> },
             ].map((stat) => (
-              <div key={stat.label} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3">
+              <div key={stat.label} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3 lg:px-5 lg:py-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">{stat.label}</p>
+                  <p className="text-[10px] lg:text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">{stat.label}</p>
                   <span className="text-accent">{stat.icon}</span>
                 </div>
-                <p className="mt-1 text-lg font-bold text-[var(--text-primary)] tabular-nums">{formatNumber(stat.value)}</p>
+                <p className="mt-1 text-lg lg:text-2xl font-bold text-[var(--text-primary)] tabular-nums">{formatNumber(stat.value)}</p>
               </div>
             ))}
           </div>
@@ -367,7 +367,7 @@ export default function ClientDashboard() {
           {/* ─── D) VIEWS CHART ─── */}
           <Card>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Views Over Time</h3>
+              <h3 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Views Over Time</h3>
               <TimeframeSelect value={timeframeDays} onChange={setTimeframeDays} includeAll />
             </div>
             {chartData.some((d) => d.views > 0) ? (
@@ -419,48 +419,48 @@ export default function ClientDashboard() {
           {/* ─── E) CLIP PERFORMANCE TABLE ─── */}
           <Card>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Clip Performance</h3>
-              {hasMoreClips && <p className="text-[10px] text-[var(--text-muted)]">Showing top 50 of {sortedClips.length} clips</p>}
+              <h3 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Clip Performance</h3>
+              {hasMoreClips && <p className="text-[10px] lg:text-xs text-[var(--text-muted)]">Showing top 50 of {sortedClips.length} clips</p>}
             </div>
             {displayClips.length === 0 ? (
               <p className="text-sm text-[var(--text-muted)]">No clips submitted yet.</p>
             ) : (
               <div className="overflow-x-auto -mx-4 sm:-mx-5">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm lg:text-base">
                   <thead>
                     <tr className="border-b border-[var(--border-color)]">
-                      <th className="text-left px-4 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">#</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Platform</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Status</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Views</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] hidden sm:table-cell">Likes</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] hidden md:table-cell">Comments</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] hidden md:table-cell">Shares</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Earnings</th>
-                      <th className="text-right px-4 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Clip</th>
+                      <th className="text-left px-4 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">#</th>
+                      <th className="text-left px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Platform</th>
+                      <th className="text-left px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Status</th>
+                      <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Views</th>
+                      <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)] hidden sm:table-cell">Likes</th>
+                      <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)] hidden md:table-cell">Comments</th>
+                      <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)] hidden md:table-cell">Shares</th>
+                      <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Earnings</th>
+                      <th className="text-right px-4 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Clip</th>
                     </tr>
                   </thead>
                   <tbody>
                     {displayClips.map((clip: any, i: number) => (
                       <tr key={i} className={`border-b border-[var(--border-subtle)] ${i % 2 === 1 ? "bg-[var(--bg-secondary)]" : ""}`}>
-                        <td className="px-4 py-2.5 text-[var(--text-muted)] tabular-nums">{i + 1}</td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-4 py-2.5 lg:py-3 text-[var(--text-muted)] tabular-nums">{i + 1}</td>
+                        <td className="px-3 py-2.5 lg:py-3">
                           <div className="flex items-center gap-1.5">
                             <PlatformDot platform={clip.platform} />
-                            <span className="text-[var(--text-secondary)] text-xs">{clip.platform}</span>
+                            <span className="text-[var(--text-secondary)] text-xs lg:text-sm">{clip.platform}</span>
                           </div>
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-3 py-2.5 lg:py-3">
                           <Badge variant={clip.status.toLowerCase() as any}>{clip.status}</Badge>
                         </td>
-                        <td className="px-3 py-2.5 text-right font-medium text-[var(--text-primary)] tabular-nums">{formatNumber(clip.views)}</td>
-                        <td className="px-3 py-2.5 text-right text-[var(--text-secondary)] tabular-nums hidden sm:table-cell">{formatNumber(clip.likes)}</td>
-                        <td className="px-3 py-2.5 text-right text-[var(--text-secondary)] tabular-nums hidden md:table-cell">{formatNumber(clip.comments)}</td>
-                        <td className="px-3 py-2.5 text-right text-[var(--text-secondary)] tabular-nums hidden md:table-cell">{formatNumber(clip.shares)}</td>
-                        <td className="px-3 py-2.5 text-right font-medium text-accent tabular-nums">{clip.earnings > 0 ? formatCurrency(clip.earnings) : "\u2014"}</td>
-                        <td className="px-4 py-2.5 text-right">
-                          <a href={clip.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline text-xs">
-                            <ExternalLink className="h-3 w-3" /> View
+                        <td className="px-3 py-2.5 lg:py-3 text-right font-medium text-[var(--text-primary)] tabular-nums">{formatNumber(clip.views)}</td>
+                        <td className="px-3 py-2.5 lg:py-3 text-right text-[var(--text-secondary)] tabular-nums hidden sm:table-cell">{formatNumber(clip.likes)}</td>
+                        <td className="px-3 py-2.5 lg:py-3 text-right text-[var(--text-secondary)] tabular-nums hidden md:table-cell">{formatNumber(clip.comments)}</td>
+                        <td className="px-3 py-2.5 lg:py-3 text-right text-[var(--text-secondary)] tabular-nums hidden md:table-cell">{formatNumber(clip.shares)}</td>
+                        <td className="px-3 py-2.5 lg:py-3 text-right font-medium text-accent tabular-nums">{clip.earnings > 0 ? formatCurrency(clip.earnings) : "\u2014"}</td>
+                        <td className="px-4 py-2.5 lg:py-3 text-right">
+                          <a href={clip.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline text-xs lg:text-sm">
+                            <ExternalLink className="h-3 w-3 lg:h-3.5 lg:w-3.5" /> View
                           </a>
                         </td>
                       </tr>
@@ -478,7 +478,7 @@ export default function ClientDashboard() {
                 onClick={() => setDailyOpen(!dailyOpen)}
                 className="flex items-center justify-between w-full text-left cursor-pointer"
               >
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Daily Breakdown</h3>
+                <h3 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Daily Breakdown</h3>
                 {dailyOpen
                   ? <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
                   : <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />
@@ -486,36 +486,36 @@ export default function ClientDashboard() {
               </button>
               {dailyOpen && (
                 <div className="overflow-x-auto -mx-4 sm:-mx-5 mt-4">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm lg:text-base">
                     <thead>
                       <tr className="border-b border-[var(--border-color)]">
-                        <th className="text-left px-4 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Date</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Clips</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Views</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] hidden sm:table-cell">Likes</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] hidden sm:table-cell">Comments</th>
-                        <th className="text-right px-4 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] hidden md:table-cell">Shares</th>
+                        <th className="text-left px-4 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Date</th>
+                        <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Clips</th>
+                        <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Views</th>
+                        <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)] hidden sm:table-cell">Likes</th>
+                        <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)] hidden sm:table-cell">Comments</th>
+                        <th className="text-right px-4 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)] hidden md:table-cell">Shares</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredDailyBreakdown.map((day: any, i: number) => (
                         <tr key={day.date} className={`border-b border-[var(--border-subtle)] ${i % 2 === 1 ? "bg-[var(--bg-secondary)]" : ""}`}>
-                          <td className="px-4 py-2.5 text-[var(--text-secondary)]">{day.date}</td>
-                          <td className="px-3 py-2.5 text-right text-[var(--text-primary)] tabular-nums">{day.clips}</td>
-                          <td className="px-3 py-2.5 text-right text-[var(--text-primary)] tabular-nums">{formatNumber(day.views)}</td>
-                          <td className="px-3 py-2.5 text-right text-[var(--text-secondary)] tabular-nums hidden sm:table-cell">{formatNumber(day.likes)}</td>
-                          <td className="px-3 py-2.5 text-right text-[var(--text-secondary)] tabular-nums hidden sm:table-cell">{formatNumber(day.comments)}</td>
-                          <td className="px-4 py-2.5 text-right text-[var(--text-secondary)] tabular-nums hidden md:table-cell">{formatNumber(day.shares)}</td>
+                          <td className="px-4 py-2.5 lg:py-3 text-[var(--text-secondary)]">{day.date}</td>
+                          <td className="px-3 py-2.5 lg:py-3 text-right text-[var(--text-primary)] tabular-nums">{day.clips}</td>
+                          <td className="px-3 py-2.5 lg:py-3 text-right text-[var(--text-primary)] tabular-nums">{formatNumber(day.views)}</td>
+                          <td className="px-3 py-2.5 lg:py-3 text-right text-[var(--text-secondary)] tabular-nums hidden sm:table-cell">{formatNumber(day.likes)}</td>
+                          <td className="px-3 py-2.5 lg:py-3 text-right text-[var(--text-secondary)] tabular-nums hidden sm:table-cell">{formatNumber(day.comments)}</td>
+                          <td className="px-4 py-2.5 lg:py-3 text-right text-[var(--text-secondary)] tabular-nums hidden md:table-cell">{formatNumber(day.shares)}</td>
                         </tr>
                       ))}
                       {/* Totals row */}
                       <tr className="border-t-2 border-[var(--border-color)]">
-                        <td className="px-4 py-2.5 font-semibold text-[var(--text-primary)]">Total</td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-[var(--text-primary)] tabular-nums">{dailyTotals.clips}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-[var(--text-primary)] tabular-nums">{formatNumber(dailyTotals.views)}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-[var(--text-secondary)] tabular-nums hidden sm:table-cell">{formatNumber(dailyTotals.likes)}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-[var(--text-secondary)] tabular-nums hidden sm:table-cell">{formatNumber(dailyTotals.comments)}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-[var(--text-secondary)] tabular-nums hidden md:table-cell">{formatNumber(dailyTotals.shares)}</td>
+                        <td className="px-4 py-2.5 lg:py-3 font-semibold text-[var(--text-primary)]">Total</td>
+                        <td className="px-3 py-2.5 lg:py-3 text-right font-semibold text-[var(--text-primary)] tabular-nums">{dailyTotals.clips}</td>
+                        <td className="px-3 py-2.5 lg:py-3 text-right font-semibold text-[var(--text-primary)] tabular-nums">{formatNumber(dailyTotals.views)}</td>
+                        <td className="px-3 py-2.5 lg:py-3 text-right font-semibold text-[var(--text-secondary)] tabular-nums hidden sm:table-cell">{formatNumber(dailyTotals.likes)}</td>
+                        <td className="px-3 py-2.5 lg:py-3 text-right font-semibold text-[var(--text-secondary)] tabular-nums hidden sm:table-cell">{formatNumber(dailyTotals.comments)}</td>
+                        <td className="px-4 py-2.5 lg:py-3 text-right font-semibold text-[var(--text-secondary)] tabular-nums hidden md:table-cell">{formatNumber(dailyTotals.shares)}</td>
                       </tr>
                     </tbody>
                   </table>
