@@ -759,8 +759,8 @@ model ScheduledVoiceCall {
   roomId       String?
   status       String   @default("scheduled") // scheduled | live | completed | cancelled
   recordingUrl String?
-  createdById  String
-  createdBy    User     @relation(fields: [createdById], references: [id])
+  createdById  String?
+  createdBy    User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
 
   @@index([campaignId])
