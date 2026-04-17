@@ -112,6 +112,11 @@ model User {
   notifications    Notification[]
   scheduledCalls   ScheduledCall[]
   campaignClients  CampaignClient[]
+  // Community system — channels, tickets, scheduled voice calls
+  channelMessages         ChannelMessage[]
+  communityTickets        CampaignTicket[]
+  communityTicketMessages TicketMessage[]
+  scheduledVoiceCalls     ScheduledVoiceCall[]
 
   @@index([role])
   @@index([referredById])
@@ -219,6 +224,10 @@ model Campaign {
   agencyEarnings   AgencyEarning[]
   campaignEvents   CampaignEvent[]
   campaignClients  CampaignClient[]
+  // Community system
+  channels             Channel[]
+  communityTickets     CampaignTicket[]
+  scheduledVoiceCalls  ScheduledVoiceCall[]
 
   @@index([status])
   @@index([isArchived])
@@ -669,4 +678,115 @@ model MagicLinkToken {
   @@index([token])
   @@index([email])
   @@map("magic_link_tokens")
+}
+
+// ─── Community: Channels, Tickets, Voice Calls ──────────────
+
+model Channel {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name        String
+  type        String   @default("general") // general | announcement | leaderboard
+  description String?
+  sortOrder   Int      @default(0)
+  isPinned    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  messages    ChannelMessage[]
+
+  @@index([campaignId])
+  @@map("channels")
+}
+
+model ChannelMessage {
+  id        String   @id @default(cuid())
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  isPinned  Boolean  @default(false)
+  isDeleted Boolean  @default(false)
+  deletedBy String?
+  createdAt DateTime @default(now())
+
+  @@index([channelId, createdAt])
+  @@index([userId])
+  @@map("channel_messages")
+}
+
+model CampaignTicket {
+  id            String   @id @default(cuid())
+  campaignId    String
+  campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status        String   @default("open") // open | waiting | resolved | pending
+  notes         String?  @db.Text
+  lastMessageAt DateTime?
+  createdAt     DateTime @default(now())
+  messages      TicketMessage[]
+
+  @@unique([campaignId, userId])
+  @@index([campaignId, status])
+  @@index([userId])
+  @@map("campaign_tickets")
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    CampaignTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_messages")
+}
+
+model ScheduledVoiceCall {
+  id           String   @id @default(cuid())
+  campaignId   String?
+  campaign     Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  isGlobal     Boolean  @default(false)
+  title        String
+  description  String?  @db.Text
+  scheduledAt  DateTime
+  duration     Int      @default(60) // minutes
+  roomId       String?
+  status       String   @default("scheduled") // scheduled | live | completed | cancelled
+  recordingUrl String?
+  createdById  String
+  createdBy    User     @relation(fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([campaignId])
+  @@index([scheduledAt])
+  @@map("scheduled_voice_calls")
+}
+
+// Tracks last-read time per user per channel for unread counts.
+// No Prisma relations — userId/channelId used as strings for cascade-safe ops at the app layer.
+model ChannelReadStatus {
+  id         String   @id @default(cuid())
+  channelId  String
+  userId     String
+  lastReadAt DateTime @default(now())
+
+  @@unique([channelId, userId])
+  @@index([userId])
+  @@map("channel_read_status")
+}
+
+model CommunityMute {
+  id         String   @id @default(cuid())
+  campaignId String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  @@unique([campaignId, userId])
+  @@map("community_mutes")
 }
