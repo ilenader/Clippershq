@@ -41,8 +41,8 @@ export default async function LandingPage() {
         <p>Automated clip tracking with real-time view counting. Fair CPM-based earnings. Bonus rewards for streaks and levels. Professional analytics dashboard. Instant payout requests.</p>
         <h2>For Brands</h2>
         <p>Launch campaigns, connect with verified content clippers, track performance in real-time, and get professional reports. Visit our brands page to learn more.</p>
-        <a href="/login">Sign In</a>
-        <a href="/brands">For Brands</a>
+        <a href="/login">Start Clipping</a>
+        <a href="/brands">Launch a Campaign</a>
       </div>
       <iframe
         src="/clipper.html"

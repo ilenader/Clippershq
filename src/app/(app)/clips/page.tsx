@@ -220,25 +220,25 @@ export default function ClipsPage() {
                 {/* Top: account + campaign + status */}
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">{clip.clipAccount?.username || "-"}</p>
-                    <p className="text-xs text-[var(--text-muted)]">{clip.campaign?.name || "-"} · {formatRelative(clip.createdAt)}</p>
+                    <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">{clip.clipAccount?.username || "-"}</p>
+                    <p className="text-xs lg:text-sm text-[var(--text-muted)]">{clip.campaign?.name || "-"} · {formatRelative(clip.createdAt)}</p>
                   </div>
                   <Badge variant={clip.status.toLowerCase() as any}>{clip.status}</Badge>
                 </div>
                 {/* Middle: link + stats */}
                 <div className="flex items-center gap-4 flex-wrap">
-                  <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-accent/15 bg-accent/5 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10 transition-colors">
+                  <a href={clip.clipUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-accent/15 bg-accent/5 px-3 py-1.5 text-xs lg:text-sm font-medium text-accent hover:bg-accent/10 transition-colors">
                     <ExternalLink className="h-3 w-3" /> Open clip
                   </a>
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-4 text-sm lg:text-base">
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.views) : "0"}</span> <span className="text-[var(--text-muted)]">views</span></span>
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.likes) : "0"}</span> <span className="text-[var(--text-muted)]">likes</span></span>
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.comments) : "0"}</span> <span className="text-[var(--text-muted)]">comments</span></span>
                     <span><span className="font-medium text-[var(--text-primary)] tabular-nums">{stat ? formatNumber(stat.shares) : "0"}</span> <span className="text-[var(--text-muted)]">shares</span></span>
                     {clip.status === "APPROVED" && clip.earnings > 0 && (
-                      <span className="font-medium text-accent tabular-nums text-right">
+                      <span className="font-semibold text-accent tabular-nums text-right">
                         {formatCurrency(clip.earnings)}
-                        {clip.bonusAmount > 0 && <span className="text-emerald-400 text-xs block sm:inline sm:ml-1">(+{formatCurrency(clip.bonusAmount)} bonus)</span>}
+                        {clip.bonusAmount > 0 && <span className="text-emerald-400 text-xs lg:text-sm font-semibold block sm:inline sm:ml-1">(+{formatCurrency(clip.bonusAmount)} bonus)</span>}
                       </span>
                     )}
                   </div>

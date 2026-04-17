@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import type { SessionUser } from "@/lib/auth-types";
@@ -109,6 +109,8 @@ export default function CampaignDetailPage() {
   const [joining, setJoining] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(true);
+  const [confirmedRequirements, setConfirmedRequirements] = useState(false);
+  const requirementsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetches: Promise<any>[] = [
@@ -346,32 +348,50 @@ export default function CampaignDetailPage() {
 
       {/* ── 3. REQUIREMENTS (collapsible) ────────────────────── */}
       {requirementLines.length > 0 && (
-        <Card>
-          <button
-            onClick={() => setRequirementsOpen((o) => !o)}
-            className="flex w-full items-center justify-between text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-accent" />
-              <h2 className="text-sm font-semibold text-[var(--text-primary)]">Campaign Requirements</h2>
-            </div>
-            {requirementsOpen ? (
-              <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />
+        <div ref={requirementsRef} className="scroll-mt-24">
+          <Card>
+            <button
+              onClick={() => setRequirementsOpen((o) => !o)}
+              className="flex w-full items-center justify-between text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-accent" />
+                <h2 className="text-sm font-semibold text-[var(--text-primary)]">Campaign Requirements</h2>
+              </div>
+              {requirementsOpen ? (
+                <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />
+              )}
+            </button>
+            {requirementsOpen && (
+              <>
+                <ul className="mt-4 space-y-2">
+                  {requirementLines.map((req, i) => (
+                    <li key={i} className="flex items-start gap-2.5">
+                      <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent" />
+                      <span className="text-[15px] text-[var(--text-primary)]">{req}</span>
+                    </li>
+                  ))}
+                </ul>
+                {/* Confirmation gate — the sticky Join button below won't fire until this is checked. */}
+                {isClipper && campaign.status === "ACTIVE" && joinedAccounts.length === 0 && (
+                  <label className="mt-5 flex items-start gap-3 cursor-pointer rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-hover)] p-3 hover:border-accent/30 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={confirmedRequirements}
+                      onChange={(e) => setConfirmedRequirements(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-[var(--border-color)] accent-accent cursor-pointer"
+                    />
+                    <span className="text-sm text-[var(--text-primary)] select-none">
+                      I have read and understood the campaign requirements
+                    </span>
+                  </label>
+                )}
+              </>
             )}
-          </button>
-          {requirementsOpen && (
-            <ul className="mt-4 space-y-2">
-              {requirementLines.map((req, i) => (
-                <li key={i} className="flex items-start gap-2.5">
-                  <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent" />
-                  <span className="text-[15px] text-[var(--text-primary)]">{req}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+          </Card>
+        </div>
       )}
 
       {/* Caption & Hashtag rules */}
@@ -503,7 +523,17 @@ export default function CampaignDetailPage() {
         <div className="sticky bottom-4 z-10 flex flex-col-reverse sm:flex-row gap-3 pt-2">
           {joinedAccounts.length === 0 && (
             <Button
-              onClick={handleQuickJoin}
+              onClick={() => {
+                // Two-step gate: first press scrolls to requirements and asks for review;
+                // second press (after checkbox ticked) actually joins.
+                if (requirementLines.length > 0 && !confirmedRequirements) {
+                  setRequirementsOpen(true);
+                  requirementsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  toast.error("Please review the requirements first");
+                  return;
+                }
+                handleQuickJoin();
+              }}
               loading={joining}
               variant="secondary"
               className="w-full sm:flex-1"

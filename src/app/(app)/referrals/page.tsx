@@ -75,10 +75,10 @@ export default function ReferralsPage() {
         </p>
         {ref?.referralCode && (
           <div className="flex items-center gap-2 mb-5">
-            <div className="flex-1 rounded-xl border border-accent/20 bg-[var(--bg-input)] px-4 py-3 text-sm text-[var(--text-primary)] truncate font-mono">
+            <div className="flex-1 rounded-xl border border-accent/20 bg-[var(--bg-input)] px-4 py-3 text-sm lg:text-base text-[var(--text-primary)] truncate font-mono">
               {typeof window !== "undefined" ? `${window.location.origin}/login?ref=${ref.referralCode}` : ref.referralCode}
             </div>
-            <button onClick={copyLink} className="flex items-center gap-1.5 rounded-xl bg-accent px-5 py-3 text-sm font-medium text-white hover:bg-accent-hover transition-all cursor-pointer">
+            <button onClick={copyLink} className="flex items-center gap-1.5 rounded-xl bg-accent px-5 py-3 text-sm lg:text-base font-medium text-white hover:bg-accent-hover transition-all cursor-pointer">
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               {copied ? "Copied" : "Copy link"}
             </button>
@@ -164,12 +164,12 @@ export default function ReferralsPage() {
             {referrals.map((r: any) => (
               <div key={r.id} className="flex items-center justify-between rounded-xl border border-[var(--border-color)] px-4 py-3">
                 <div>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">{r.username}</p>
-                  <p className="text-xs text-[var(--text-muted)]">Joined {formatRelative(r.createdAt)}</p>
+                  <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">{r.username}</p>
+                  <p className="text-xs lg:text-sm text-[var(--text-muted)]">Joined {formatRelative(r.createdAt)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-accent">{formatCurrency(r.totalEarnings * 0.05)}</p>
-                  <p className="text-xs text-[var(--text-muted)]">from {formatCurrency(r.totalEarnings)} earned</p>
+                  <p className="text-sm lg:text-base font-semibold text-accent">{formatCurrency(r.totalEarnings * 0.05)}</p>
+                  <p className="text-xs lg:text-sm text-[var(--text-muted)]">from {formatCurrency(r.totalEarnings)} earned</p>
                 </div>
               </div>
             ))}

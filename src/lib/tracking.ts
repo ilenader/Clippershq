@@ -687,6 +687,24 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     console.log(`[TRACKING] Found ${dueJobs.length} due jobs`);
     details.push(`Found ${dueJobs.length} due jobs`);
 
+    // One-time migration: clamp stale intervals left over from before the 8h (480 min) cap was
+    // introduced. Once every active job cycles through, this becomes a no-op. REJECTED clips
+    // keep their longer interval (2880 min per the REJECTED branch below).
+    for (const job of dueJobs as any[]) {
+      if ((job.checkIntervalMin || 0) > 480 && job.clip?.status !== "REJECTED") {
+        try {
+          await db.trackingJob.update({
+            where: { id: job.id },
+            data: { checkIntervalMin: 480 },
+          });
+          job.checkIntervalMin = 480;
+          console.log(`[TRACKING] Clamped stale interval on job ${job.id} from >${480}min → 480min`);
+        } catch (clampErr: any) {
+          console.error(`[TRACKING] Failed to clamp interval for job ${job.id}:`, clampErr?.message);
+        }
+      }
+    }
+
     // For manual checks, broadcast progress to all owners via SSE
     if (source === "manual") {
       try {

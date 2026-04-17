@@ -219,7 +219,7 @@ export default function AccountsPage() {
                 {/* Header: username + platform + status */}
                 <div className="flex items-start justify-between mb-2.5">
                   <div>
-                    <p className="text-base font-semibold text-[var(--text-primary)]">{account.username}</p>
+                    <p className="text-base lg:text-lg font-semibold text-[var(--text-primary)]">{account.username}</p>
                     <Badge variant={(statusBadge[account.status] || "pending") as any} className="mt-0.5">
                       {account.platform} · {statusDisplay[account.status] || account.status}
                     </Badge>
@@ -243,20 +243,20 @@ export default function AccountsPage() {
                 {stats && stats.clipCount > 0 && (
                   <div className="grid grid-cols-4 gap-2 pt-2.5 border-t border-[var(--border-subtle)]">
                     <div>
-                      <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalViews.toLocaleString()}</p>
-                      <p className="text-xs text-[var(--text-muted)]">Views</p>
+                      <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalViews.toLocaleString()}</p>
+                      <p className="text-xs lg:text-sm text-[var(--text-muted)]">Views</p>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalLikes.toLocaleString()}</p>
-                      <p className="text-xs text-[var(--text-muted)]">Likes</p>
+                      <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalLikes.toLocaleString()}</p>
+                      <p className="text-xs lg:text-sm text-[var(--text-muted)]">Likes</p>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalComments.toLocaleString()}</p>
-                      <p className="text-xs text-[var(--text-muted)]">Comments</p>
+                      <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalComments.toLocaleString()}</p>
+                      <p className="text-xs lg:text-sm text-[var(--text-muted)]">Comments</p>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.clipCount}</p>
-                      <p className="text-xs text-[var(--text-muted)]">Clips</p>
+                      <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)] tabular-nums">{stats.clipCount}</p>
+                      <p className="text-xs lg:text-sm text-[var(--text-muted)]">Clips</p>
                     </div>
                   </div>
                 )}

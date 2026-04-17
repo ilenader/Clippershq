@@ -384,20 +384,20 @@ export default function PayoutsPage() {
             <Card key={payout.id}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-lg font-bold text-[var(--text-primary)]">
+                  <p className="text-lg lg:text-xl font-bold text-[var(--text-primary)]">
                     {payout.finalAmount != null ? formatCurrency(payout.finalAmount) : formatCurrency(payout.amount)}
                   </p>
                   {payout.finalAmount != null && payout.finalAmount !== payout.amount && (
-                    <p className="text-[11px] text-[var(--text-muted)] tabular-nums">
+                    <p className="text-[11px] lg:text-xs text-[var(--text-muted)] tabular-nums">
                       {formatCurrency(payout.amount)} requested
                       {payout.feeAmount > 0 && <> · <span className="text-red-400">-{formatCurrency(payout.feeAmount)} fee</span></>}
                       {payout.bonusAmount > 0 && <> · <span className="text-emerald-400">+{formatCurrency(payout.bonusAmount)} bonus</span></>}
                     </p>
                   )}
                   {payout.campaign?.name && (
-                    <p className="text-xs font-medium text-accent truncate">{payout.campaign.name}</p>
+                    <p className="text-xs lg:text-sm font-medium text-accent truncate">{payout.campaign.name}</p>
                   )}
-                  <p className="text-xs text-[var(--text-muted)] truncate">
+                  <p className="text-xs lg:text-sm text-[var(--text-muted)] truncate">
                     {formatRelative(payout.createdAt)} · {payout.walletAddress}
                   </p>
                 </div>
