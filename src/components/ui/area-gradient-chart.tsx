@@ -93,16 +93,11 @@ export function AreaGradientChart({
                   if (!active || !payload || payload.length === 0) return null;
                   const v = Number((payload[0] as any).value);
                   return (
-                    <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-xs">
-                      <p className="whitespace-nowrap flex items-center gap-1.5">
-                        <span className="text-[var(--text-muted)]">{label}</span>
-                        <span className="text-[var(--text-muted)]">—</span>
-                        {seriesLabel ? (
-                          <>
-                            <span className="inline-block h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                            <span className="text-[var(--text-secondary)]">{seriesLabel}:</span>
-                          </>
-                        ) : null}
+                    <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-xs">
+                      <p className="text-[var(--text-muted)] mb-1 whitespace-nowrap">{label}</p>
+                      <p className="flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                        {seriesLabel && <span className="text-[var(--text-secondary)]">{seriesLabel}:</span>}
                         <span className="font-semibold text-[var(--text-primary)] tabular-nums">{formatTooltip(v, valuePrefix, valueSuffix)}</span>
                       </p>
                     </div>
