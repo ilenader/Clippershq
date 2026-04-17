@@ -188,12 +188,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // After Google login, route CLIENT users to /client
-      if (url.startsWith(baseUrl)) {
-        // Check if url is /dashboard (default callback) and user might be CLIENT
-        // The session callback above sets the role, but redirect fires before session is fully built
-        // So we handle this in app-layout.tsx instead (already does CLIENT -> /client redirect)
-        return url;
+      // Allow relative paths (most NextAuth callback URLs)
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Allow same-origin absolute URLs only (prevent https://clipershq.com.evil.com bypass)
+      try {
+        const parsed = new URL(url);
+        const base = new URL(baseUrl);
+        if (parsed.origin === base.origin) return url;
+      } catch {
+        // fall through
       }
       return baseUrl;
     },

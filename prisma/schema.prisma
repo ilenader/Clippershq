@@ -114,6 +114,7 @@ model User {
   campaignClients  CampaignClient[]
 
   @@index([role])
+  @@index([referredById])
   @@map("users")
 }
 
@@ -326,6 +327,7 @@ model Clip {
   @@index([userId, createdAt])
   @@index([campaignId])
   @@index([campaignId, status, isDeleted])
+  @@index([campaignId, status, videoUnavailable, isDeleted])
   @@index([status])
   @@map("clips")
 }

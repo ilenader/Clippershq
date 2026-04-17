@@ -246,17 +246,40 @@ async function processTrackingJob(
       console.log(`[TRACKING] Video restored for clip ${clip.id} — earnings unfrozen ($${savedE})`);
     }
 
-    // Save new snapshot
-    await db.clipStat.create({
-      data: {
-        clipId: clip.id,
-        isManual: source === "manual",
-        views: stats.views,
-        likes: stats.likes,
-        comments: stats.comments,
-        shares: stats.shares,
-      },
-    });
+    // Save new snapshot.
+    // For cron, write it atomically with a short-term nextCheckAt bump so that if Vercel
+    // kills the function before the final trackingJob.update below, the next cron run
+    // won't immediately re-pick-up this clip and create a duplicate snapshot.
+    // Manual checks don't touch nextCheckAt (preserves cron schedule per existing contract).
+    if (source === "manual") {
+      await db.clipStat.create({
+        data: {
+          clipId: clip.id,
+          isManual: true,
+          views: stats.views,
+          likes: stats.likes,
+          comments: stats.comments,
+          shares: stats.shares,
+        },
+      });
+    } else {
+      await db.$transaction([
+        db.clipStat.create({
+          data: {
+            clipId: clip.id,
+            isManual: false,
+            views: stats.views,
+            likes: stats.likes,
+            comments: stats.comments,
+            shares: stats.shares,
+          },
+        }),
+        db.trackingJob.update({
+          where: { id: job.id },
+          data: { lastCheckedAt: new Date(), nextCheckAt: new Date(Date.now() + 10 * 60_000) },
+        }),
+      ]);
+    }
 
     // ── Fraud detection ──
     try {

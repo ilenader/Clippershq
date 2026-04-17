@@ -59,8 +59,10 @@ export async function POST(
       );
     }
 
-    // Validate campaign balance before marking as PAID
-    if (action === "PAID" && existing.campaignId) {
+    // Validate campaign balance on promise-money transitions (APPROVED and PAID).
+    // Balance can drop between REQUESTED and APPROVED (other payouts, video unavailability, recalc),
+    // so checking only at PAID would let us tell a user "approved!" when the money isn't there.
+    if ((action === "APPROVED" || action === "PAID") && existing.campaignId) {
       const campaignClips = await db.clip.findMany({
         where: {
           userId: existing.userId,
@@ -88,7 +90,7 @@ export async function POST(
 
       if (existing.amount > campaignAvailable) {
         return NextResponse.json({
-          error: `Cannot approve — campaign earnings (${formatCurrency(campaignEarned)}) are less than total payouts (${formatCurrency(campaignPaidAndLocked + existing.amount)}). Earnings may have changed since this payout was requested.`,
+          error: `Cannot ${action.toLowerCase()} — campaign earnings (${formatCurrency(campaignEarned)}) are less than total payouts (${formatCurrency(campaignPaidAndLocked + existing.amount)}). Earnings may have changed since this payout was requested.`,
         }, { status: 400 });
       }
     }

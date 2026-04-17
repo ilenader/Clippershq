@@ -14,6 +14,25 @@ interface EmailParams {
   html: string;
 }
 
+/**
+ * Escape user-controlled content before interpolating into HTML email bodies.
+ * Prevents stored XSS via usernames, campaign names, rejection reasons, etc.
+ * Also strips CR/LF from subjects to block header injection if a non-JSON mailer is ever used.
+ */
+export function escapeHtml(str: unknown): string {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function safeSubject(str: unknown): string {
+  return String(str ?? "").replace(/[\r\n]+/g, " ").trim();
+}
+
 async function sendEmail(params: EmailParams): Promise<boolean> {
   const apiKey = process.env.EMAIL_API_KEY || "";
   const from = process.env.EMAIL_FROM;
@@ -116,7 +135,7 @@ export async function sendWelcomeEmail(email: string, username: string): Promise
     to: email,
     subject: "Welcome to Clippers HQ",
     html: wrap(`
-      <p style="font-size: 16px; margin: 0 0 12px;">Hey ${username},</p>
+      <p style="font-size: 16px; margin: 0 0 12px;">Hey ${escapeHtml(username)},</p>
       <p style="font-size: 15px; color: #a1a1aa; margin: 0 0 16px;">Welcome to Clippers HQ! Here's how to start earning:</p>
       <ol style="font-size: 14px; color: #d4d4d8; padding-left: 20px; margin: 0 0 16px;">
         <li style="margin-bottom: 8px;">Add your TikTok or Instagram account in <strong style="color: #fff;">Accounts</strong></li>
@@ -135,7 +154,7 @@ export async function sendClipApproved(email: string, campaignName: string, earn
     subject: "Your clip was approved",
     html: wrap(`
       <p style="font-size: 16px; margin: 0 0 12px;">Great news!</p>
-      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${campaignName}</strong> has been approved.</p>
+      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${escapeHtml(campaignName)}</strong> has been approved.</p>
       ${earnings > 0 ? `<p style="font-size: 20px; color: #2596be; font-weight: bold; margin: 0 0 12px;">Current earnings: $${earnings.toFixed(2)}</p>` : ""}
       <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Tracking has started — we'll monitor views and calculate your earnings automatically.</p>
     `),
@@ -147,8 +166,8 @@ export async function sendClipRejected(email: string, campaignName: string, reas
     to: email,
     subject: "Clip update",
     html: wrap(`
-      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${campaignName}</strong> was not approved.</p>
-      ${reason ? `<p style="font-size: 14px; color: #f87171; margin: 0 0 12px;">Reason: ${reason}</p>` : ""}
+      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${escapeHtml(campaignName)}</strong> was not approved.</p>
+      ${reason ? `<p style="font-size: 14px; color: #f87171; margin: 0 0 12px;">Reason: ${escapeHtml(reason)}</p>` : ""}
       <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Submit another clip to keep your streak going!</p>
     `),
   });
@@ -172,7 +191,7 @@ export async function sendPayoutRejected(email: string, amount: number, reason?:
     subject: "Payout update",
     html: wrap(`
       <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your payout request of <strong style="color: #fff;">$${amount.toFixed(2)}</strong> was not approved.</p>
-      ${reason ? `<p style="font-size: 14px; color: #f87171; margin: 0 0 12px;">Reason: ${reason}</p>` : ""}
+      ${reason ? `<p style="font-size: 14px; color: #f87171; margin: 0 0 12px;">Reason: ${escapeHtml(reason)}</p>` : ""}
       <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Contact us on Discord if you have questions.</p>
     `),
   });
@@ -197,10 +216,10 @@ export async function sendStreakWarning(email: string, currentStreak: number): P
   return sendEmail({ to: email, subject: "Don't lose your streak", html: wrap(`<p style="font-size: 15px;">Your ${currentStreak}-day streak is at risk. Submit a clip today!</p>`) });
 }
 export async function sendCampaignApproved(email: string, campaignName: string): Promise<boolean> {
-  return sendEmail({ to: email, subject: `Campaign approved`, html: wrap(`<p style="font-size: 15px;">Your campaign <strong>${campaignName}</strong> is live.</p>`) });
+  return sendEmail({ to: email, subject: `Campaign approved`, html: wrap(`<p style="font-size: 15px;">Your campaign <strong>${escapeHtml(campaignName)}</strong> is live.</p>`) });
 }
 export async function sendCampaignRejected(email: string, campaignName: string): Promise<boolean> {
-  return sendEmail({ to: email, subject: `Campaign not approved`, html: wrap(`<p style="font-size: 15px;">Your campaign <strong>${campaignName}</strong> was not approved.</p>`) });
+  return sendEmail({ to: email, subject: `Campaign not approved`, html: wrap(`<p style="font-size: 15px;">Your campaign <strong>${escapeHtml(campaignName)}</strong> was not approved.</p>`) });
 }
 export async function sendCampaignAlertEmail(email: string, campaignName: string, description: string, campaignId?: string, cpm?: number, budget?: number): Promise<boolean> {
   const link = campaignId ? `https://clipershq.com/campaigns/${campaignId}` : "https://clipershq.com/campaigns";
@@ -210,13 +229,13 @@ export async function sendCampaignAlertEmail(email: string, campaignName: string
     : "A new campaign is live and ready for clippers!";
   return sendEmail({
     to: email,
-    subject: `New Campaign: ${campaignName}`,
+    subject: safeSubject(`New Campaign: ${campaignName}`),
     html: wrap(`
       <div style="text-align: center; padding: 8px 0 16px; background-color: #111720 !important;">
         <span style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">New Campaign Available</span>
       </div>
-      <h1 style="color: #ffffff !important; font-size: 26px; font-weight: 700; margin: 0 0 16px; text-align: center; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${campaignName}</h1>
-      <p style="color: #a1a1aa !important; font-size: 15px; margin: 0 0 20px; text-align: center; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${desc}</p>
+      <h1 style="color: #ffffff !important; font-size: 26px; font-weight: 700; margin: 0 0 16px; text-align: center; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(campaignName)}</h1>
+      <p style="color: #a1a1aa !important; font-size: 15px; margin: 0 0 20px; text-align: center; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(desc)}</p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 24px; background-color: #0d1117 !important; border: 1px solid #1c2333; border-radius: 12px;">
         <tr style="background-color: #0d1117;">
           <td class="stats-cell" style="padding: 16px; text-align: center; border-right: 1px solid #1c2333; background-color: #0d1117 !important;">
@@ -236,7 +255,7 @@ export async function sendCampaignAlertEmail(email: string, campaignName: string
 }
 
 export async function sendReferralSignup(email: string, referredName: string): Promise<boolean> {
-  return sendEmail({ to: email, subject: "New referral", html: wrap(`<p style="font-size: 15px;"><strong>${referredName}</strong> signed up with your link. You earn 5% of their earnings forever.</p>`) });
+  return sendEmail({ to: email, subject: "New referral", html: wrap(`<p style="font-size: 15px;"><strong>${escapeHtml(referredName)}</strong> signed up with your link. You earn 5% of their earnings forever.</p>`) });
 }
 
 export async function sendPayoutReminder(email: string, campaignName: string, amount: string): Promise<boolean> {
@@ -245,7 +264,7 @@ export async function sendPayoutReminder(email: string, campaignName: string, am
     subject: "Payout reminder",
     html: wrap(`
       <p style="font-size: 16px; margin: 0 0 12px; text-align: center; background-color: #111720 !important;">Payout Reminder</p>
-      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 16px; text-align: center; background-color: #111720 !important;">You have <strong style="color: #2596be;">${amount}</strong> unpaid from <strong style="color: #fff;">${campaignName}</strong>.</p>
+      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 16px; text-align: center; background-color: #111720 !important;">You have <strong style="color: #2596be;">${escapeHtml(amount)}</strong> unpaid from <strong style="color: #fff;">${escapeHtml(campaignName)}</strong>.</p>
       <p style="font-size: 14px; color: #a1a1aa; margin: 0 0 24px; text-align: center; background-color: #111720 !important;">Please request your payout so we can process it.</p>
       ${emailButton("Go to Payouts", "https://clipershq.com/payouts")}
     `),
@@ -261,7 +280,7 @@ export async function sendStreakRejectionWarning(email: string, campaignName: st
     subject: "Clip rejected — post again to save your streak!",
     html: wrap(`
       <p style="font-size: 16px; margin: 0 0 12px;">Your clip was rejected</p>
-      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${campaignName}</strong> was rejected.</p>
+      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${escapeHtml(campaignName)}</strong> was rejected.</p>
       <p style="font-size: 18px; color: #f59e0b; font-weight: bold; margin: 0 0 12px;">You have ${timeStr} left to post today to keep your streak!</p>
       <p style="font-size: 14px; color: #a1a1aa; margin: 0 0 24px;">Submit a new clip now before the day ends.</p>
       ${emailButton("Submit a Clip", "https://clipershq.com/clips")}

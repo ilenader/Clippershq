@@ -51,7 +51,11 @@ export async function POST(
     // Fetch clip with campaign info for access check
     const clip = await db.clip.findUnique({
       where: { id },
-      select: { id: true, campaignId: true, status: true, userId: true, isOwnerOverride: true, user: { select: { email: true, role: true } } },
+      select: {
+        id: true, campaignId: true, status: true, userId: true, isOwnerOverride: true,
+        user: { select: { email: true, role: true } },
+        campaign: { select: { status: true, isArchived: true } },
+      },
     });
 
     if (!clip) return NextResponse.json({ error: "Clip not found" }, { status: 404 });
@@ -61,6 +65,21 @@ export async function POST(
       const allowedIds = await getUserCampaignIds(session.user.id, role);
       if (Array.isArray(allowedIds) && !allowedIds.includes(clip.campaignId)) {
         return NextResponse.json({ error: "You don't have access to this campaign" }, { status: 403 });
+      }
+    }
+
+    // Campaign state guard — approvals only legal on ACTIVE or PAUSED, not DRAFT/COMPLETED/archived.
+    // REJECTED / PENDING / FLAGGED transitions are still allowed (e.g., to fix mistakes on archived campaigns).
+    if (action === "APPROVED") {
+      if ((clip as any).campaign?.isArchived) {
+        return NextResponse.json({ error: "Cannot approve clips on an archived campaign" }, { status: 400 });
+      }
+      const campaignStatus = (clip as any).campaign?.status;
+      if (campaignStatus && campaignStatus !== "ACTIVE" && campaignStatus !== "PAUSED") {
+        return NextResponse.json(
+          { error: `Cannot approve clips while campaign is ${campaignStatus}` },
+          { status: 400 },
+        );
       }
     }
 

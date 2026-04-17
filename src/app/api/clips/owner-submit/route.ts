@@ -35,6 +35,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Campaign and clip URL are required." }, { status: 400 });
   }
 
+  // Length + protocol allowlist (defense vs stored XSS)
+  if (typeof clipUrl !== "string" || clipUrl.length > 2000) {
+    return NextResponse.json({ error: "Clip URL is invalid or too long." }, { status: 400 });
+  }
+  const urlLower = clipUrl.trim().toLowerCase();
+  if (!urlLower.startsWith("http://") && !urlLower.startsWith("https://")) {
+    return NextResponse.json({ error: "URL must start with https://" }, { status: 400 });
+  }
+
   try { new URL(clipUrl); } catch {
     return NextResponse.json({ error: "Invalid URL." }, { status: 400 });
   }

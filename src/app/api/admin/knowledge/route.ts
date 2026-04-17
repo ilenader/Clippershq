@@ -11,6 +11,9 @@ export async function GET() {
   const role = (session.user as any).role;
   if (role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
+
   if (!db) return NextResponse.json([]);
 
   const entries = await db.chatKnowledge.findMany({ orderBy: { category: "asc" } });

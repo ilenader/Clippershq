@@ -91,6 +91,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Name and platform are required" }, { status: 400 });
   }
 
+  // String length caps (defense vs. payload bombs)
+  const stringCaps: Record<string, number> = {
+    name: 200, clientName: 200, platform: 100, payoutRule: 500,
+    description: 5000, requirements: 5000, examples: 5000,
+    soundLink: 2000, assetLink: 2000, imageUrl: 2000,
+    bannedContent: 5000, captionRules: 5000, hashtagRules: 5000,
+    aiKnowledge: 20000, reviewTiming: 500,
+  };
+  for (const [field, cap] of Object.entries(stringCaps)) {
+    const v = data[field];
+    if (v != null && typeof v === "string" && v.length > cap) {
+      return NextResponse.json({ error: `${field} is too long (max ${cap} chars)` }, { status: 400 });
+    }
+  }
+
   // Reject negative or NaN numeric inputs (budget must be >= 0 or absent for unlimited)
   for (const field of ["budget", "clipperCpm", "ownerCpm", "agencyFee", "maxPayoutPerClip", "minViews", "videoLengthMin", "videoLengthMax"]) {
     const v = data[field];

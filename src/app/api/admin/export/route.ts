@@ -56,6 +56,20 @@ function fmtDate(d: Date | string | null): string {
   return dt.toISOString().replace("T", " ").substring(0, 16);
 }
 
+/**
+ * Sanitize a string cell value so Excel doesn't interpret it as a formula.
+ * Any cell starting with =, +, -, @, TAB, CR, LF can become a formula (RCE/phishing).
+ * Prefixing with ' makes Excel render it as plain text.
+ */
+function safe(val: any): any {
+  if (typeof val !== "string" || val.length === 0) return val;
+  const first = val[0];
+  if (first === "=" || first === "+" || first === "-" || first === "@" || first === "\t" || first === "\r" || first === "\n") {
+    return "'" + val;
+  }
+  return val;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession();
@@ -220,10 +234,10 @@ async function buildOwnerWorkbook(
     const stat = clip.stats?.[0];
     const r = cd.addRow([
       clip.id,
-      clip.user?.username || clip.user?.name || "Unknown",
-      clip.campaign?.name || "",
-      clip.campaign?.platform || "",
-      clip.clipUrl || "",
+      safe(clip.user?.username || clip.user?.name || "Unknown"),
+      safe(clip.campaign?.name || ""),
+      safe(clip.campaign?.platform || ""),
+      safe(clip.clipUrl || ""),
       clip.status,
       stat?.views || 0,
       stat?.likes || 0,
@@ -289,7 +303,7 @@ async function buildOwnerWorkbook(
     .sort((a: any, b: any) => b.earnings - a.earnings)
     .forEach((u: any, i: number) => {
       const r = cs.addRow([
-        u.name, u.email, u.level, u.streak,
+        safe(u.name), safe(u.email), u.level, u.streak,
         u.earnings, u.views, u.approved, u.pending, u.rejected,
         0, u.earnings, 9,
         u.referred ? "Yes" : "No",
@@ -338,7 +352,7 @@ async function buildOwnerWorkbook(
     .forEach((c: any, i: number) => {
       const spent = c.clipperEarnings + c.ownerEarnings;
       const r = camp.addRow([
-        c.name, c.status, c.budget, spent, Math.max(c.budget - spent, 0),
+        safe(c.name), c.status, c.budget, spent, Math.max(c.budget - spent, 0),
         c.clipperCpm, c.ownerCpm, c.totalClips, c.approved, c.views,
         c.clipperEarnings, c.ownerEarnings, c.clippers.size, fmtDate(c.created),
       ]);
@@ -442,8 +456,8 @@ async function buildClientWorkbook(
     const stat = clip.stats?.[0];
     const row = perf.addRow([
       i + 1,
-      clip.campaign?.platform || "",
-      clip.clipUrl || "",
+      safe(clip.campaign?.platform || ""),
+      safe(clip.clipUrl || ""),
       clip.status,
       stat?.views || 0,
       stat?.likes || 0,

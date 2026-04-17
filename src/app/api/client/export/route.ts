@@ -31,6 +31,15 @@ function autoWidth(sheet: ExcelJS.Worksheet, minWidths?: Record<number, number>)
   sheet.columns.forEach((col, i) => { const min = minWidths?.[i + 1] || 10; let max = min; col.eachCell?.({ includeEmpty: false }, (cell) => { const len = String(cell.value ?? "").length + 2; if (len > max) max = len; }); col.width = Math.min(max, 50); });
 }
 function fmtDate(d: Date | string | null): string { if (!d) return ""; return new Date(d).toISOString().replace("T", " ").substring(0, 16); }
+// Prevent Excel formula injection from user-controlled strings
+function safe(val: any): any {
+  if (typeof val !== "string" || val.length === 0) return val;
+  const first = val[0];
+  if (first === "=" || first === "+" || first === "-" || first === "@" || first === "\t" || first === "\r" || first === "\n") {
+    return "'" + val;
+  }
+  return val;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -125,7 +134,7 @@ export async function GET(req: NextRequest) {
     const sortedClips = [...clips].sort((a: any, b: any) => (b.stats?.[0]?.views || 0) - (a.stats?.[0]?.views || 0));
     sortedClips.forEach((clip: any, i: number) => {
       const stat = clip.stats?.[0];
-      const row = perf.addRow([i + 1, clip.campaign?.platform || "", clip.clipUrl || "", clip.status, stat?.views || 0, stat?.likes || 0, stat?.comments || 0, stat?.shares || 0, clip.earnings || 0, fmtDate(clip.createdAt)]);
+      const row = perf.addRow([i + 1, safe(clip.campaign?.platform || ""), safe(clip.clipUrl || ""), clip.status, stat?.views || 0, stat?.likes || 0, stat?.comments || 0, stat?.shares || 0, clip.earnings || 0, fmtDate(clip.createdAt)]);
       styleDataRow(row, i);
       const sc = row.getCell(4);
       if (clip.status === "APPROVED") sc.font = { ...sc.font, color: { argb: "FF16A34A" } };

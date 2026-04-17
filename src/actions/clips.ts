@@ -36,6 +36,15 @@ export async function submitClip(data: {
   });
   if (!account) throw new Error("Account not approved or not found");
 
+  // Length + protocol allowlist (defense vs stored XSS)
+  if (typeof data.clipUrl !== "string" || data.clipUrl.length > 2000) {
+    throw new Error("Clip URL is invalid or too long");
+  }
+  const urlLower = data.clipUrl.trim().toLowerCase();
+  if (!urlLower.startsWith("http://") && !urlLower.startsWith("https://")) {
+    throw new Error("URL must start with https://");
+  }
+
   // Check URL is valid
   try {
     new URL(data.clipUrl);

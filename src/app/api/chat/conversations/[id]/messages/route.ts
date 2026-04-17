@@ -157,6 +157,9 @@ export async function POST(
 
   const content = (body.content || "").trim();
   if (!content) return NextResponse.json({ error: "Message content is required" }, { status: 400 });
+  if (content.length > 5000) {
+    return NextResponse.json({ error: "Message is too long (max 5000 chars)" }, { status: 400 });
+  }
 
   try {
     // If owner is jumping into a conversation they're not a participant of, add them

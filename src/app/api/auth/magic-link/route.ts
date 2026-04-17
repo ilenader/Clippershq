@@ -18,8 +18,21 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const email = body.email?.trim()?.toLowerCase();
-    if (!email || !email.includes("@")) {
+    if (!email || !email.includes("@") || email.length > 254) {
       return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
+    }
+
+    // Consent guard — require the email to already have a CLIENT account.
+    // Prevents OWNER from auto-provisioning a brand they don't manage by mailing a link blind.
+    const existingUser = await db.user.findFirst({
+      where: { email, role: "CLIENT" },
+      select: { id: true },
+    });
+    if (!existingUser) {
+      return NextResponse.json(
+        { error: "No client account found for this email. Create the client first via /admin/clients." },
+        { status: 400 },
+      );
     }
 
     const token = crypto.randomUUID();

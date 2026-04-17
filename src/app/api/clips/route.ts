@@ -106,6 +106,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Campaign, account, and clip URL are required" }, { status: 400 });
   }
 
+  // Length caps (defense vs. payload bombs)
+  if (typeof data.clipUrl !== "string" || data.clipUrl.length > 2000) {
+    return NextResponse.json({ error: "Clip URL is invalid or too long." }, { status: 400 });
+  }
+  if (data.note != null && typeof data.note === "string" && data.note.length > 2000) {
+    return NextResponse.json({ error: "Note is too long (max 2000 chars)." }, { status: 400 });
+  }
+
+  // Protocol allowlist — block javascript:, data:, vbscript:, file:, etc. (stored-XSS vector)
+  const urlLower = data.clipUrl.trim().toLowerCase();
+  if (!urlLower.startsWith("http://") && !urlLower.startsWith("https://")) {
+    return NextResponse.json({ error: "URL must start with https://" }, { status: 400 });
+  }
+
   try { new URL(data.clipUrl); } catch {
     return NextResponse.json({ error: "Please enter a valid URL (e.g. https://tiktok.com/...)." }, { status: 400 });
   }
@@ -285,14 +299,18 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Normalize URL for duplicate detection: strip query params, protocol, www
-    const normalizedUrl = data.clipUrl.split("?")[0].toLowerCase().trim()
-      .replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
+    // Normalize URL for duplicate detection: strip protocol, www, query, hash, trailing slash
+    const normalizedUrl = data.clipUrl.trim().toLowerCase()
+      .split("?")[0]
+      .split("#")[0]
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .replace(/\/$/, "");
 
     const existingOnCampaign = await db.clip.findFirst({
       where: {
         campaignId: data.campaignId,
-        clipUrl: { contains: normalizedUrl },
+        clipUrl: { contains: normalizedUrl, mode: "insensitive" },
         status: { in: ["PENDING", "APPROVED"] },
         isDeleted: false,
       },
@@ -304,7 +322,7 @@ export async function POST(req: NextRequest) {
     const existingByUser = await db.clip.findFirst({
       where: {
         userId: session.user.id,
-        clipUrl: { contains: normalizedUrl },
+        clipUrl: { contains: normalizedUrl, mode: "insensitive" },
         status: { in: ["PENDING", "APPROVED"] },
         isDeleted: false,
       },

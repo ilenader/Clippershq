@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { getUserCampaignIds } from "@/lib/campaign-access";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -12,15 +13,23 @@ export async function GET(
   const session = await getSession();
   if (!session?.user) return NextResponse.json([], { status: 401 });
 
-  const role = (session.user as any).role;
-  if (role !== "ADMIN" && role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
+
+  const role = (session.user as any).role;
+  if (role !== "ADMIN" && role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   if (!db) return NextResponse.json([]);
 
   const { id } = await params;
+
+  // ADMIN scope guard — only campaigns they manage
+  if (role === "ADMIN") {
+    const allowedIds = await getUserCampaignIds(session.user.id, role);
+    if (Array.isArray(allowedIds) && !allowedIds.includes(id)) {
+      return NextResponse.json({ error: "You don't have access to this campaign" }, { status: 403 });
+    }
+  }
 
   try {
     const events = await db.campaignEvent.findMany({
