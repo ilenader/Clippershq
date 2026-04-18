@@ -2,8 +2,20 @@
 
 import { useRef, useState, useEffect } from "react";
 import { Pin, Reply, SmilePlus, Trash2 } from "lucide-react";
-import { formatRelative } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+
+/** Discord-style message timestamp: time for today, "Yesterday at …" for yesterday,
+ *  full MM/DD/YYYY for older. */
+function formatMessageTime(date: string | Date): string {
+  const d = new Date(date);
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  if (d.toDateString() === now.toDateString()) return time;
+  if (d.toDateString() === yesterday.toDateString()) return `Yesterday at ${time}`;
+  return `${d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })} ${time}`;
+}
 
 export interface Reaction {
   emoji: string;
@@ -129,12 +141,21 @@ export function MessageBubble({
   const hasReactions = Object.keys(groupedReactions).length > 0;
 
   return (
-    <div className="group flex gap-3 px-3 sm:px-4 py-2 hover:bg-[var(--bg-card-hover)] transition-colors">
+    <div className={`group flex gap-3 px-3 sm:px-4 ${showAvatar ? "py-1.5 mt-1" : "py-0.5"} hover:bg-[var(--bg-card-hover)] transition-colors`}>
       <div className="flex-shrink-0 w-8">
         {showAvatar && (
-          <div className="h-8 w-8 rounded-full bg-accent/15 border border-accent/20 flex items-center justify-center text-accent text-xs font-bold uppercase">
-            {username[0] || "?"}
-          </div>
+          message.user?.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={message.user.image}
+              alt={username}
+              className="h-8 w-8 rounded-full object-cover"
+            />
+          ) : (
+            <div className="h-8 w-8 rounded-full bg-accent/15 border border-accent/20 flex items-center justify-center text-accent text-xs font-bold uppercase">
+              {username[0] || "?"}
+            </div>
+          )
         )}
       </div>
 
@@ -155,7 +176,7 @@ export function MessageBubble({
               </span>
             )}
             <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
-              {formatRelative(message.createdAt)}
+              {formatMessageTime(message.createdAt)}
             </span>
             {message.isPinned && (
               <span className="inline-flex items-center gap-1 text-[10px] text-accent font-medium">

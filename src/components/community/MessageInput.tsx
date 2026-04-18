@@ -61,6 +61,8 @@ export function MessageInput({
       setValue("");
     } finally {
       setSending(false);
+      // Re-focus so the user can keep typing without clicking back into the field.
+      setTimeout(() => textareaRef.current?.focus(), 50);
     }
   };
 

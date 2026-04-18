@@ -1,10 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { MessageBubble, type Message } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { toast } from "@/lib/toast";
-import { ArrowDown, ChevronDown, Loader2, Megaphone, MessageCircle, Pin, Search, X } from "lucide-react";
+import { ArrowDown, ChevronDown, Loader2, Megaphone, MessageCircle, Pin, Search, Trophy, X } from "lucide-react";
+
+/** Discord-style day divider label. */
+function formatDateSeparator(date: string | Date): string {
+  const d = new Date(date);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+function channelHeaderIcon(type: string) {
+  if (type === "announcement") return Megaphone;
+  if (type === "leaderboard") return Trophy;
+  return MessageCircle;
+}
 
 function MessageSkeleton() {
   return (
@@ -428,9 +445,19 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
   const displayMessages = searchActive && searchResults ? searchResults : messages;
   const typingList = Array.from(typingUsers.values()).map((t) => t.username);
   const pinnedMessages = messages.filter((m) => m.isPinned && !m.isDeleted);
+  const HeaderIcon = channelHeaderIcon(channelType);
 
   return (
-    <div className="relative flex flex-col h-full min-h-0">
+    <div className="relative flex flex-col h-full min-h-0 bg-[var(--bg-primary)]">
+      {/* Channel header — shows the channel name persistently inside the chat area
+          so the context is visible below the campaign tabs on desktop and mobile. */}
+      <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+        <HeaderIcon className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
+        <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)] truncate">
+          {channelName}
+        </h2>
+      </div>
+
       {isAdminOrOwner && (
         <div className="px-3 sm:px-4 py-2 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
           <div className="relative">
@@ -542,20 +569,35 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
           </div>
         ) : (
           <div className="py-2">
-            {messages.map((m, i) => (
-              <MessageBubble
-                key={m.id}
-                message={m}
-                viewerId={viewerId}
-                viewerRole={viewerRole}
-                channelType={channelType}
-                onDelete={handleDelete}
-                onReply={handleReply}
-                onPin={handlePin}
-                onReact={handleReact}
-                showAvatar={shouldShowAvatar(i)}
-              />
-            ))}
+            {messages.map((m, i) => {
+              const prev = i > 0 ? messages[i - 1] : null;
+              const sameDay = prev && new Date(prev.createdAt).toDateString() === new Date(m.createdAt).toDateString();
+              const showSeparator = !sameDay;
+              return (
+                <Fragment key={m.id}>
+                  {showSeparator && (
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <div className="flex-1 h-px bg-[var(--border-color)]" />
+                      <span className="text-[11px] font-medium text-[var(--text-muted)] whitespace-nowrap uppercase tracking-wider">
+                        {formatDateSeparator(m.createdAt)}
+                      </span>
+                      <div className="flex-1 h-px bg-[var(--border-color)]" />
+                    </div>
+                  )}
+                  <MessageBubble
+                    message={m}
+                    viewerId={viewerId}
+                    viewerRole={viewerRole}
+                    channelType={channelType}
+                    onDelete={handleDelete}
+                    onReply={handleReply}
+                    onPin={handlePin}
+                    onReact={handleReact}
+                    showAvatar={shouldShowAvatar(i)}
+                  />
+                </Fragment>
+              );
+            })}
             <div ref={bottomAnchorRef} />
           </div>
         )}

@@ -70,18 +70,23 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName }: 
       setNextCursor(cursor);
 
       // Select existing ticket if one exists. Never auto-CREATE — CLIPPER must click
-      // "Start a Conversation" first (see the empty-state block in render). Avoids
-      // empty tickets cluttering the admin inbox when a user just peeks at the tab.
-      if (!append && !selectedId && list.length > 0) {
-        const mine = !isAdminOrOwner ? list.find((t) => t.userId === viewerId) : list[0];
-        if (mine) setSelectedId(mine.id);
+      // "Start a Conversation" first. Functional setState so this callback doesn't
+      // need `selectedId` in its deps — otherwise `setSelectedId` inside
+      // `startConversation` invalidates this callback, re-fires the init effect
+      // below, and wipes the just-created ticket back out of state.
+      if (!append && list.length > 0) {
+        setSelectedId((prev) => {
+          if (prev) return prev;
+          const mine = !isAdminOrOwner ? list.find((t) => t.userId === viewerId) : list[0];
+          return mine?.id || prev;
+        });
       }
     } catch {}
     fetchingRef.current = false;
     if (append) setLoadingMore(false);
     setLoading(false);
     setLoadedTicketsOnce(true);
-  }, [campaignId, isAdminOrOwner, viewerId, selectedId]);
+  }, [campaignId, isAdminOrOwner, viewerId]);
 
   const startConversation = useCallback(async () => {
     try {

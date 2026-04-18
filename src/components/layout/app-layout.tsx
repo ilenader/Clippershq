@@ -308,7 +308,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6 animate-[fadeIn_200ms_ease-out]">{children}</main>
       </div>
-      <ChatWidget userId={effectiveSession.user.id} role={effectiveRole} />
+      {/* Hide the support ChatWidget on /community — the community has its own
+          chat + ticket UI, so the floating bubble would be redundant there. */}
+      {!pathname?.startsWith("/community") && (
+        <ChatWidget userId={effectiveSession.user.id} role={effectiveRole} />
+      )}
       {!isPWA && effectiveRole !== "CLIENT" && <PWAInstallPopup />}
       {/* Community: DM toast (CLIPPER only) + top-of-page call banner (all non-CLIENT roles) */}
       {effectiveRole !== "CLIENT" && <DmToast viewerId={effectiveSession.user.id} viewerRole={effectiveRole} />}
