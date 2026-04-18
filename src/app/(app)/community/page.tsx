@@ -82,6 +82,7 @@ export default function CommunityPage() {
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("servers");
   const initialLoadDone = useRef(false);
+  const navHandledRef = useRef(false);
 
   // Handle subsequent client-side navigations (not initial load — loadCampaigns handles that).
   useEffect(() => {
@@ -104,6 +105,12 @@ export default function CommunityPage() {
   }, [searchParams]);
 
   const loadCampaigns = useCallback(async () => {
+    if (navHandledRef.current) {
+      navHandledRef.current = false;
+      setLoadingCampaigns(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/community/campaigns");
       if (!res.ok) return;
@@ -111,7 +118,6 @@ export default function CommunityPage() {
       const list: Campaign[] = Array.isArray(data?.campaigns) ? data.campaigns : [];
       setCampaigns(list);
 
-      // Priority 1: sessionStorage nav target (from DM toast)
       let handled = false;
       try {
         const raw = sessionStorage.getItem("community_nav_target");
@@ -129,6 +135,7 @@ export default function CommunityPage() {
             if (target.ticketId) {
               sessionStorage.setItem("community_initial_ticket", target.ticketId);
             }
+            navHandledRef.current = true;
             handled = true;
           }
         }
