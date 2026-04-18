@@ -81,6 +81,7 @@ export default function CommunityPage() {
   const [unresolvedTicketCount, setUnresolvedTicketCount] = useState(0);
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("servers");
+  const urlCampaignIdRef = useRef<string>("");
 
   // URL-driven initial state (e.g., ?campaignId=X&tab=ticket&ticketId=Y).
   useEffect(() => {
@@ -89,8 +90,8 @@ export default function CommunityPage() {
     const callId = searchParams.get("callId");
     const cid = searchParams.get("campaignId");
     if (cid) {
+      urlCampaignIdRef.current = cid;
       setSelectedCampaignId(cid);
-      // On mobile, if we already know the campaign, jump straight into the channels view.
       setMobileView((prev) => (prev === "servers" ? "channels" : prev));
     }
     if (tab === "ticket" || ticketId) {
@@ -109,7 +110,7 @@ export default function CommunityPage() {
       const data = await res.json();
       const list: Campaign[] = Array.isArray(data?.campaigns) ? data.campaigns : [];
       setCampaigns(list);
-      if (!selectedCampaignId && list.length > 0) {
+      if (!selectedCampaignId && !urlCampaignIdRef.current && list.length > 0) {
         const first = list[0].id;
         setSelectedCampaignId(first);
         if (typeof window !== "undefined") {
