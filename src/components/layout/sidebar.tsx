@@ -49,20 +49,23 @@ const clientNav: NavSection[] = [
   },
 ];
 
+const clipperNavTop: NavItem[] = [
+  { label: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
+  { label: "Campaigns", href: "/campaigns", icon: <Megaphone className="h-[18px] w-[18px]" /> },
+  { label: "Clips", href: "/clips", icon: <Film className="h-[18px] w-[18px]" /> },
+];
+
+const clipperNavBottom: NavItem[] = [
+  { label: "Accounts", href: "/accounts", icon: <UserCircle className="h-[18px] w-[18px]" /> },
+  { label: "Earnings", href: "/earnings", icon: <DollarSign className="h-[18px] w-[18px]" /> },
+  { label: "Progress", href: "/progress", icon: <Trophy className="h-[18px] w-[18px]" /> },
+  { label: "Referrals", href: "/referrals", icon: <Users className="h-[18px] w-[18px]" /> },
+  { label: "Payouts", href: "/payouts", icon: <Wallet className="h-[18px] w-[18px]" /> },
+  { label: "Help", href: "/help", icon: <HelpCircle className="h-[18px] w-[18px]" /> },
+];
+
 const clipperNav: NavSection[] = [
-  {
-    items: [
-      { label: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
-      { label: "Campaigns", href: "/campaigns", icon: <Megaphone className="h-[18px] w-[18px]" /> },
-      { label: "Accounts", href: "/accounts", icon: <UserCircle className="h-[18px] w-[18px]" /> },
-      { label: "Clips", href: "/clips", icon: <Film className="h-[18px] w-[18px]" /> },
-      { label: "Earnings", href: "/earnings", icon: <DollarSign className="h-[18px] w-[18px]" /> },
-      { label: "Progress", href: "/progress", icon: <Trophy className="h-[18px] w-[18px]" /> },
-      { label: "Referrals", href: "/referrals", icon: <Users className="h-[18px] w-[18px]" /> },
-      { label: "Payouts", href: "/payouts", icon: <Wallet className="h-[18px] w-[18px]" /> },
-      { label: "Help", href: "/help", icon: <HelpCircle className="h-[18px] w-[18px]" /> },
-    ],
-  },
+  { items: [...clipperNavTop, ...clipperNavBottom] },
 ];
 
 // Admin sees only: Dashboard, Campaigns, Clips (for their assigned campaigns)
@@ -200,45 +203,49 @@ export function Sidebar({ role }: SidebarProps) {
               </p>
             )}
             <div className="space-y-1">
-              {section.items.map((item) => {
+              {section.items.map((item, itemIdx) => {
                 const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href + "/"));
+                const insertCommunityAfter = !isClient && i === 0 && (
+                  isAdmin
+                    ? itemIdx === section.items.length - 1
+                    : item.href === "/clips"
+                );
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-all duration-150",
-                      isActive
-                        ? "bg-accent/10 text-accent"
-                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
+                  <div key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-all duration-150",
+                        isActive
+                          ? "bg-accent/10 text-accent"
+                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
+                      )}
+                    >
+                      {item.icon}
+                      {item.label}
+                    </Link>
+                    {insertCommunityAfter && (
+                      <Link
+                        href="/community"
+                        className={cn(
+                          "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-all duration-150 mt-1",
+                          onCommunityPage
+                            ? "bg-accent/10 text-accent"
+                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]",
+                        )}
+                      >
+                        <MessageCircle className="h-[18px] w-[18px]" />
+                        <span>Community</span>
+                        {totalCommunityUnread > 0 && (
+                          <span className="ml-auto h-4 min-w-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-1 tabular-nums">
+                            {totalCommunityUnread > 99 ? "99+" : totalCommunityUnread}
+                          </span>
+                        )}
+                      </Link>
                     )}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </Link>
+                  </div>
                 );
               })}
-              {/* Community link — inserts after the first nav section
-                  (for CLIPPER this is the only section; for ADMIN/OWNER it's "Overview"). */}
-              {i === 0 && !isClient && (
-                <Link
-                  href="/community"
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-all duration-150",
-                    onCommunityPage
-                      ? "bg-accent/10 text-accent"
-                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]",
-                  )}
-                >
-                  <MessageCircle className="h-[18px] w-[18px]" />
-                  <span>Community</span>
-                  {totalCommunityUnread > 0 && (
-                    <span className="ml-auto h-4 min-w-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-1 tabular-nums">
-                      {totalCommunityUnread > 99 ? "99+" : totalCommunityUnread}
-                    </span>
-                  )}
-                </Link>
-              )}
             </div>
           </div>
         ))}

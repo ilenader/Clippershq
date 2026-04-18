@@ -223,7 +223,7 @@ export function ChannelList({
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="px-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--text-muted)]/60 mb-1 select-none">
+      <p className="px-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--text-muted)] opacity-60 mb-1 select-none">
         {label}
       </p>
       <div className="space-y-0.5">{children}</div>
@@ -283,7 +283,7 @@ function ChannelRow({
       className={`relative group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-all duration-150 cursor-pointer ${
         active
           ? "bg-accent/10 text-accent font-semibold"
-          : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] hover:pl-3"
+          : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] hover:translate-x-0.5"
       }`}
     >
       {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-accent rounded-r-full" />}
@@ -378,7 +378,7 @@ function PseudoRow({
       className={`relative w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-all duration-150 ${
         active
           ? "bg-accent/10 text-accent font-semibold"
-          : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] hover:pl-3"
+          : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] hover:translate-x-0.5"
       }`}
     >
       {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-accent rounded-r-full" />}

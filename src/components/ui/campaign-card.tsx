@@ -112,26 +112,32 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
             )}
           </div>
 
-          {/* Status badge */}
-          {campaign.status === "PAUSED" && (
-            <div className="absolute top-3 right-12 px-2 py-0.5 rounded-md bg-amber-500/80 text-white text-[10px] font-bold uppercase">
-              Paused
-            </div>
-          )}
         </div>
 
-        {/* Progress bar separator */}
-        <div className="h-1 w-full bg-[var(--bg-input)]">
-          <div
-            className="h-full bg-accent transition-all duration-700"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
+        {/* Budget progress bar */}
+        {budget != null && budget > 0 ? (
+          <div className="px-4 pt-3 pb-2 bg-[var(--bg-primary)]">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-[var(--text-muted)]">${(spent || 0).toLocaleString()} of ${budget.toLocaleString()}</span>
+              <span className="text-[10px] text-[var(--text-muted)]">{Math.round(((spent || 0) / budget) * 100)}%</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-[var(--bg-input)] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-700"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="h-1 w-full bg-[var(--bg-input)]">
+            <div className="h-full bg-accent w-full" />
+          </div>
+        )}
 
         {/* Solid stats block */}
-        <div className="bg-[var(--bg-primary)] p-4 transition-transform duration-300 group-hover:-translate-y-0.5">
+        <div className="bg-[var(--bg-primary)] p-4 transition-transform duration-300 group-hover:-translate-y-0.5 space-y-3">
           {hasStats && (
-            <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center justify-between gap-2">
               {campaign.minViews != null && campaign.minViews > 0 && (
                 <div className="text-center flex-1">
                   <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-0.5">Min Views</p>
@@ -159,15 +165,17 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
             </div>
           )}
 
-          <div className="flex items-center justify-between">
-            <div>{children}</div>
+          {children && (
+            <div className="flex justify-center">
+              {children}
+            </div>
+          )}
 
-            {audienceLabel && (
-              <p className={`text-sm font-semibold ${audienceColor}`}>
-                {audienceLabel}
-              </p>
-            )}
-          </div>
+          {audienceLabel && (
+            <p className={`text-xs font-semibold text-right ${audienceColor}`}>
+              {audienceLabel}
+            </p>
+          )}
         </div>
       </div>
     </Link>

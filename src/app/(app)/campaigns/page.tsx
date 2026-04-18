@@ -105,18 +105,22 @@ export default function CampaignsPage() {
                   budget={campaign.budget}
                   spent={spendByCampaign[campaign.id] || 0}
                   index={index}
-                  className={campaign.status === "PAUSED" ? "opacity-70" : ""}
+                  className=""
                 >
                   {isClipper && (
                     isJoined ? (
-                      <span className="px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 text-sm font-bold">
+                      <span className="px-6 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 text-sm font-bold w-full text-center block">
                         Joined
                       </span>
                     ) : campaign.status === "ACTIVE" ? (
-                      <span className="px-5 py-2 rounded-xl bg-accent text-white text-sm font-bold group-hover:bg-accent/80 transition-colors">
+                      <span className="px-6 py-2.5 rounded-xl bg-accent text-white text-sm font-bold w-full text-center block group-hover:bg-accent/80 transition-colors">
                         Join Campaign
                       </span>
-                    ) : null
+                    ) : (
+                      <span className="px-6 py-2.5 rounded-xl bg-amber-500/20 text-amber-400 text-sm font-bold w-full text-center block">
+                        Campaign Paused
+                      </span>
+                    )
                   )}
                 </CampaignCard>
                 <button
