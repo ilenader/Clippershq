@@ -82,8 +82,12 @@ export async function GET() {
         let totalUnread = 0;
 
         // Channel unread — sum across all of the campaign's channels.
+        // Clippers cannot see private channels, so exclude them from the unread total.
         const channels = await db.channel.findMany({
-          where: { campaignId: c.id },
+          where: {
+            campaignId: c.id,
+            ...(role === "CLIPPER" ? { type: { not: "private" } } : {}),
+          },
           select: { id: true },
         });
         if (channels.length > 0) {

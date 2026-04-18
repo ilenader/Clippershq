@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import type { SessionUser } from "@/lib/auth-types";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  AlertCircle, Loader2, MessageCircle, Phone,
+  AlertCircle, ArrowLeft, Loader2, MessageCircle, Phone,
 } from "lucide-react";
 import { ChannelChat } from "@/components/community/ChannelChat";
 import { Leaderboard } from "@/components/community/Leaderboard";
@@ -346,6 +346,22 @@ export default function CommunityPage() {
     setMobileView("chat");
   };
 
+  const handleDeleteChannel = async (channelId: string) => {
+    try {
+      const res = await fetch(`/api/community/channels/${channelId}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Channel deleted");
+        if (selectedChannelId === channelId) setSelectedChannelId("");
+        loadChannels(selectedCampaignId);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err?.error || "Failed to delete");
+      }
+    } catch {
+      toast.error("Failed to delete channel");
+    }
+  };
+
   const toggleMute = async () => {
     if (!selectedCampaignId) return;
     try {
@@ -448,6 +464,7 @@ export default function CommunityPage() {
             muted={muted}
             onToggleMute={toggleMute}
             onAddChannel={() => setShowAddChannel(true)}
+            onDeleteChannel={handleDeleteChannel}
             onBack={() => setMobileView("servers")}
           />
         </div>
@@ -463,7 +480,7 @@ export default function CommunityPage() {
               className="p-1 rounded hover:bg-[var(--bg-input)] transition-colors"
               aria-label="Back to channels"
             >
-              <MessageCircle className="h-4 w-4 text-[var(--text-muted)] rotate-180" />
+              <ArrowLeft className="h-4 w-4 text-[var(--text-muted)]" />
             </button>
             <p className="text-sm font-semibold text-[var(--text-primary)] truncate flex-1">
               {viewMode === "ticket" ? (isAdmin ? "Tickets" : "Direct messages")

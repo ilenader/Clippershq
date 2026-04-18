@@ -22,7 +22,7 @@ interface Props {
  */
 export function ServerStrip({ campaigns, selectedId, onSelect }: Props) {
   return (
-    <div className="w-[72px] flex-shrink-0 bg-[#1a1f2e] flex flex-col items-center py-3 gap-2 overflow-y-auto border-r border-[var(--border-color)]">
+    <div className="w-[72px] flex-shrink-0 bg-[var(--bg-primary)] flex flex-col items-center py-3 gap-2 overflow-y-auto border-r border-[var(--border-color)]">
       {/* Home */}
       <button
         onClick={() => onSelect(null)}
@@ -99,7 +99,7 @@ export function ServerStrip({ campaigns, selectedId, onSelect }: Props) {
 
 function Tooltip({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-[#111] text-white text-sm font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 max-w-[200px] truncate shadow-xl">
+    <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-[#111] text-white text-sm font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[60] max-w-[200px] truncate shadow-xl">
       {children}
     </div>
   );

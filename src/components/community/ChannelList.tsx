@@ -2,7 +2,7 @@
 
 import {
   Activity, ArrowLeft, Bell, BellOff, Hash, Lock, Megaphone, MessageSquare,
-  Phone, Plus, Trophy,
+  Phone, Plus, Trophy, X,
 } from "lucide-react";
 
 interface Channel {
@@ -40,9 +40,12 @@ interface Props {
   muted: boolean;
   onToggleMute: () => void;
   onAddChannel: () => void;
+  onDeleteChannel?: (channelId: string) => void;
   /** Mobile back chevron — hidden on desktop. */
   onBack?: () => void;
 }
+
+const DEFAULT_CHANNEL_NAMES = ["announcements", "general", "leaderboard"];
 
 function iconFor(type: string) {
   if (type === "announcement") return Megaphone;
@@ -70,6 +73,7 @@ export function ChannelList({
   muted,
   onToggleMute,
   onAddChannel,
+  onDeleteChannel,
   onBack,
 }: Props) {
   // Bucket the real channels by type for section rendering.
@@ -120,6 +124,8 @@ export function ChannelList({
                 channel={ch}
                 active={isActiveChannel(ch.id)}
                 onClick={() => onSelectChannel(ch)}
+                canDelete={isOwner && !DEFAULT_CHANNEL_NAMES.includes(ch.name.toLowerCase())}
+                onDelete={onDeleteChannel ? () => onDeleteChannel(ch.id) : undefined}
               />
             ))}
           </Section>
@@ -172,7 +178,7 @@ export function ChannelList({
       </div>
 
       {/* User footer */}
-      <div className="px-3 py-2 border-t border-[var(--border-color)] bg-[#1a1f2e] flex items-center gap-2.5">
+      <div className="px-3 py-2 border-t border-[var(--border-color)] bg-[var(--bg-primary)] flex items-center gap-2.5">
         {userImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -221,17 +227,24 @@ function ChannelRow({
   channel,
   active,
   onClick,
+  canDelete,
+  onDelete,
 }: {
   channel: Channel;
   active: boolean;
   onClick: () => void;
+  canDelete?: boolean;
+  onDelete?: () => void;
 }) {
   const Icon = iconFor(channel.type);
   const unread = channel.unread || 0;
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+      className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer ${
         active
           ? "bg-[var(--bg-input)] text-[var(--text-primary)]"
           : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
@@ -244,7 +257,22 @@ function ChannelRow({
           {unread > 99 ? "99+" : unread}
         </span>
       )}
-    </button>
+      {canDelete && onDelete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirm(`Delete #${channel.name}? All messages will be lost.`)) {
+              onDelete();
+            }
+          }}
+          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-500/10 transition-opacity"
+          aria-label="Delete channel"
+          title="Delete channel"
+        >
+          <X className="h-3 w-3 text-red-400" />
+        </button>
+      )}
+    </div>
   );
 }
 

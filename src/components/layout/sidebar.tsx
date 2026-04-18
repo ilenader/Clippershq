@@ -26,10 +26,9 @@ import {
   Smartphone,
   BookOpen,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useInstallPrompt } from "@/hooks/use-pwa";
 import { PWAInstallInstructions } from "@/components/pwa-install-popup";
-import { CommunitySidebarNav } from "@/components/community/CommunitySidebarNav";
 
 interface NavItem {
   label: string;
@@ -125,6 +124,33 @@ export function Sidebar({ role }: SidebarProps) {
     sections = [...sections, ownerManageNav, ownerExtraNav];
   }
 
+  const [totalCommunityUnread, setTotalCommunityUnread] = useState(0);
+
+  useEffect(() => {
+    if (role === "CLIENT") return;
+    const load = () => {
+      fetch("/api/community/campaigns")
+        .then((r) => r.json())
+        .then((data) => {
+          const campaigns = data.campaigns || [];
+          setTotalCommunityUnread(
+            campaigns.reduce((sum: number, c: any) => sum + (c.totalUnread || 0), 0),
+          );
+        })
+        .catch(() => {});
+    };
+    load();
+    const handler = () => load();
+    window.addEventListener("sse:channel_message", handler);
+    window.addEventListener("sse:ticket_message", handler);
+    return () => {
+      window.removeEventListener("sse:channel_message", handler);
+      window.removeEventListener("sse:ticket_message", handler);
+    };
+  }, [role]);
+
+  const onCommunityPage = pathname.startsWith("/community");
+
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-full w-60 flex-col border-r border-[var(--border-color)] bg-[var(--bg-secondary)] transition-theme">
       {/* Logo */}
@@ -177,10 +203,26 @@ export function Sidebar({ role }: SidebarProps) {
                   </Link>
                 );
               })}
-              {/* Community expandable block — inserts after the first nav section
+              {/* Community link — inserts after the first nav section
                   (for CLIPPER this is the only section; for ADMIN/OWNER it's "Overview"). */}
               {i === 0 && !isClient && (
-                <CommunitySidebarNav role={role} />
+                <Link
+                  href="/community"
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-all duration-150",
+                    onCommunityPage
+                      ? "bg-accent/10 text-accent"
+                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]",
+                  )}
+                >
+                  <MessageCircle className="h-[18px] w-[18px]" />
+                  <span>Community</span>
+                  {totalCommunityUnread > 0 && (
+                    <span className="ml-auto h-4 min-w-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-1 tabular-nums">
+                      {totalCommunityUnread > 99 ? "99+" : totalCommunityUnread}
+                    </span>
+                  )}
+                </Link>
               )}
             </div>
           </div>
