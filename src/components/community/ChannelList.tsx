@@ -79,12 +79,11 @@ export function ChannelList({
   onRenameChannel,
   onBack,
 }: Props) {
-  // Bucket the real channels by type for section rendering.
-  const textChannels = channels.filter(
-    (c) => c.type === "general" || c.type === "announcement" || c.type === "private",
-  );
   const leaderboardChannel = channels.find((c) => c.type === "leaderboard") || null;
   const voiceChannel = channels.find((c) => c.type === "voice") || null;
+  const textChannels = channels.filter(
+    (c) => c.type !== "leaderboard" && c.type !== "voice",
+  );
 
   const isActiveChannel = (id: string) => active?.kind === "channel" && active.id === id;
 
