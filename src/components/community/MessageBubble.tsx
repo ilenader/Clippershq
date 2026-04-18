@@ -38,6 +38,9 @@ interface Props {
   message: Message;
   viewerRole: "CLIPPER" | "ADMIN" | "OWNER" | "CLIENT";
   viewerId: string;
+  /** Channel type — when "announcement" and viewer is CLIPPER, Reply is hidden
+   *  (clippers can't post in announcement channels, so replying would dead-end). */
+  channelType?: string;
   onDelete?: (id: string) => void;
   onReply?: (m: { id: string; username: string; content: string }) => void;
   onPin?: (id: string, nextPinned: boolean) => void;
@@ -62,6 +65,7 @@ export const REACTION_GLYPHS: Record<string, string> = {
 
 export function MessageBubble({
   message, viewerRole, viewerId,
+  channelType,
   onDelete, onReply, onPin, onReact,
   showAvatar = true,
 }: Props) {
@@ -74,12 +78,22 @@ export function MessageBubble({
   const canModerate = isOwner || isAdmin;
   const canDelete = canModerate && !message.isDeleted;
   const isDeletedForViewer = message.isDeleted;
+  // Reply is hidden for clippers on announcement channels — they can't post there, so a
+  // reply prompt would just dead-end at a locked input.
+  const canReply =
+    channelType !== "announcement" || viewerRole === "OWNER" || viewerRole === "ADMIN";
 
-  // Emoji picker popover state.
+  // Emoji picker popover state + flip logic. Default above; if the trigger is near the top
+  // of the viewport (< 80px), render below so the popover stays visible.
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerAbove, setPickerAbove] = useState(true);
   const pickerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!pickerOpen) return;
+    if (pickerRef.current) {
+      const rect = pickerRef.current.getBoundingClientRect();
+      setPickerAbove(rect.top > 80);
+    }
     const onDoc = (e: MouseEvent) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
     };
@@ -199,7 +213,9 @@ export function MessageBubble({
                   <SmilePlus className="h-3 w-3 text-[var(--text-muted)]" />
                 </button>
                 {pickerOpen && (
-                  <div className="absolute bottom-full left-0 mb-1 flex gap-0.5 p-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-xl shadow-black/40 z-20">
+                  <div
+                    className={`absolute ${pickerAbove ? "bottom-full mb-1" : "top-full mt-1"} left-0 flex gap-0.5 p-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-xl shadow-black/40 z-20`}
+                  >
                     {REACTION_KEYS.map((key) => (
                       <button
                         key={key}
@@ -221,7 +237,7 @@ export function MessageBubble({
       {/* Hover action rail */}
       {!isDeletedForViewer && (
         <div className="flex items-start gap-0.5 flex-shrink-0">
-          {onReply && (
+          {onReply && canReply && (
             <button
               onClick={() => onReply({ id: message.id, username, content: message.content })}
               className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 rounded-lg flex items-center justify-center hover:bg-accent/10"

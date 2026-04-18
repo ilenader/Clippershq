@@ -343,22 +343,28 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
   }, [channelId]);
 
   const handleReact = useCallback(async (messageId: string, emoji: string) => {
-    // Optimistic toggle: update the reaction count immediately so UI feels instant.
+    // Snapshot the target message's reactions so we can restore on API failure.
+    let snapshot: Message["reactions"] | undefined;
     setMessages((prev) => prev.map((m) => {
       if (m.id !== messageId) return m;
+      snapshot = m.reactions ? [...m.reactions] : [];
       const existing = (m.reactions || []).findIndex((r) => r.userId === viewerId && r.emoji === emoji);
       const nextReactions = [...(m.reactions || [])];
       if (existing >= 0) nextReactions.splice(existing, 1);
       else nextReactions.push({ userId: viewerId, emoji });
       return { ...m, reactions: nextReactions };
     }));
+
     try {
-      await fetch("/api/community/reactions", {
+      const res = await fetch("/api/community/reactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messageId, emoji }),
       });
+      if (!res.ok) throw new Error("Failed");
     } catch {
+      // Rollback — restore the snapshot for the exact message we optimistically edited.
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions: snapshot } : m)));
       toast.error("Could not save reaction");
     }
   }, [viewerId]);
@@ -484,6 +490,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
                   message={m}
                   viewerId={viewerId}
                   viewerRole={viewerRole}
+                  channelType={channelType}
                   onDelete={handleDelete}
                   onReply={handleReply}
                   onPin={handlePin}
@@ -519,6 +526,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
                 message={m}
                 viewerId={viewerId}
                 viewerRole={viewerRole}
+                channelType={channelType}
                 onDelete={handleDelete}
                 onReply={handleReply}
                 onPin={handlePin}

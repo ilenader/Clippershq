@@ -40,6 +40,30 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: limit,
     });
+
+    // Background cleanup — cap each campaign's log at 500 rows. Fire-and-forget so the
+    // response returns immediately. Schedules the cleanup via Promise.resolve().then so
+    // the Node event loop runs it after the response is sent.
+    Promise.resolve().then(async () => {
+      try {
+        const total = await db.communityActivity.count({ where: { campaignId } });
+        if (total > 500) {
+          const cutoff = await db.communityActivity.findMany({
+            where: { campaignId },
+            orderBy: { createdAt: "desc" },
+            skip: 500,
+            take: 1,
+            select: { createdAt: true },
+          });
+          if (cutoff[0]) {
+            await db.communityActivity.deleteMany({
+              where: { campaignId, createdAt: { lt: cutoff[0].createdAt } },
+            });
+          }
+        }
+      } catch {}
+    }).catch(() => {});
+
     return NextResponse.json({ activity });
   } catch (err: any) {
     console.error("[COMMUNITY] activity GET error:", err?.message);

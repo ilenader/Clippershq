@@ -269,10 +269,24 @@ export async function PATCH(
 
     const target = await db.channelMessage.findUnique({
       where: { id: messageId },
-      select: { channelId: true },
+      select: { channelId: true, isPinned: true },
     });
     if (!target || target.channelId !== channelId) {
       return NextResponse.json({ error: "Message not found" }, { status: 404 });
+    }
+
+    // Cap pinned messages at 10 per channel (only when switching from unpinned → pinned,
+    // otherwise a toggle-off of the 11th message would be blocked too).
+    if (isPinned && !target.isPinned) {
+      const pinnedCount = await db.channelMessage.count({
+        where: { channelId, isPinned: true, isDeleted: false },
+      });
+      if (pinnedCount >= 10) {
+        return NextResponse.json(
+          { error: "Maximum 10 pinned messages per channel. Unpin one first." },
+          { status: 400 },
+        );
+      }
     }
 
     await db.channelMessage.update({ where: { id: messageId }, data: { isPinned } });
