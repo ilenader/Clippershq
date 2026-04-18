@@ -44,6 +44,10 @@ export async function GET(
   const hasAccess = await userHasCampaignCommunityAccess(session.user.id, role, channel.campaignId);
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  if (channel.type === "private" && role !== "OWNER" && role !== "ADMIN") {
+    return NextResponse.json({ error: "This channel is private" }, { status: 403 });
+  }
+
   const cursor = req.nextUrl.searchParams.get("cursor");
   const limitRaw = parseInt(req.nextUrl.searchParams.get("limit") || "50", 10);
   const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 50, 1), 100);

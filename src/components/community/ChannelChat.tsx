@@ -435,7 +435,9 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
   const locked =
     channelType === "announcement" && viewerRole === "CLIPPER"
       ? "Only admins can post announcements"
-      : undefined;
+      : channelType === "private" && viewerRole === "CLIPPER"
+        ? "This channel is private"
+        : undefined;
 
   // Group consecutive messages from the same user (hide repeat avatars for a tighter read).
   // Deleted messages on either side break the grouping — a deleted bubble shouldn't
