@@ -224,19 +224,22 @@ async function processTrackingJob(
       }
     }
 
-    // If batch returned no data for this clip: skip, retry next cron (don't flag unavailable)
-    if (prefetchedStats === null) {
-      await db.trackingJob.update({
-        where: { id: job.id },
-        data: { nextCheckAt: new Date(Date.now() + 30 * 60 * 1000), lastCheckedAt: new Date() },
-      }).catch(() => {});
-      console.log(`[TRACKING] Clip ${clip.id}: no batch stats, retry in 30min`);
-      details.push(`Clip ${clip.id}: batch missing, retry next cron`);
-      return { success: true, detail: "batch-missing" };
+    // Use prefetched stats when available; fall back to individual fetch if batch missed this clip
+    let stats = prefetchedStats;
+    if (stats === null || stats === undefined) {
+      try {
+        console.log(`[TRACKING] Clip ${clip.id}: batch miss, trying individual fetch`);
+        stats = await fetchClipStats(clip.clipUrl);
+      } catch (fetchErr: any) {
+        await db.trackingJob.update({
+          where: { id: job.id },
+          data: { nextCheckAt: new Date(Date.now() + 30 * 60 * 1000), lastCheckedAt: new Date() },
+        }).catch(() => {});
+        console.log(`[TRACKING] Clip ${clip.id}: individual fetch also failed, retry in 30min`);
+        details.push(`Clip ${clip.id}: fetch failed, retry in 30min`);
+        return { success: true, detail: "fetch-failed" };
+      }
     }
-
-    // Use prefetched stats when available; else fall back to individual fetch (manual single-clip path)
-    const stats = prefetchedStats ?? await fetchClipStats(clip.clipUrl);
 
     // Get previous snapshot for growth calculation
     const prevStat = await db.clipStat.findFirst({
