@@ -33,6 +33,7 @@ export interface Message {
   user?: {
     id: string;
     username?: string | null;
+    name?: string | null;
     role?: string | null;
     image?: string | null;
   } | null;
@@ -98,7 +99,15 @@ export function MessageBubble({
   searchQuery,
 }: Props) {
   const router = useRouter();
-  const username = message.user?.username || "user";
+  // Prefer the stored Discord username. Fall back to `name` (display name) if
+  // the username field is missing or the historic placeholder "user" — avoids
+  // a generic "user" bubble for owner accounts created before the username
+  // migration landed.
+  const rawUsername = message.user?.username;
+  const username =
+    rawUsername && rawUsername !== "user"
+      ? rawUsername
+      : (message.user?.name || rawUsername || "Unknown");
   const role = (message.user?.role || "CLIPPER").toUpperCase();
   const roleStyle = roleStyles[role];
   const isOwner = viewerRole === "OWNER";

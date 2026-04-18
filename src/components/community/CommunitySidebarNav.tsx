@@ -140,7 +140,7 @@ export function CommunitySidebarNav({
                   key={c.id}
                   href={`/community?campaignId=${encodeURIComponent(c.id)}`}
                   className={cn(
-                    "flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors",
+                    "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors",
                     isActive
                       ? "bg-accent/10 text-accent"
                       : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]",
@@ -151,14 +151,14 @@ export function CommunitySidebarNav({
                     <img
                       src={c.imageUrl}
                       alt=""
-                      className="h-5 w-5 rounded-md object-cover flex-shrink-0 border border-[var(--border-subtle)]"
+                      className="h-6 w-6 lg:h-7 lg:w-7 rounded-md object-cover flex-shrink-0 border border-[var(--border-subtle)]"
                     />
                   ) : (
-                    <span className="h-5 w-5 rounded-md bg-accent/15 border border-accent/20 flex-shrink-0 text-[9px] font-bold text-accent flex items-center justify-center uppercase">
+                    <span className="h-6 w-6 lg:h-7 lg:w-7 rounded-md bg-accent/15 border border-accent/20 flex-shrink-0 text-[10px] font-bold text-accent flex items-center justify-center uppercase">
                       {c.name?.[0] || "?"}
                     </span>
                   )}
-                  <span className="text-xs truncate flex-1">{c.name}</span>
+                  <span className="text-sm lg:text-base truncate flex-1">{c.name}</span>
                   {(c.totalUnread || 0) > 0 && (
                     <span className="h-4 min-w-4 rounded-full bg-accent text-white text-[9px] font-bold flex items-center justify-center px-1 tabular-nums flex-shrink-0">
                       {(c.totalUnread || 0) > 99 ? "99+" : c.totalUnread}

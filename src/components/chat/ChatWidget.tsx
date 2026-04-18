@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { MessageCircle, X, ArrowLeft, Send, Plus, Search, Megaphone, UserRound, AlertTriangle, ChevronDown, Bot, Clock } from "lucide-react";
 const WELCOME_MESSAGE = "Hey! I'm the Clippers HQ assistant. I can help with questions about campaigns, clips, earnings, payouts, and more. If you need to talk to a real person, just let me know and I'll connect you with our support team.";
 
@@ -159,6 +160,11 @@ interface ChatWidgetProps {
 }
 
 export function ChatWidget({ userId, role }: ChatWidgetProps) {
+  const pathname = usePathname();
+  // Defense-in-depth: never render the floating support widget on /community —
+  // the community has its own chat/ticket UI and the widget would be redundant.
+  const hideOnCommunity = pathname?.startsWith("/community") ?? false;
+
   const myId = userId;
   const isClipper = role === "CLIPPER" || role === "CLIENT";
   const isClientRole = role === "CLIENT";
@@ -564,6 +570,9 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   };
 
   if (!myId) return null;
+  // Don't render the floating widget on community pages — handled here too
+  // so the check survives even if app-layout ever stops wrapping the mount.
+  if (hideOnCommunity) return null;
 
   const filteredUsers = messageableUsers.filter((u) => {
     const q = userSearch.toLowerCase();

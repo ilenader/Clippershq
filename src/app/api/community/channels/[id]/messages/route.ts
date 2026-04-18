@@ -59,8 +59,8 @@ export async function GET(
     const messages = await db.channelMessage.findMany({
       where: { channelId, ...(searchClause || {}) },
       include: {
-        user: { select: { id: true, username: true, role: true, image: true } },
-        replyTo: { select: { id: true, content: true, user: { select: { username: true } }, isDeleted: true } },
+        user: { select: { id: true, username: true, name: true, role: true, image: true } },
+        replyTo: { select: { id: true, content: true, user: { select: { username: true, name: true } }, isDeleted: true } },
         reactions: { select: { emoji: true, userId: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -169,8 +169,8 @@ export async function POST(
     const message = await db.channelMessage.create({
       data: { channelId, userId: session.user.id, content, replyToId: replyToId || undefined },
       include: {
-        user: { select: { id: true, username: true, role: true, image: true } },
-        replyTo: { select: { id: true, content: true, user: { select: { username: true } }, isDeleted: true } },
+        user: { select: { id: true, username: true, name: true, role: true, image: true } },
+        replyTo: { select: { id: true, content: true, user: { select: { username: true, name: true } }, isDeleted: true } },
         reactions: { select: { emoji: true, userId: true } },
       },
     });
@@ -183,6 +183,7 @@ export async function POST(
       id: message.id,
       userId: session.user.id,
       username: (message.user as any)?.username || (message.user as any)?.name || "user",
+      name: (message.user as any)?.name || null,
       role: (message.user as any)?.role || "CLIPPER",
       image: (message.user as any)?.image || null,
       content: message.content,

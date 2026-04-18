@@ -194,6 +194,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
         user: {
           id: detail.userId,
           username: detail.username || "user",
+          name: detail.name || null,
           role: detail.role || "CLIPPER",
           image: detail.image || null,
         },

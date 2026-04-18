@@ -100,7 +100,20 @@ export default function CommunityPage() {
       const data = await res.json();
       const list: Campaign[] = Array.isArray(data?.campaigns) ? data.campaigns : [];
       setCampaigns(list);
-      if (!selectedCampaignId && list.length > 0) setSelectedCampaignId(list[0].id);
+      if (!selectedCampaignId && list.length > 0) {
+        const first = list[0].id;
+        setSelectedCampaignId(first);
+        // Mirror the auto-selection in the URL so the sidebar can highlight it.
+        if (typeof window !== "undefined") {
+          try {
+            const params = new URLSearchParams(window.location.search);
+            if (!params.get("campaignId")) {
+              params.set("campaignId", first);
+              window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
+            }
+          } catch {}
+        }
+      }
     } catch {}
     setLoadingCampaigns(false);
   }, [selectedCampaignId]);
@@ -276,6 +289,26 @@ export default function CommunityPage() {
     }
   };
 
+  // Keep the URL ?campaignId=… in sync with the selected campaign so the
+  // sidebar's community dropdown can highlight the active one and back/forward
+  // navigation lands on the right campaign. history.replaceState (not push)
+  // avoids polluting the back stack with every campaign switch.
+  const handleCampaignSelect = (id: string) => {
+    setSelectedCampaignId(id);
+    if (typeof window !== "undefined") {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        params.set("campaignId", id);
+        // Strip ticket/call params so switching campaigns doesn't carry over
+        // a ticketId/callId that belongs to the previous campaign.
+        params.delete("ticketId");
+        params.delete("callId");
+        params.delete("tab");
+        window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
+      } catch {}
+    }
+  };
+
   // Mute toggle — also fires a local window event so DmToast (and any future listener)
   // updates its mute set without a refetch.
   const toggleMute = async () => {
@@ -342,7 +375,7 @@ export default function CommunityPage() {
                   key={c.id}
                   campaign={c}
                   active={c.id === selectedCampaignId}
-                  onSelect={() => setSelectedCampaignId(c.id)}
+                  onSelect={() => handleCampaignSelect(c.id)}
                 />
               ))}
             </div>
@@ -469,7 +502,7 @@ export default function CommunityPage() {
                 }`}
               >
                 <MessageCircle className="h-3.5 w-3.5" />
-                {isAdmin ? "Tickets" : "Direct"}
+                {isAdmin ? "Tickets" : "Direct Messages"}
                 {isAdmin && unresolvedTicketCount > 0 && viewMode !== "ticket" && (
                   <span className="ml-0.5 h-4 min-w-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-1 tabular-nums">
                     {unresolvedTicketCount > 99 ? "99+" : unresolvedTicketCount}
@@ -491,17 +524,19 @@ export default function CommunityPage() {
                 </button>
               )}
 
-              {upcomingCall && (
+              {(upcomingCall || isAdmin) && (
                 <button
                   onClick={() => setViewMode("call")}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${
                     viewMode === "call"
                       ? "bg-accent text-white"
-                      : "text-amber-400 hover:bg-amber-500/10"
+                      : upcomingCall
+                        ? "text-amber-400 hover:bg-amber-500/10"
+                        : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)]"
                   }`}
                 >
                   <Phone className="h-3.5 w-3.5" />
-                  Call
+                  {isAdmin ? "Calls" : "Voice"}
                 </button>
               )}
             </div>

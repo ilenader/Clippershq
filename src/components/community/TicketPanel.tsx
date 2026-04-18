@@ -101,9 +101,12 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, in
         body: JSON.stringify({ campaignId }),
       });
       if (!res.ok) throw new Error("Failed");
-      const t = await res.json();
-      setTickets([{ ...t, unread: 0 }]);
-      setSelectedId(t.id);
+      const data = await res.json();
+      // Accept either a bare ticket object or { ticket: {...} } for forward-compat.
+      const ticket = data?.ticket || data;
+      if (!ticket?.id) throw new Error("Bad ticket response");
+      setTickets([{ ...ticket, unread: 0 }]);
+      setSelectedId(ticket.id);
     } catch {
       toast.error("Could not start conversation");
     }
