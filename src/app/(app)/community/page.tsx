@@ -536,6 +536,9 @@ export default function CommunityPage() {
                             <p className="text-sm font-medium text-[var(--text-primary)]">
                               {new Date(upcomingCall.scheduledAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
                             </p>
+                            {new Date(upcomingCall.scheduledAt).getTime() <= Date.now() && (
+                              <p className="text-xs text-amber-400 mt-1 font-medium">Starting soon…</p>
+                            )}
                           </div>
                         )}
                       </div>

@@ -40,7 +40,13 @@ export function Leaderboard({ channelId, viewerId }: Props) {
   useEffect(() => {
     setLoading(true);
     load();
-    const interval = setInterval(load, 60_000);
+    // Only refresh when the tab is visible — background tabs don't need a fresh
+    // leaderboard every minute.
+    const interval = setInterval(() => {
+      if (typeof document === "undefined" || document.visibilityState === "visible") {
+        load();
+      }
+    }, 60_000);
     return () => clearInterval(interval);
   }, [load]);
 

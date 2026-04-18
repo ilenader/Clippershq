@@ -142,6 +142,18 @@ export async function DELETE(req: NextRequest) {
         data: { campaignId, userId: session.user.id, username: account.username, action: "left" },
       });
     } catch {}
+    // Auto-resolve any open tickets the clipper had for this campaign so admins
+    // don't see orphaned threads from users who walked away.
+    try {
+      await db.campaignTicket.updateMany({
+        where: {
+          campaignId,
+          userId: session.user.id,
+          status: { not: "resolved" },
+        },
+        data: { status: "resolved", notes: "Auto-resolved: clipper left the campaign" },
+      });
+    } catch {}
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Failed to leave campaign" }, { status: 500 });

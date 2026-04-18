@@ -47,10 +47,14 @@ export default function VoiceRoom({
   const [participantCount, setParticipantCount] = useState(0);
   const [raisedHands, setRaisedHands] = useState<{ userId: string; username: string; time: number }[]>([]);
   const [showHandQueue, setShowHandQueue] = useState(false);
+  const [jitsiLoading, setJitsiLoading] = useState(true);
   const apiRef = useRef<any>(null);
 
-  // Room name: deterministic from call ID so everyone joins the same room.
-  const roomName = `clipershq-${call.campaignId || "global"}-${call.id}`.replace(/[^a-zA-Z0-9-]/g, "");
+  // Room name: deterministic from call ID so everyone joins the same room, but
+  // base64-hashed so the URL is not trivially guessable from a known call ID.
+  const roomName = `chq-${(typeof window !== "undefined" ? btoa(call.id) : call.id)
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 24)}`;
 
   // When host joins, flip call status to "live" on the server.
   useEffect(() => {
@@ -66,6 +70,7 @@ export default function VoiceRoom({
 
   const handleApiReady = useCallback((externalApi: any) => {
     apiRef.current = externalApi;
+    setJitsiLoading(false);
 
     const refreshCount = () => {
       try {
@@ -279,7 +284,15 @@ export default function VoiceRoom({
       )}
 
       {/* Jitsi iframe */}
-      <div className="flex-1 bg-black overflow-hidden">
+      <div className="flex-1 bg-black overflow-hidden relative">
+        {jitsiLoading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--bg-primary)] z-10">
+            <div className="h-12 w-12 rounded-2xl bg-accent/10 flex items-center justify-center mb-4 animate-pulse">
+              <Phone className="h-6 w-6 text-accent" />
+            </div>
+            <p className="text-sm text-[var(--text-muted)]">Connecting to call…</p>
+          </div>
+        )}
         <JitsiMeeting
           domain={JITSI_DOMAIN}
           roomName={roomName}

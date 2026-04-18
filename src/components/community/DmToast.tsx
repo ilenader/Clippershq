@@ -110,7 +110,7 @@ export function DmToast({ viewerId, viewerRole }: { viewerId: string; viewerRole
 
   return (
     <div
-      className="fixed top-4 right-4 z-[70] max-w-sm w-[calc(100vw-2rem)] sm:w-80"
+      className="fixed top-16 right-4 z-[70] max-w-sm w-[calc(100vw-2rem)] sm:w-80"
       style={{ animation: "dm-toast-in 220ms cubic-bezier(0.22, 1, 0.36, 1)" }}
     >
       <style jsx>{`

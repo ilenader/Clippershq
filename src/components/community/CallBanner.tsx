@@ -138,7 +138,9 @@ export function CallBanner() {
 
         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           <div className="font-mono text-xs sm:text-sm font-bold text-accent tabular-nums">
-            {isLive ? "LIVE" : (
+            {isLive ? "LIVE" : diff <= 0 && call.status === "scheduled" ? (
+              <span className="text-amber-400 font-semibold">Starting soon…</span>
+            ) : (
               <>
                 {days > 0 && `${days}d `}
                 {hours > 0 && `${hours}h `}

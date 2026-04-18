@@ -46,6 +46,21 @@ interface Props {
   onPin?: (id: string, nextPinned: boolean) => void;
   onReact?: (messageId: string, emoji: string) => void;
   showAvatar?: boolean;
+  /** When set and non-empty, matching substrings in the message content are highlighted. */
+  searchQuery?: string;
+}
+
+/** Highlight case-insensitive matches of `query` inside `text`. Safe: React escapes children. */
+function highlightMatch(text: string, query: string): React.ReactNode {
+  if (!query || query.length < 2) return text;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escaped})`, "gi");
+  const parts = text.split(regex);
+  return parts.map((part, i) =>
+    i % 2 === 1
+      ? <mark key={i} className="bg-accent/30 text-[var(--text-primary)] rounded px-0.5">{part}</mark>
+      : part,
+  );
 }
 
 const roleStyles: Record<string, { name: string; badgeBg: string; badgeText: string }> = {
@@ -68,6 +83,7 @@ export function MessageBubble({
   channelType,
   onDelete, onReply, onPin, onReact,
   showAvatar = true,
+  searchQuery,
 }: Props) {
   const router = useRouter();
   const username = message.user?.username || "user";
@@ -83,16 +99,19 @@ export function MessageBubble({
   const canReply =
     channelType !== "announcement" || viewerRole === "OWNER" || viewerRole === "ADMIN";
 
-  // Emoji picker popover state + flip logic. Default above; if the trigger is near the top
-  // of the viewport (< 80px), render below so the popover stays visible.
+  // Emoji picker popover state + flip logic. Defaults above; flips below if near the top
+  // of the viewport (< 80px). Also flips horizontally if the trigger is close to the right
+  // edge so the 5-emoji row stays fully visible on narrow screens.
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerAbove, setPickerAbove] = useState(true);
+  const [pickerLeft, setPickerLeft] = useState(true);
   const pickerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!pickerOpen) return;
     if (pickerRef.current) {
       const rect = pickerRef.current.getBoundingClientRect();
       setPickerAbove(rect.top > 80);
+      setPickerLeft(rect.left < window.innerWidth - 200);
     }
     const onDoc = (e: MouseEvent) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
@@ -126,7 +145,7 @@ export function MessageBubble({
               onClick={() => {
                 if (isOwner && message.user?.id) router.push(`/admin/users/${message.user.id}`);
               }}
-              className={`text-sm font-semibold ${roleStyle?.name || "text-[var(--text-primary)]"} ${isOwner ? "hover:underline cursor-pointer" : "cursor-default"}`}
+              className={`text-sm font-semibold truncate max-w-[150px] sm:max-w-[200px] ${roleStyle?.name || "text-[var(--text-primary)]"} ${isOwner ? "hover:underline cursor-pointer" : "cursor-default"}`}
             >
               {username}
             </button>
@@ -169,12 +188,16 @@ export function MessageBubble({
             </p>
           ) : (
             <p className="text-sm text-[var(--text-muted)] italic">
-              {message.userId === viewerId ? "This message was deleted by admin" : message.content}
+              {message.userId === viewerId
+                ? (message.deletedBy && message.deletedBy === viewerId
+                    ? "You deleted this message"
+                    : "This message was deleted by admin")
+                : message.content}
             </p>
           )
         ) : (
           <p className="text-sm lg:text-[15px] text-[var(--text-secondary)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed">
-            {message.content}
+            {searchQuery ? highlightMatch(message.content, searchQuery) : message.content}
           </p>
         )}
 
@@ -214,7 +237,7 @@ export function MessageBubble({
                 </button>
                 {pickerOpen && (
                   <div
-                    className={`absolute ${pickerAbove ? "bottom-full mb-1" : "top-full mt-1"} left-0 flex gap-0.5 p-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-xl shadow-black/40 z-20`}
+                    className={`absolute ${pickerAbove ? "bottom-full mb-1" : "top-full mt-1"} ${pickerLeft ? "left-0" : "right-0"} flex gap-0.5 p-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-xl shadow-black/40 z-20`}
                   >
                     {REACTION_KEYS.map((key) => (
                       <button

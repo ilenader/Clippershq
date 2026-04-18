@@ -40,21 +40,30 @@ export function CommunitySidebarNav({
   });
   const [campaigns, setCampaigns] = useState<CommunityCampaign[]>([]);
   const fetchingRef = useRef(false);
+  // 30s in-memory TTL cache so route changes don't trigger a /api/community/campaigns
+  // round-trip every time (this component remounts on every navigation).
+  const cacheRef = useRef<{ data: CommunityCampaign[]; time: number } | null>(null);
 
   // Persist open/close preference.
   useEffect(() => {
     try { localStorage.setItem("sidebar_community_open", open ? "1" : "0"); } catch {}
   }, [open]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { skipCache?: boolean }) => {
     if (role === "CLIENT") return;
     if (fetchingRef.current) return;
+    if (!opts?.skipCache && cacheRef.current && Date.now() - cacheRef.current.time < 30_000) {
+      setCampaigns(cacheRef.current.data);
+      return;
+    }
     fetchingRef.current = true;
     try {
       const res = await fetch("/api/community/campaigns");
       if (!res.ok) return;
       const data = await res.json();
-      setCampaigns(Array.isArray(data?.campaigns) ? data.campaigns : []);
+      const list: CommunityCampaign[] = Array.isArray(data?.campaigns) ? data.campaigns : [];
+      setCampaigns(list);
+      cacheRef.current = { data: list, time: Date.now() };
     } catch {}
     fetchingRef.current = false;
   }, [role]);
@@ -62,8 +71,9 @@ export function CommunitySidebarNav({
   useEffect(() => { load(); }, [load]);
 
   // Ably: refresh unread totals when any channel message arrives / is deleted.
+  // Invalidate the cache so the refetch isn't served the stale copy.
   useEffect(() => {
-    const handler = () => load();
+    const handler = () => { cacheRef.current = null; load({ skipCache: true }); };
     window.addEventListener("sse:channel_message", handler);
     window.addEventListener("sse:channel_message_deleted", handler);
     return () => {
