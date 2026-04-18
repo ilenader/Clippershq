@@ -21,20 +21,21 @@ export default function CampaignsPage() {
   }, [session, userRole, router]);
 
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [spendByCampaign, setSpendByCampaign] = useState<Record<string, number>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Join system state
   const [joinedCampaignIds, setJoinedCampaignIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     Promise.all([
       fetch("/api/campaigns").then((r) => r.json()),
+      fetch("/api/campaigns/spend").then((r) => r.json()),
       fetch("/api/campaign-accounts").then((r) => r.json()),
     ])
-      .then(([campaignData, joinsData]) => {
+      .then(([campaignData, spendData, joinsData]) => {
         const arr = Array.isArray(campaignData) ? campaignData : [];
         setCampaigns(arr.filter((c: any) => c.status === "ACTIVE" || c.status === "PAUSED"));
+        setSpendByCampaign(typeof spendData === "object" && spendData !== null ? spendData : {});
         const joinsArr = Array.isArray(joinsData) ? joinsData : [];
         setJoinedCampaignIds(new Set(joinsArr.map((j: any) => j.campaignId)));
       })
@@ -67,6 +68,16 @@ export default function CampaignsPage() {
     );
   }
 
+  const sorted = [...campaigns].sort((a: any, b: any) => {
+    const aStarred = favorites.includes(a.id) ? 0 : 1;
+    const bStarred = favorites.includes(b.id) ? 0 : 1;
+    if (aStarred !== bStarred) return aStarred - bStarred;
+    const aActive = a.status === "ACTIVE" ? 0 : 1;
+    const bActive = b.status === "ACTIVE" ? 0 : 1;
+    if (aActive !== bActive) return aActive - bActive;
+    return (a.name || "").localeCompare(b.name || "");
+  });
+
   return (
     <div className="space-y-6">
       <div>
@@ -82,42 +93,39 @@ export default function CampaignsPage() {
         />
       ) : (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          {[...campaigns].sort((a: any, b: any) => {
-            const aStarred = favorites.includes(a.id) ? 0 : 1;
-            const bStarred = favorites.includes(b.id) ? 0 : 1;
-            if (aStarred !== bStarred) return aStarred - bStarred;
-            const aActive = a.status === "ACTIVE" ? 0 : 1;
-            const bActive = b.status === "ACTIVE" ? 0 : 1;
-            if (aActive !== bActive) return aActive - bActive;
-            return (a.name || "").localeCompare(b.name || "");
-          }).map((campaign: any) => {
+          {sorted.map((campaign: any, index: number) => {
             const isJoined = joinedCampaignIds.has(campaign.id);
+            const isFav = favorites.includes(campaign.id);
 
             return (
               <div key={campaign.id} className="relative">
                 <CampaignCard
                   campaign={campaign}
                   href={`/campaigns/${campaign.id}`}
+                  budget={campaign.budget}
+                  spent={spendByCampaign[campaign.id] || 0}
+                  index={index}
                   className={campaign.status === "PAUSED" ? "opacity-70" : ""}
                 >
                   {isClipper && (
                     isJoined ? (
-                      <span className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold">
+                      <span className="px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 text-sm font-bold">
                         Joined
                       </span>
                     ) : campaign.status === "ACTIVE" ? (
-                      <span className="px-3 py-1 rounded-lg bg-accent text-white text-xs font-semibold group-hover:bg-accent/80 transition-colors">
+                      <span className="px-5 py-2 rounded-xl bg-accent text-white text-sm font-bold group-hover:bg-accent/80 transition-colors">
                         Join Campaign
                       </span>
                     ) : null
                   )}
                 </CampaignCard>
-                {/* Favorite star — overlaid top-right */}
                 <button
                   onClick={(e) => toggleFavorite(e, campaign.id)}
                   className="absolute top-3 right-3 z-10 rounded-lg p-1.5 transition-colors cursor-pointer hover:bg-black/30 backdrop-blur-sm"
                 >
-                  <Star className={`h-4 w-4 ${favorites.includes(campaign.id) ? "fill-accent text-accent" : "text-white/60"}`} />
+                  <Star
+                    className={`h-4 w-4 transition-all ${isFav ? "fill-accent text-accent animate-[starPop_0.3s_ease-out]" : "text-white/60"}`}
+                  />
                 </button>
               </div>
             );
