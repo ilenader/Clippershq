@@ -14,7 +14,7 @@ import { ChannelChat } from "@/components/community/ChannelChat";
 import { Leaderboard } from "@/components/community/Leaderboard";
 import { TicketPanel } from "@/components/community/TicketPanel";
 import { CallScheduler } from "@/components/community/CallScheduler";
-import { VoiceRoom } from "@/components/community/VoiceRoom";
+import VoiceRoom from "@/components/community/VoiceRoom";
 import { ActivityFeed } from "@/components/community/ActivityFeed";
 import { CommunityErrorBoundary } from "@/components/community/CommunityErrorBoundary";
 import { toast } from "@/lib/toast";
@@ -86,7 +86,7 @@ export default function CommunityPage() {
     const cid = searchParams.get("campaignId");
     if (cid) setSelectedCampaignId(cid);
     if (tab === "ticket" || ticketId) setViewMode("ticket");
-    if (callId) setViewMode("call");
+    if (tab === "voice" || callId) setViewMode("call");
   }, [searchParams]);
 
   const isAdmin = viewerRole === "OWNER" || viewerRole === "ADMIN";
@@ -190,6 +190,26 @@ export default function CommunityPage() {
   useEffect(() => {
     if (selectedCampaignId) loadCalls(selectedCampaignId);
   }, [selectedCampaignId, loadCalls]);
+
+  // When the host ends the live call, kick everyone back to the channel view.
+  useEffect(() => {
+    const handler = (e: any) => {
+      const detail = e?.detail;
+      if (!detail?.callId || !upcomingCall) return;
+      if (detail.callId !== upcomingCall.id) return;
+      if (detail.status === "ended" || detail.status === "completed" || detail.status === "cancelled") {
+        setUpcomingCall((prev) => (prev && prev.id === detail.callId ? { ...prev, status: detail.status } : prev));
+        if (viewMode === "call") {
+          setViewMode("channel");
+          toast.info("The host ended the call");
+        }
+      } else if (detail.status === "live") {
+        setUpcomingCall((prev) => (prev && prev.id === detail.callId ? { ...prev, status: "live" } : prev));
+      }
+    };
+    window.addEventListener("sse:voice_call_status", handler);
+    return () => window.removeEventListener("sse:voice_call_status", handler);
+  }, [upcomingCall, viewMode]);
 
   const selectedCampaign = useMemo(
     () => campaigns.find((c) => c.id === selectedCampaignId) || null,
@@ -442,7 +462,15 @@ export default function CommunityPage() {
                     </button>
                   </div>
                 ) : viewMode === "call" && upcomingCall ? (
-                  <VoiceRoom call={upcomingCall} />
+                  <VoiceRoom
+                    call={upcomingCall}
+                    campaignName={selectedCampaign?.name || ""}
+                    isHost={isAdmin}
+                    onLeave={() => setViewMode("channel")}
+                    onCallStatusChange={(status) => {
+                      setUpcomingCall((prev) => (prev ? { ...prev, status } : prev));
+                    }}
+                  />
                 ) : viewMode === "activity" && isAdmin ? (
                   <ActivityFeed campaignId={selectedCampaignId} />
                 ) : viewMode === "ticket" ? (

@@ -22,9 +22,15 @@ export async function GET(req: NextRequest) {
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   const campaignId = req.nextUrl.searchParams.get("campaignId");
+  const statusParam = req.nextUrl.searchParams.get("status");
   const where: any = campaignId
     ? { OR: [{ campaignId }, { isGlobal: true }] }
     : { isGlobal: true };
+
+  if (statusParam) {
+    const statuses = statusParam.split(",").map((s) => s.trim()).filter(Boolean);
+    if (statuses.length > 0) where.status = { in: statuses };
+  }
 
   if (campaignId && role === "CLIPPER") {
     const hasAccess = await userHasCampaignCommunityAccess(session.user.id, role, campaignId);
@@ -37,6 +43,9 @@ export async function GET(req: NextRequest) {
     orderBy: { scheduledAt: "desc" },
     take: 200,
   });
+
+  // Status-filtered requests get a flat array; legacy callers still get {upcoming, past}.
+  if (statusParam) return NextResponse.json(calls);
 
   const now = Date.now();
   const upcoming = calls.filter((c: any) => new Date(c.scheduledAt).getTime() >= now);

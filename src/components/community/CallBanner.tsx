@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Phone, X } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 interface Call {
   id: string;
@@ -61,7 +60,6 @@ export function CallBanner() {
   const [call, setCall] = useState<Call | null>(null);
   const [now, setNow] = useState(Date.now());
   const [dismissedUntil, setDismissedUntil] = useState<number>(() => readDismissedUntil());
-  const router = useRouter();
 
   const pickActive = (data: { upcoming: Call[] } | null | undefined): Call | null => {
     const upcoming: Call[] = data?.upcoming || [];
@@ -151,7 +149,11 @@ export function CallBanner() {
 
           {isLive && (
             <button
-              onClick={() => router.push(`/community?callId=${encodeURIComponent(call.id)}`)}
+              onClick={() => {
+                const params = new URLSearchParams({ tab: "voice", callId: call.id });
+                if (call.campaignId) params.set("campaignId", call.campaignId);
+                window.location.href = `/community?${params.toString()}`;
+              }}
               className="px-3 py-1 rounded-lg bg-accent text-white text-xs font-semibold animate-pulse hover:animate-none hover:bg-accent/85 transition-colors"
             >
               Join Now

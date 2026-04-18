@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_STATUSES = ["scheduled", "live", "completed", "cancelled"];
+const ALLOWED_STATUSES = ["scheduled", "live", "completed", "cancelled", "ended"];
 
 export async function GET(
   _req: NextRequest,
@@ -72,6 +72,27 @@ export async function PATCH(
 
   try {
     const updated = await db.scheduledVoiceCall.update({ where: { id }, data });
+
+    // Notify subscribers when the call's lifecycle status changes so clients
+    // can auto-leave (ended) or auto-open the room (live).
+    if (data.status) {
+      try {
+        const subs = updated.isGlobal
+          ? (await db.user.findMany({
+              where: { role: { in: ["CLIPPER", "OWNER", "ADMIN"] } },
+              select: { id: true },
+            })).map((u: any) => u.id)
+          : updated.campaignId
+            ? await getCampaignSubscriberIds(updated.campaignId)
+            : [];
+        publishToUsers(subs, "voice_call_status", {
+          callId: updated.id,
+          status: data.status,
+          campaignId: updated.campaignId,
+        }).catch(() => {});
+      } catch {}
+    }
+
     return NextResponse.json(updated);
   } catch (err: any) {
     console.error("[COMMUNITY] call PATCH error:", err?.message);
