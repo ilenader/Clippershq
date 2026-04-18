@@ -95,6 +95,9 @@ export async function POST(req: NextRequest) {
   if (data.targetAudience && !VALID_AUDIENCES.includes(data.targetAudience)) {
     return NextResponse.json({ error: "Invalid target audience" }, { status: 400 });
   }
+  if (data.targetAudience && data.targetAudience !== "custom") {
+    data.targetCountries = null;
+  }
 
   // String length caps (defense vs. payload bombs)
   const stringCaps: Record<string, number> = {

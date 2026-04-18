@@ -26,28 +26,31 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const select = roleFilter
+      ? { id: true, username: true, name: true, role: true, image: true }
+      : {
+          id: true,
+          username: true,
+          email: true,
+          image: true,
+          role: true,
+          status: true,
+          discordId: true,
+          createdAt: true,
+          level: true,
+          totalEarnings: true,
+          currentStreak: true,
+          longestStreak: true,
+          bonusPercentage: true,
+          manualBonusOverride: true,
+          referralCode: true,
+          referredById: true,
+        };
     const users = await db.user.findMany({
       where,
       orderBy: { createdAt: "desc" },
       take: 500,
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        image: true,
-        role: true,
-        status: true,
-        discordId: true,
-        createdAt: true,
-        level: true,
-        totalEarnings: true,
-        currentStreak: true,
-        longestStreak: true,
-        bonusPercentage: true,
-        manualBonusOverride: true,
-        referralCode: true,
-        referredById: true,
-      },
+      select,
     });
     return NextResponse.json(users);
   } catch (err: any) {

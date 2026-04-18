@@ -679,7 +679,10 @@ export default function AdminCampaignsPage() {
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => updateField("targetAudience", form.targetAudience === opt.value ? "" : opt.value)}
+                  onClick={() => {
+                    const newVal = form.targetAudience === opt.value ? "" : opt.value;
+                    setForm((prev) => ({ ...prev, targetAudience: newVal, ...(newVal !== "custom" ? { targetCountriesInput: "" } : {}) }));
+                  }}
                   className={`px-4 py-3 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
                     form.targetAudience === opt.value ? opt.color : "border-[var(--border-color)] text-[var(--text-muted)] hover:border-accent/20"
                   }`}

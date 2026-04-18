@@ -88,6 +88,9 @@ export async function PATCH(
     if (raw.targetAudience && !VALID_AUDIENCES.includes(raw.targetAudience)) {
       return NextResponse.json({ error: "Invalid target audience" }, { status: 400 });
     }
+    if (raw.targetAudience && raw.targetAudience !== "custom") {
+      raw.targetCountries = null;
+    }
 
     // ── ADMIN: must create pending edit, never direct save ──
     if (role === "ADMIN") {
