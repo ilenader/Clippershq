@@ -2,7 +2,7 @@
 
 import {
   Activity, ArrowLeft, Bell, BellOff, Hash, Lock, Megaphone, MessageSquare,
-  Phone, Plus, Trophy, X,
+  Phone, Plus, Settings, Trophy, X,
 } from "lucide-react";
 
 interface Channel {
@@ -41,6 +41,7 @@ interface Props {
   onToggleMute: () => void;
   onAddChannel: () => void;
   onDeleteChannel?: (channelId: string) => void;
+  onRenameChannel?: (channelId: string, newName: string) => void;
   /** Mobile back chevron — hidden on desktop. */
   onBack?: () => void;
 }
@@ -74,6 +75,7 @@ export function ChannelList({
   onToggleMute,
   onAddChannel,
   onDeleteChannel,
+  onRenameChannel,
   onBack,
 }: Props) {
   // Bucket the real channels by type for section rendering.
@@ -126,6 +128,11 @@ export function ChannelList({
                 onClick={() => onSelectChannel(ch)}
                 canDelete={isOwner && !DEFAULT_CHANNEL_NAMES.includes(ch.name.toLowerCase())}
                 onDelete={onDeleteChannel ? () => onDeleteChannel(ch.id) : undefined}
+                onRename={
+                  isOwner && !DEFAULT_CHANNEL_NAMES.includes(ch.name.toLowerCase()) && onRenameChannel
+                    ? (newName: string) => onRenameChannel(ch.id, newName)
+                    : undefined
+                }
               />
             ))}
           </Section>
@@ -229,12 +236,14 @@ function ChannelRow({
   onClick,
   canDelete,
   onDelete,
+  onRename,
 }: {
   channel: Channel;
   active: boolean;
   onClick: () => void;
   canDelete?: boolean;
   onDelete?: () => void;
+  onRename?: (newName: string) => void;
 }) {
   const Icon = iconFor(channel.type);
   const unread = channel.unread || 0;
@@ -256,6 +265,22 @@ function ChannelRow({
         <span className="h-4 min-w-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-1 tabular-nums">
           {unread > 99 ? "99+" : unread}
         </span>
+      )}
+      {canDelete && onRename && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            const newName = prompt(`Rename #${channel.name}:`, channel.name);
+            if (newName && newName.trim() && newName.trim() !== channel.name) {
+              onRename(newName.trim());
+            }
+          }}
+          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent/10 transition-opacity"
+          aria-label="Rename channel"
+          title="Rename channel"
+        >
+          <Settings className="h-3 w-3 text-[var(--text-muted)]" />
+        </button>
       )}
       {canDelete && onDelete && (
         <button

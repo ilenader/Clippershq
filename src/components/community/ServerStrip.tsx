@@ -84,7 +84,7 @@ export function ServerStrip({ campaigns, selectedId, onSelect }: Props) {
 
             {/* Unread badge */}
             {!active && unread > 0 && (
-              <span className="absolute -bottom-0.5 -right-0.5 h-5 min-w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 border-2 border-[#1a1f2e] tabular-nums">
+              <span className="absolute -bottom-0.5 -right-0.5 h-5 min-w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 border-2 border-[var(--bg-primary)] tabular-nums">
                 {unread > 99 ? "99+" : unread}
               </span>
             )}

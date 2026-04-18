@@ -26,7 +26,7 @@ import {
   Smartphone,
   BookOpen,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useInstallPrompt } from "@/hooks/use-pwa";
 import { PWAInstallInstructions } from "@/components/pwa-install-popup";
 
@@ -125,22 +125,34 @@ export function Sidebar({ role }: SidebarProps) {
   }
 
   const [totalCommunityUnread, setTotalCommunityUnread] = useState(0);
+  const communityUnreadRef = useRef<{ value: number; time: number }>({ value: 0, time: 0 });
 
   useEffect(() => {
     if (role === "CLIENT") return;
     const load = () => {
+      const now = Date.now();
+      if (now - communityUnreadRef.current.time < 30000) {
+        setTotalCommunityUnread(communityUnreadRef.current.value);
+        return;
+      }
       fetch("/api/community/campaigns")
         .then((r) => r.json())
         .then((data) => {
           const campaigns = data.campaigns || [];
-          setTotalCommunityUnread(
-            campaigns.reduce((sum: number, c: any) => sum + (c.totalUnread || 0), 0),
+          const total = campaigns.reduce(
+            (sum: number, c: any) => sum + (c.totalUnread || 0),
+            0,
           );
+          communityUnreadRef.current = { value: total, time: Date.now() };
+          setTotalCommunityUnread(total);
         })
         .catch(() => {});
     };
     load();
-    const handler = () => load();
+    const handler = () => {
+      communityUnreadRef.current.time = 0;
+      load();
+    };
     window.addEventListener("sse:channel_message", handler);
     window.addEventListener("sse:ticket_message", handler);
     return () => {

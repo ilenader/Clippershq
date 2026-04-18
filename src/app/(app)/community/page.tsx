@@ -346,6 +346,25 @@ export default function CommunityPage() {
     setMobileView("chat");
   };
 
+  const handleRenameChannel = async (channelId: string, newName: string) => {
+    try {
+      const res = await fetch(`/api/community/channels/${channelId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
+      });
+      if (res.ok) {
+        toast.success("Channel renamed");
+        loadChannels(selectedCampaignId);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err?.error || "Failed to rename");
+      }
+    } catch {
+      toast.error("Failed to rename channel");
+    }
+  };
+
   const handleDeleteChannel = async (channelId: string) => {
     try {
       const res = await fetch(`/api/community/channels/${channelId}`, { method: "DELETE" });
@@ -465,6 +484,7 @@ export default function CommunityPage() {
             onToggleMute={toggleMute}
             onAddChannel={() => setShowAddChannel(true)}
             onDeleteChannel={handleDeleteChannel}
+            onRenameChannel={handleRenameChannel}
             onBack={() => setMobileView("servers")}
           />
         </div>

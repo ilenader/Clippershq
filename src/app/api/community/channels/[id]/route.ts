@@ -20,6 +20,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const channel = await db.channel.findUnique({ where: { id } });
   if (!channel) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const campaign = await db.campaign.findUnique({ where: { id: channel.campaignId } });
+  if (!campaign) return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+
   const body = await req.json().catch(() => ({}));
   const name = String(body?.name || "")
     .trim()
@@ -45,6 +48,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
   const channel = await db.channel.findUnique({ where: { id } });
   if (!channel) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const campaign = await db.campaign.findUnique({ where: { id: channel.campaignId } });
+  if (!campaign) return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
 
   if (DEFAULT_CHANNEL_NAMES.includes(channel.name.toLowerCase())) {
     return NextResponse.json({ error: "Cannot delete default channels" }, { status: 400 });
