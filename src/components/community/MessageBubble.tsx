@@ -265,6 +265,7 @@ export function MessageBubble({
               onClick={() => onReply({ id: message.id, username, content: message.content })}
               className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 rounded-lg flex items-center justify-center hover:bg-accent/10"
               title="Reply"
+              aria-label="Reply to message"
             >
               <Reply className="h-3.5 w-3.5 text-accent" />
             </button>
@@ -274,6 +275,7 @@ export function MessageBubble({
               onClick={() => onPin(message.id, !message.isPinned)}
               className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 rounded-lg flex items-center justify-center hover:bg-accent/10"
               title={message.isPinned ? "Unpin" : "Pin"}
+              aria-label={message.isPinned ? "Unpin message" : "Pin message"}
             >
               <Pin className={`h-3.5 w-3.5 ${message.isPinned ? "text-accent" : "text-[var(--text-muted)]"}`} />
             </button>
@@ -283,6 +285,7 @@ export function MessageBubble({
               onClick={() => onDelete(message.id)}
               className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 rounded-lg flex items-center justify-center hover:bg-red-500/10"
               title="Delete message"
+              aria-label="Delete message"
             >
               <Trash2 className="h-3.5 w-3.5 text-red-400" />
             </button>

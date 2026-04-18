@@ -143,16 +143,23 @@ export async function DELETE(req: NextRequest) {
       });
     } catch {}
     // Auto-resolve any open tickets the clipper had for this campaign so admins
-    // don't see orphaned threads from users who walked away.
+    // don't see orphaned threads from users who walked away. Existing owner notes
+    // are appended to, never overwritten.
     try {
-      await db.campaignTicket.updateMany({
-        where: {
-          campaignId,
-          userId: session.user.id,
-          status: { not: "resolved" },
-        },
-        data: { status: "resolved", notes: "Auto-resolved: clipper left the campaign" },
+      const openTickets = await db.campaignTicket.findMany({
+        where: { campaignId, userId: session.user.id, status: { not: "resolved" } },
+        select: { id: true, notes: true },
       });
+      for (const t of openTickets) {
+        const prior = t.notes || "";
+        const appended = prior
+          ? `${prior}\n---\nAuto-resolved: clipper left the campaign`
+          : "Auto-resolved: clipper left the campaign";
+        await db.campaignTicket.update({
+          where: { id: t.id },
+          data: { status: "resolved", notes: appended },
+        });
+      }
     } catch {}
     return NextResponse.json({ success: true });
   } catch {

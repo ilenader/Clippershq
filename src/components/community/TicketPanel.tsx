@@ -470,7 +470,7 @@ function TicketThread({ ticket, viewerId, viewerRole, campaignName, onUpdate }: 
             onChange={(e) => setNotesDraft(e.target.value.slice(0, 5000))}
             placeholder="Private notes about this clipper (never visible to them)…"
             rows={3}
-            className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] p-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-accent/40 focus:outline-none transition-colors resize-y"
+            className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] p-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-accent/40 focus:outline-none transition-colors resize-y max-h-[200px]"
           />
           <div className="flex justify-end mt-2">
             <button

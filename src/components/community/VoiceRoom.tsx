@@ -202,10 +202,10 @@ export default function VoiceRoom({
           <p className="text-sm font-medium text-[var(--text-primary)]">{call.title}</p>
           <p className="text-[10px] text-[var(--text-muted)]">{participantCount} participants</p>
         </div>
-        <button onClick={() => onMaximize?.()} className="p-1.5 rounded-lg hover:bg-[var(--bg-input)] transition-colors" title="Expand">
+        <button onClick={() => onMaximize?.()} className="p-1.5 rounded-lg hover:bg-[var(--bg-input)] transition-colors" title="Expand" aria-label="Expand call">
           <ChevronUp className="h-4 w-4 text-accent" />
         </button>
-        <button onClick={handleLeave} className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors" title="Hang up">
+        <button onClick={handleLeave} className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors" title="Hang up" aria-label="Leave call">
           <PhoneOff className="h-4 w-4 text-red-400" />
         </button>
       </div>
@@ -232,6 +232,7 @@ export default function VoiceRoom({
               onClick={handleMuteAll}
               className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[10px] sm:text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               title="Mute everyone except you"
+              aria-label="Mute all participants"
             >
               <MicOff className="h-3.5 w-3.5" />
               Mute All
@@ -246,10 +247,14 @@ export default function VoiceRoom({
               {raisedHands.length} raised
             </button>
           )}
-          <button onClick={() => onMinimize?.()} className="p-2 rounded-lg hover:bg-[var(--bg-input)] transition-colors" title="Minimize">
+          <button onClick={() => onMinimize?.()} className="p-2 rounded-lg hover:bg-[var(--bg-input)] transition-colors" title="Minimize" aria-label="Minimize call">
             <X className="h-4 w-4 text-[var(--text-muted)]" />
           </button>
-          <button onClick={handleLeave} className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-[10px] sm:text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors">
+          <button
+            onClick={handleLeave}
+            className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-[10px] sm:text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+            aria-label={isHost ? "End call for everyone" : "Leave call"}
+          >
             <PhoneOff className="h-3.5 w-3.5" />
             {isHost ? "End Call" : "Leave"}
           </button>

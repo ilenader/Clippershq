@@ -48,6 +48,10 @@ export function MessageInput({
     ta.style.height = `${Math.min(ta.scrollHeight, 128)}px`;
   }, [value]);
 
+  // Focus on mount and whenever the user chooses to reply to something.
+  useEffect(() => { textareaRef.current?.focus(); }, []);
+  useEffect(() => { if (replyTo) textareaRef.current?.focus(); }, [replyTo]);
+
   const send = async () => {
     const content = value.trim();
     if (!content || sending || disabled) return;

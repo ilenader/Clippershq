@@ -29,6 +29,10 @@ export function CallScheduler({ campaignId, onScheduled }: Props) {
       toast.error("Scheduled time must be in the future");
       return;
     }
+    if (!duration || duration < 1) {
+      toast.error("Duration must be at least 1 minute");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/community/calls", {

@@ -94,8 +94,29 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
     setLoading(true);
     setMessages([]);
     setNextCursor(null);
+    // Reset search + reply state when switching channels — stale state from the
+    // previous channel would otherwise leak into the new one's view.
+    setSearchQuery("");
+    setSearchActive(false);
+    setSearchResults(null);
+    setReplyTo(null);
     loadInitial();
   }, [channelId, loadInitial]);
+
+  // Escape: clear search first, then cancel reply. Ignored while typing in an input
+  // so we don't hijack the textarea's native behavior.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (searchQuery) { clearSearch(); return; }
+      if (replyTo) { setReplyTo(null); return; }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [searchQuery, replyTo]);
 
   // On unmount or channel switch: poke the GET endpoint so server-side ChannelReadStatus
   // advances to "now". GET handler already does an upsert — this is a cheap tail call.

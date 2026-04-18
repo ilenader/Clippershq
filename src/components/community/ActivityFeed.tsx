@@ -21,16 +21,22 @@ interface Props {
 export function ActivityFeed({ campaignId }: Props) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pageSize, setPageSize] = useState(30);
+  const [hasMore, setHasMore] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/community/activity?campaignId=${encodeURIComponent(campaignId)}&limit=100`);
-      if (!res.ok) { setEntries([]); return; }
+      // +1 trick: request one more than the page size so we know whether there are
+      // further entries without doing a separate COUNT query.
+      const res = await fetch(`/api/community/activity?campaignId=${encodeURIComponent(campaignId)}&limit=${pageSize + 1}`);
+      if (!res.ok) { setEntries([]); setHasMore(false); return; }
       const data = await res.json();
-      setEntries(Array.isArray(data?.activity) ? data.activity : []);
-    } catch { setEntries([]); }
+      const all: Entry[] = Array.isArray(data?.activity) ? data.activity : [];
+      setHasMore(all.length > pageSize);
+      setEntries(all.slice(0, pageSize));
+    } catch { setEntries([]); setHasMore(false); }
     setLoading(false);
-  }, [campaignId]);
+  }, [campaignId, pageSize]);
 
   useEffect(() => {
     setLoading(true);
@@ -39,6 +45,9 @@ export function ActivityFeed({ campaignId }: Props) {
     const t = setInterval(load, 60_000);
     return () => clearInterval(t);
   }, [load]);
+
+  // Reset to the first page when switching campaigns so the new view starts clean.
+  useEffect(() => { setPageSize(30); }, [campaignId]);
 
   return (
     <div className="p-3 sm:p-4 max-w-2xl mx-auto w-full">
@@ -95,6 +104,14 @@ export function ActivityFeed({ campaignId }: Props) {
               </div>
             );
           })}
+          {hasMore && (
+            <button
+              onClick={() => setPageSize((n) => n + 30)}
+              className="w-full mt-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-accent hover:border-accent/30 transition-colors"
+            >
+              Load more activity
+            </button>
+          )}
         </div>
       )}
     </div>
