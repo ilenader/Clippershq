@@ -3,6 +3,16 @@
 import Link from "next/link";
 import { useState } from "react";
 
+if (typeof document !== "undefined" && !document.getElementById("campaign-card-anims")) {
+  const s = document.createElement("style");
+  s.id = "campaign-card-anims";
+  s.textContent = `
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes starPop { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  `;
+  document.head.appendChild(s);
+}
+
 interface CampaignCardProps {
   campaign: {
     id: string;
@@ -67,17 +77,6 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
 
   return (
     <Link href={href} className={`block group ${className}`}>
-      <style jsx global>{`
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(12px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes starPop {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.3); }
-          100% { transform: scale(1); }
-        }
-      `}</style>
       <div
         className="relative w-full rounded-xl overflow-hidden border border-white/20 transition-all duration-300 ease-out group-hover:border-white/40 group-hover:shadow-lg group-hover:shadow-accent/5 opacity-0 animate-[fadeUp_0.5s_cubic-bezier(0.16,1,0.3,1)_forwards]"
         style={index != null ? { animationDelay: `${index * 80}ms` } : undefined}
@@ -103,7 +102,7 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
           <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-black/90 via-black/60 to-transparent" />
 
           {/* Name overlay */}
-          <div className="absolute top-0 inset-x-0 p-4 pr-12">
+          <div className="absolute top-0 inset-x-0 p-4 pr-8">
             <h3 className="text-base lg:text-lg font-bold text-white drop-shadow-lg leading-tight line-clamp-2">
               {campaign.name}
             </h3>
@@ -140,25 +139,25 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
               {campaign.minViews != null && campaign.minViews > 0 && (
                 <div className="text-center flex-1">
                   <p className="text-[9px] uppercase tracking-widest text-[var(--text-muted)] mb-0.5">Min Views</p>
-                  <p className="text-xl font-bold text-[var(--text-primary)]">{formatViews(campaign.minViews)}</p>
+                  <p className="text-base xl:text-lg font-bold text-[var(--text-primary)]">{formatViews(campaign.minViews)}</p>
                 </div>
               )}
               {cpm != null && cpm > 0 && (
                 <div className="text-center flex-1">
                   <p className="text-[9px] uppercase tracking-widest text-[var(--text-muted)] mb-0.5">CPM</p>
-                  <p className="text-xl font-bold text-accent">${cpm.toFixed(2)}</p>
+                  <p className="text-base xl:text-lg font-bold text-accent">${cpm.toFixed(2)}</p>
                 </div>
               )}
               {campaign.maxPayoutPerClip != null && campaign.maxPayoutPerClip > 0 && (
                 <div className="text-center flex-1">
                   <p className="text-[9px] uppercase tracking-widest text-[var(--text-muted)] mb-0.5">Max/Clip</p>
-                  <p className="text-xl font-bold text-[var(--text-primary)]">${campaign.maxPayoutPerClip}</p>
+                  <p className="text-base xl:text-lg font-bold text-[var(--text-primary)]">${campaign.maxPayoutPerClip}</p>
                 </div>
               )}
               {campaign.maxClipsPerUserPerDay != null && campaign.maxClipsPerUserPerDay > 0 && (
                 <div className="text-center flex-1">
                   <p className="text-[9px] uppercase tracking-widest text-[var(--text-muted)] mb-0.5">Daily Limit</p>
-                  <p className="text-xl font-bold text-[var(--text-primary)]">{campaign.maxClipsPerUserPerDay}</p>
+                  <p className="text-base xl:text-lg font-bold text-[var(--text-primary)]">{campaign.maxClipsPerUserPerDay}</p>
                 </div>
               )}
             </div>

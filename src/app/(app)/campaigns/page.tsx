@@ -125,10 +125,10 @@ export default function CampaignsPage() {
                 </CampaignCard>
                 <button
                   onClick={(e) => toggleFavorite(e, campaign.id)}
-                  className="absolute top-3 right-3 z-10 rounded-lg p-1.5 transition-colors cursor-pointer hover:bg-black/30 backdrop-blur-sm"
+                  className="absolute top-2 right-2 z-10 rounded-lg p-1 transition-colors cursor-pointer hover:bg-black/30 backdrop-blur-sm"
                 >
                   <Star
-                    className={`h-4 w-4 transition-all ${isFav ? "fill-accent text-accent animate-[starPop_0.3s_ease-out]" : "text-white/60"}`}
+                    className={`h-3.5 w-3.5 transition-all ${isFav ? "fill-accent text-accent animate-[starPop_0.3s_ease-out]" : "text-white/60"}`}
                   />
                 </button>
               </div>
