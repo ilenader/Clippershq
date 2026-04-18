@@ -32,6 +32,38 @@ export async function GET(req: NextRequest) {
   console.log("[CRON] Tracking cron fired at", new Date().toISOString());
   const start = Date.now();
 
+  // Sweep: reset jobs stuck in batch-missing retry loop (checked recently but no stat recorded)
+  if (db) {
+    try {
+      const soonDue = await db.trackingJob.findMany({
+        where: {
+          isActive: true,
+          lastCheckedAt: { not: null },
+          nextCheckAt: { lte: new Date(Date.now() + 5 * 60 * 1000) },
+        },
+        select: { id: true, clipId: true, lastCheckedAt: true },
+        take: 50,
+      });
+      let resetCount = 0;
+      for (const job of soonDue) {
+        if (!job.lastCheckedAt) continue;
+        const hoursSince = (Date.now() - new Date(job.lastCheckedAt).getTime()) / 3_600_000;
+        if (hoursSince >= 2) continue;
+        const recentStat = await db.clipStat.findFirst({
+          where: { clipId: job.clipId, checkedAt: { gt: new Date(Date.now() - 2 * 3_600_000) } },
+          select: { id: true },
+        });
+        if (!recentStat) {
+          await db.trackingJob.update({ where: { id: job.id }, data: { nextCheckAt: new Date() } });
+          resetCount++;
+        }
+      }
+      if (resetCount > 0) console.log(`[CRON] Reset ${resetCount} stuck tracking jobs`);
+    } catch (sweepErr: any) {
+      console.error("[CRON] Stuck job sweep error:", sweepErr?.message);
+    }
+  }
+
   const result = await runDueTrackingJobs();
 
   // Opportunistic cleanup: remove used/expired magic-link tokens older than 7 days.

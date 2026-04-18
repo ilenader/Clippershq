@@ -230,6 +230,7 @@ async function processTrackingJob(
       try {
         console.log(`[TRACKING] Clip ${clip.id}: batch miss, trying individual fetch`);
         stats = await fetchClipStats(clip.clipUrl);
+        console.log(`[TRACKING] Clip ${clip.id}: individual fetch succeeded, views=${stats.views}`);
       } catch (fetchErr: any) {
         await db.trackingJob.update({
           where: { id: job.id },
