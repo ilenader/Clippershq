@@ -234,9 +234,11 @@ export default function CommunityPage() {
   useEffect(() => {
     if (!selectedCampaignId) return;
     loadChannels(selectedCampaignId);
-    const currentUrl = new URLSearchParams(window.location.search);
-    if (!currentUrl.get("tab") && !currentUrl.get("ticketId") && !currentUrl.get("callId")) {
-      setViewMode("channel");
+    if (initialLoadDone.current) {
+      const currentUrl = new URLSearchParams(window.location.search);
+      if (!currentUrl.get("tab") && !currentUrl.get("ticketId") && !currentUrl.get("callId")) {
+        setViewMode("channel");
+      }
     }
   }, [selectedCampaignId, loadChannels]);
 
