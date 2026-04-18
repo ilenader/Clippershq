@@ -147,13 +147,15 @@ export default function CommunityPage() {
     try {
       const res = await fetch(`/api/community/channels?campaignId=${encodeURIComponent(cid)}`);
       if (res.status === 403) {
-        setError("You don't have access to this campaign's community.");
-        setChannels([]);
-        setMuted(false);
+        setChannels((prev) => {
+          if (prev.length === 0) setError("You don't have access to this campaign's community.");
+          return prev;
+        });
       } else if (!res.ok) {
-        setError("Couldn't load this campaign's community. Try again in a moment.");
-        setChannels([]);
-        setMuted(false);
+        setChannels((prev) => {
+          if (prev.length === 0) setError("Couldn't load this campaign's community. Try again in a moment.");
+          return prev;
+        });
       } else {
         const data = await res.json();
         const list: Channel[] = data.channels || [];
@@ -170,8 +172,10 @@ export default function CommunityPage() {
         }
       }
     } catch {
-      setError("Network error. Please refresh.");
-      setChannels([]);
+      setChannels((prev) => {
+        if (prev.length === 0) setError("Network error. Please refresh.");
+        return prev;
+      });
     }
     setLoadingChannels(false);
   }, []);
