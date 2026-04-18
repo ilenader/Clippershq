@@ -267,6 +267,10 @@ export async function PATCH(
     const channel = await loadChannelWithCampaign(channelId);
     if (!channel) return NextResponse.json({ error: "Channel not found" }, { status: 404 });
 
+    // Scope ADMIN to their campaigns — OWNER always passes.
+    const hasAccess = await userHasCampaignCommunityAccess(session.user.id, role, channel.campaignId);
+    if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const target = await db.channelMessage.findUnique({
       where: { id: messageId },
       select: { channelId: true, isPinned: true },
@@ -328,6 +332,10 @@ export async function DELETE(
   try {
     const channel = await loadChannelWithCampaign(channelId);
     if (!channel) return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+
+    // Scope ADMIN to their campaigns — OWNER always passes.
+    const hasAccess = await userHasCampaignCommunityAccess(session.user.id, role, channel.campaignId);
+    if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     await db.channelMessage.update({
       where: { id: messageId },

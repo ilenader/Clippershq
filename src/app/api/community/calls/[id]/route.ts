@@ -2,7 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
 import { publishToUsers } from "@/lib/ably";
-import { getCampaignSubscriberIds } from "@/lib/community";
+import { getCampaignSubscriberIds, userHasCampaignCommunityAccess } from "@/lib/community";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +70,20 @@ export async function PATCH(
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
+  // Per-campaign authorization for ADMIN. Global calls are OWNER-only to modify.
+  const existing = await db.scheduledVoiceCall.findUnique({
+    where: { id },
+    select: { campaignId: true, isGlobal: true },
+  });
+  if (!existing) return NextResponse.json({ error: "Call not found" }, { status: 404 });
+  if (existing.isGlobal && role !== "OWNER") {
+    return NextResponse.json({ error: "Only owners can modify global calls" }, { status: 403 });
+  }
+  if (!existing.isGlobal && existing.campaignId) {
+    const hasAccess = await userHasCampaignCommunityAccess(session.user.id, role, existing.campaignId);
+    if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   try {
     const updated = await db.scheduledVoiceCall.update({ where: { id }, data });
 
@@ -122,6 +136,15 @@ export async function DELETE(
   const { id } = await params;
   const call = await db.scheduledVoiceCall.findUnique({ where: { id } });
   if (!call) return NextResponse.json({ error: "Call not found" }, { status: 404 });
+
+  // Per-campaign authorization for ADMIN. Global calls are OWNER-only to cancel.
+  if (call.isGlobal && role !== "OWNER") {
+    return NextResponse.json({ error: "Only owners can cancel global calls" }, { status: 403 });
+  }
+  if (!call.isGlobal && call.campaignId) {
+    const hasAccess = await userHasCampaignCommunityAccess(session.user.id, role, call.campaignId);
+    if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   try {
     await db.scheduledVoiceCall.update({ where: { id }, data: { status: "cancelled" } });

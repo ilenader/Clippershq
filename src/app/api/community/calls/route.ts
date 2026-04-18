@@ -93,6 +93,15 @@ export async function POST(req: NextRequest) {
   if (!isGlobal && !campaignId) {
     return NextResponse.json({ error: "campaignId required unless isGlobal" }, { status: 400 });
   }
+  // Global announcements affect every clipper — OWNER-only.
+  if (isGlobal && role !== "OWNER") {
+    return NextResponse.json({ error: "Only owners can schedule global calls" }, { status: 403 });
+  }
+  // Scope ADMIN to campaigns they manage — OWNER always passes.
+  if (!isGlobal && campaignId) {
+    const hasAccess = await userHasCampaignCommunityAccess(session.user.id, role, campaignId);
+    if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   try {
     const call = await db.scheduledVoiceCall.create({

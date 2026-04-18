@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { userHasCampaignCommunityAccess } from "@/lib/community";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +82,16 @@ export async function PATCH(
   }
 
   try {
+    // Scope ADMIN to their campaigns — OWNER always passes. Prevents an admin on
+    // one team from updating status/notes on another team's tickets.
+    const existing = await db.campaignTicket.findUnique({
+      where: { id },
+      select: { campaignId: true },
+    });
+    if (!existing) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+    const hasAccess = await userHasCampaignCommunityAccess(session.user.id, role, existing.campaignId);
+    if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const updated = await db.campaignTicket.update({ where: { id }, data });
     return NextResponse.json(updated);
   } catch (err: any) {
