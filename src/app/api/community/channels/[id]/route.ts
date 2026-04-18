@@ -33,6 +33,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
 
   const updated = await db.channel.update({ where: { id }, data: { name } });
+
+  try {
+    const { publishToUsers } = await import("@/lib/ably");
+    const { getCampaignSubscriberIds } = await import("@/lib/community");
+    const subs = await getCampaignSubscriberIds(channel.campaignId);
+    await publishToUsers(subs, "channel_updated", {
+      channelId: id,
+      campaignId: channel.campaignId,
+      name,
+    });
+  } catch {}
+
   return NextResponse.json(updated);
 }
 
@@ -57,5 +69,16 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   }
 
   await db.channel.delete({ where: { id } });
+
+  try {
+    const { publishToUsers } = await import("@/lib/ably");
+    const { getCampaignSubscriberIds } = await import("@/lib/community");
+    const subs = await getCampaignSubscriberIds(channel.campaignId);
+    await publishToUsers(subs, "channel_deleted", {
+      channelId: id,
+      campaignId: channel.campaignId,
+    });
+  } catch {}
+
   return NextResponse.json({ deleted: true });
 }

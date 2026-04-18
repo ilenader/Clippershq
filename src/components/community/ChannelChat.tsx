@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { MessageBubble, type Message } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { toast } from "@/lib/toast";
-import { ArrowDown, ChevronDown, Loader2, Megaphone, MessageCircle, Pin, Search, Trophy, X } from "lucide-react";
+import { AlertCircle, ArrowDown, ChevronDown, Loader2, Megaphone, MessageCircle, Pin, Search, Trophy, X } from "lucide-react";
 
 /** Discord-style day divider label. */
 function formatDateSeparator(date: string | Date): string {
@@ -66,6 +66,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
   const [typingUsers, setTypingUsers] = useState<Map<string, { username: string; until: number }>>(new Map());
   const [replyTo, setReplyTo] = useState<{ id: string; username: string; content: string } | null>(null);
   const [pinnedOpen, setPinnedOpen] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomAnchorRef = useRef<HTMLDivElement>(null);
@@ -91,6 +92,10 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
     fetchingRef.current = true;
     try {
       const res = await fetch(`/api/community/channels/${channelId}/messages?limit=${PAGE_SIZE}`);
+      if (res.status === 404) {
+        setError("This channel no longer exists");
+        return;
+      }
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
       // API returns newest-first; we reverse so oldest is at the top of the scroll column.
@@ -111,6 +116,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
     setLoading(true);
     setMessages([]);
     setNextCursor(null);
+    setError(null);
     // Reset search + reply state when switching channels — stale state from the
     // previous channel would otherwise leak into the new one's view.
     setSearchQuery("");
@@ -448,6 +454,17 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
   const typingList = Array.from(typingUsers.values()).map((t) => t.username);
   const pinnedMessages = messages.filter((m) => m.isPinned && !m.isDeleted);
   const HeaderIcon = channelHeaderIcon(channelType);
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center h-full">
+        <div className="text-center px-4">
+          <AlertCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
+          <p className="text-sm text-[var(--text-muted)]">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex flex-col h-full min-h-0 bg-[var(--bg-primary)]">

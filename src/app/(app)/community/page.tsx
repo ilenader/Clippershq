@@ -192,13 +192,26 @@ export default function CommunityPage() {
       fetchingRef.current = true;
       try { await loadChannels(selectedCampaignId); } finally { fetchingRef.current = false; }
     };
+    const deleteHandler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.channelId && detail.channelId === selectedChannelId) {
+        setSelectedChannelId("");
+        setViewMode("channel");
+        toast.info("This channel was deleted");
+      }
+      handler();
+    };
     window.addEventListener("sse:channel_message", handler);
     window.addEventListener("sse:channel_created", handler);
+    window.addEventListener("sse:channel_updated", handler);
+    window.addEventListener("sse:channel_deleted", deleteHandler);
     return () => {
       window.removeEventListener("sse:channel_message", handler);
       window.removeEventListener("sse:channel_created", handler);
+      window.removeEventListener("sse:channel_updated", handler);
+      window.removeEventListener("sse:channel_deleted", deleteHandler);
     };
-  }, [selectedCampaignId, loadChannels]);
+  }, [selectedCampaignId, selectedChannelId, loadChannels]);
 
   // Upcoming call for the current campaign.
   const loadCalls = useCallback(async (cid: string) => {

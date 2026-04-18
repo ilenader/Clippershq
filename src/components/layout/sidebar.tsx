@@ -149,15 +149,18 @@ export function Sidebar({ role }: SidebarProps) {
         .catch(() => {});
     };
     load();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const handler = () => {
       communityUnreadRef.current.time = 0;
-      load();
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => load(), 3000);
     };
     window.addEventListener("sse:channel_message", handler);
     window.addEventListener("sse:ticket_message", handler);
     return () => {
       window.removeEventListener("sse:channel_message", handler);
       window.removeEventListener("sse:ticket_message", handler);
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [role]);
 

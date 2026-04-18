@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
   Activity, ArrowLeft, Bell, BellOff, Hash, Lock, Megaphone, MessageSquare,
   Phone, Plus, Settings, Trophy, X,
@@ -247,12 +248,38 @@ function ChannelRow({
 }) {
   const Icon = iconFor(channel.type);
   const unread = channel.unread || 0;
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(channel.name);
+  const editRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      editRef.current?.focus();
+      editRef.current?.select();
+    }
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) setEditValue(channel.name);
+  }, [channel.name, editing]);
+
+  const commitRename = () => {
+    const next = editValue.trim();
+    if (next && next !== channel.name) {
+      onRename?.(next);
+    }
+    setEditing(false);
+  };
+
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+      onClick={editing ? undefined : onClick}
+      onKeyDown={(e) => {
+        if (editing) return;
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); }
+      }}
       className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer ${
         active
           ? "bg-[var(--bg-input)] text-[var(--text-primary)]"
@@ -260,20 +287,48 @@ function ChannelRow({
       }`}
     >
       <Icon className="h-4 w-4 flex-shrink-0" />
-      <span className="text-sm truncate flex-1 text-left">{channel.name}</span>
-      {unread > 0 && !active && (
+      {editing ? (
+        <input
+          ref={editRef}
+          value={editValue}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) =>
+            setEditValue(
+              e.target.value
+                .toLowerCase()
+                .replace(/\s+/g, "-")
+                .replace(/[^a-z0-9-]/g, ""),
+            )
+          }
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitRename();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              setEditValue(channel.name);
+              setEditing(false);
+            }
+          }}
+          onBlur={commitRename}
+          className="text-sm bg-transparent border-b border-accent outline-none flex-1 min-w-0 text-[var(--text-primary)]"
+          maxLength={50}
+        />
+      ) : (
+        <span className="text-sm truncate flex-1 text-left">{channel.name}</span>
+      )}
+      {unread > 0 && !active && !editing && (
         <span className="h-4 min-w-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-1 tabular-nums">
           {unread > 99 ? "99+" : unread}
         </span>
       )}
-      {canDelete && onRename && (
+      {canDelete && onRename && !editing && (
         <button
           onClick={(e) => {
             e.stopPropagation();
-            const newName = prompt(`Rename #${channel.name}:`, channel.name);
-            if (newName && newName.trim() && newName.trim() !== channel.name) {
-              onRename(newName.trim());
-            }
+            setEditValue(channel.name);
+            setEditing(true);
           }}
           className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent/10 transition-opacity"
           aria-label="Rename channel"
@@ -282,7 +337,7 @@ function ChannelRow({
           <Settings className="h-3 w-3 text-[var(--text-muted)]" />
         </button>
       )}
-      {canDelete && onDelete && (
+      {canDelete && onDelete && !editing && (
         <button
           onClick={(e) => {
             e.stopPropagation();
