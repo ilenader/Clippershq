@@ -31,18 +31,14 @@ export async function GET(req: NextRequest) {
   try {
     await ensureCampaignChannels(campaignId);
 
-    const [channels, readStatuses, mute] = await Promise.all([
+    const [channels, mute] = await Promise.all([
       db.channel.findMany({
         where: { campaignId },
         orderBy: [{ isPinned: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
       }),
-      db.channelReadStatus.findMany({
-        where: { userId: session.user.id, channelId: { in: [] } }, // placeholder, refilled below
-      }).catch(() => []),
       db.communityMute.findFirst({ where: { campaignId, userId: session.user.id } }),
     ]);
 
-    // Re-run read-status lookup with the real channel IDs (placeholder above avoided N+1 on missing data)
     const channelIds = channels.map((c: any) => c.id);
     const reads = channelIds.length > 0
       ? await db.channelReadStatus.findMany({

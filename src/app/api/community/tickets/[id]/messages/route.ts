@@ -130,6 +130,7 @@ export async function POST(
         ticketId,
         messageId: message.id,
         userId: session.user.id,
+        campaignId: ticket.campaignId,
         campaignName: ticket.campaign?.name,
       }).catch(() => {});
       publishToUsers(adminIds, "notif_refresh", {}).catch(() => {});
@@ -150,6 +151,7 @@ export async function POST(
         ticketId,
         messageId: message.id,
         userId: session.user.id,
+        campaignId: ticket.campaignId,
         campaignName: ticket.campaign?.name,
       }).catch(() => {});
       publishToUser(ticket.userId, "notif_refresh", {}).catch(() => {});

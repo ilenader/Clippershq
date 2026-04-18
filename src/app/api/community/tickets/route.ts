@@ -63,13 +63,7 @@ export async function GET(req: NextRequest) {
       }),
     );
 
-    // Shape: backward-compatible with direct-array consumers (old clients still work).
-    // New clients use the .tickets / .hasMore / .nextCursor keys.
     const nextCursor = hasMore ? enriched[enriched.length - 1].id : null;
-    const response: any = enriched;
-    response.tickets = enriched;
-    response.hasMore = hasMore;
-    response.nextCursor = nextCursor;
     return NextResponse.json({ tickets: enriched, hasMore, nextCursor });
   } catch (err: any) {
     console.error("[COMMUNITY] tickets GET error:", err?.message);
