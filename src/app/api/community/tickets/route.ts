@@ -72,7 +72,11 @@ export async function GET(req: NextRequest) {
         select: { clipAccount: { select: { userId: true, user: { select: { id: true, username: true, name: true, image: true } } } } },
         take: 500,
       });
-      const ticketUserIds = new Set(page.map((t: any) => t.userId));
+      const allTicketUsers = await db.campaignTicket.findMany({
+        where: { campaignId },
+        select: { userId: true },
+      });
+      const ticketUserIds = new Set(allTicketUsers.map((t: any) => t.userId));
       const seen = new Set<string>();
       const noConversation = [];
       for (const ca of campaignAccounts) {

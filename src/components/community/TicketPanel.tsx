@@ -354,9 +354,14 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, in
                     : "hover:bg-[var(--bg-card-hover)] border-l-2 border-l-transparent"
                 }`}
               >
-                <div className="h-9 w-9 rounded-full bg-accent/15 border border-accent/20 flex items-center justify-center text-accent text-xs font-bold uppercase flex-shrink-0">
-                  {(t.user?.username || "?")[0]}
-                </div>
+                {t.user?.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={t.user.image} alt="" className="h-9 w-9 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <div className="h-9 w-9 rounded-full bg-accent/15 border border-accent/20 flex items-center justify-center text-accent text-xs font-bold uppercase flex-shrink-0">
+                    {(t.user?.username || "?")[0]}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm lg:text-base font-medium text-[var(--text-primary)] truncate">
