@@ -16,6 +16,7 @@ import { useIsPWA } from "@/hooks/use-pwa";
 import { useAbly } from "@/hooks/use-ably";
 import { DmToast } from "@/components/community/DmToast";
 import { CallBanner } from "@/components/community/CallBanner";
+import VoiceRoom from "@/components/community/VoiceRoom";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -24,6 +25,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isPWA = useIsPWA();
+
+  // Voice call state — lives here so the call survives navigation between pages.
+  const [activeVoiceCall, setActiveVoiceCall] = useState<any>(null);
+  const [showVoiceRoom, setShowVoiceRoom] = useState(false);
+  const [voiceMinimized, setVoiceMinimized] = useState(false);
 
   // Close mobile nav on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
@@ -71,6 +77,41 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace("/client");
     }
   }, [isLoading, isAuthenticated, isDevMode, router, effectiveRole, pathname]);
+
+  // Expose a global opener/closer so pages and the CallBanner can launch the voice
+  // room without re-rendering it. The room lives in app-layout, so it survives any
+  // client-side navigation.
+  useEffect(() => {
+    (window as any).__openVoiceRoom = (call: any) => {
+      setActiveVoiceCall(call);
+      setShowVoiceRoom(true);
+      setVoiceMinimized(false);
+    };
+    (window as any).__closeVoiceRoom = () => {
+      setShowVoiceRoom(false);
+      setActiveVoiceCall(null);
+      setVoiceMinimized(false);
+    };
+    return () => {
+      try { delete (window as any).__openVoiceRoom; } catch {}
+      try { delete (window as any).__closeVoiceRoom; } catch {}
+    };
+  }, []);
+
+  // Auto-close if the host ends the call server-side.
+  useEffect(() => {
+    const handler = (e: any) => {
+      const { status, callId } = e?.detail || {};
+      if (!callId || !activeVoiceCall?.id || activeVoiceCall.id !== callId) return;
+      if (status === "ended" || status === "completed" || status === "cancelled") {
+        setShowVoiceRoom(false);
+        setActiveVoiceCall(null);
+        setVoiceMinimized(false);
+      }
+    };
+    window.addEventListener("sse:voice_call_status", handler);
+    return () => window.removeEventListener("sse:voice_call_status", handler);
+  }, [activeVoiceCall]);
 
   // Progressive swipe-to-open sidebar on mobile
   const sidebarPanelRef = useRef<HTMLDivElement>(null);
@@ -268,6 +309,33 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Community: DM toast (CLIPPER only) + top-of-page call banner (all non-CLIENT roles) */}
       {effectiveRole !== "CLIENT" && <DmToast viewerId={effectiveSession.user.id} viewerRole={effectiveRole} />}
       {effectiveRole !== "CLIENT" && <CallBanner />}
+
+      {/* Persistent voice room — survives navigation between pages. */}
+      {activeVoiceCall && showVoiceRoom && effectiveRole !== "CLIENT" && (
+        <div className={voiceMinimized ? "" : "fixed inset-0 z-[65] bg-[var(--bg-primary)]"}>
+          <VoiceRoom
+            call={activeVoiceCall}
+            campaignName={activeVoiceCall.campaignName || "Campaign"}
+            isHost={effectiveRole === "OWNER" || effectiveRole === "ADMIN"}
+            onLeave={() => {
+              setShowVoiceRoom(false);
+              setActiveVoiceCall(null);
+              setVoiceMinimized(false);
+            }}
+            onCallStatusChange={(status) => {
+              setActiveVoiceCall((prev: any) => (prev ? { ...prev, status } : null));
+              if (status === "ended" || status === "completed" || status === "cancelled") {
+                setShowVoiceRoom(false);
+                setActiveVoiceCall(null);
+                setVoiceMinimized(false);
+              }
+            }}
+            isMinimized={voiceMinimized}
+            onMinimize={() => setVoiceMinimized(true)}
+            onMaximize={() => setVoiceMinimized(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

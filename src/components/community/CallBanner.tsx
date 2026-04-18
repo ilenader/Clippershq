@@ -150,6 +150,12 @@ export function CallBanner() {
           {isLive && (
             <button
               onClick={() => {
+                const opener = (window as any).__openVoiceRoom;
+                if (typeof opener === "function") {
+                  opener({ ...call, campaignName: call.campaign?.name || "Campaign" });
+                  return;
+                }
+                // Fallback: full navigation (shouldn't normally happen — app-layout always mounts).
                 const params = new URLSearchParams({ tab: "voice", callId: call.id });
                 if (call.campaignId) params.set("campaignId", call.campaignId);
                 window.location.href = `/community?${params.toString()}`;

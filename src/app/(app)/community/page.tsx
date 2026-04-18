@@ -14,7 +14,6 @@ import { ChannelChat } from "@/components/community/ChannelChat";
 import { Leaderboard } from "@/components/community/Leaderboard";
 import { TicketPanel } from "@/components/community/TicketPanel";
 import { CallScheduler } from "@/components/community/CallScheduler";
-import VoiceRoom from "@/components/community/VoiceRoom";
 import { ActivityFeed } from "@/components/community/ActivityFeed";
 import { CommunityErrorBoundary } from "@/components/community/CommunityErrorBoundary";
 import { toast } from "@/lib/toast";
@@ -76,6 +75,7 @@ export default function CommunityPage() {
   const [selectedChannelId, setSelectedChannelId] = useState<string>("");
   const [viewMode, setViewMode] = useState<"channel" | "ticket" | "call" | "activity">("channel");
   const [upcomingCall, setUpcomingCall] = useState<Call | null>(null);
+  const [pastCalls, setPastCalls] = useState<Call[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // URL-driven initial tab (e.g., ?tab=ticket from "transfer to human" flow).
@@ -191,14 +191,29 @@ export default function CommunityPage() {
     if (selectedCampaignId) loadCalls(selectedCampaignId);
   }, [selectedCampaignId, loadCalls]);
 
-  // When the host ends the live call, kick everyone back to the channel view.
+  // Past calls — admin only.
+  useEffect(() => {
+    if (!selectedCampaignId || !isAdmin) { setPastCalls([]); return; }
+    fetch(`/api/community/calls?campaignId=${encodeURIComponent(selectedCampaignId)}&status=ended,completed,cancelled`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setPastCalls(Array.isArray(data) ? data : []))
+      .catch(() => setPastCalls([]));
+  }, [selectedCampaignId, isAdmin]);
+
+  // Keep the page's call state in sync with server-side lifecycle events.
   useEffect(() => {
     const handler = (e: any) => {
       const detail = e?.detail;
       if (!detail?.callId || !upcomingCall) return;
       if (detail.callId !== upcomingCall.id) return;
       if (detail.status === "ended" || detail.status === "completed" || detail.status === "cancelled") {
-        setUpcomingCall((prev) => (prev && prev.id === detail.callId ? { ...prev, status: detail.status } : prev));
+        setUpcomingCall(null);
+        if (isAdmin && selectedCampaignId) {
+          fetch(`/api/community/calls?campaignId=${encodeURIComponent(selectedCampaignId)}&status=ended,completed,cancelled`)
+            .then((r) => (r.ok ? r.json() : []))
+            .then((data) => setPastCalls(Array.isArray(data) ? data : []))
+            .catch(() => {});
+        }
         if (viewMode === "call") {
           setViewMode("channel");
           toast.info("The host ended the call");
@@ -209,7 +224,7 @@ export default function CommunityPage() {
     };
     window.addEventListener("sse:voice_call_status", handler);
     return () => window.removeEventListener("sse:voice_call_status", handler);
-  }, [upcomingCall, viewMode]);
+  }, [upcomingCall, viewMode, isAdmin, selectedCampaignId]);
 
   const selectedCampaign = useMemo(
     () => campaigns.find((c) => c.id === selectedCampaignId) || null,
@@ -220,6 +235,14 @@ export default function CommunityPage() {
     () => channels.find((c) => c.id === selectedChannelId) || null,
     [channels, selectedChannelId],
   );
+
+  // Open the persistent voice room (hosted by app-layout).
+  const openVoice = (c: Call) => {
+    const opener = (window as any).__openVoiceRoom;
+    if (typeof opener === "function") {
+      opener({ ...c, campaignName: selectedCampaign?.name });
+    }
+  };
 
   // Mute toggle — also fires a local window event so DmToast (and any future listener)
   // updates its mute set without a refetch.
@@ -461,16 +484,85 @@ export default function CommunityPage() {
                       Back to Community
                     </button>
                   </div>
-                ) : viewMode === "call" && upcomingCall ? (
-                  <VoiceRoom
-                    call={upcomingCall}
-                    campaignName={selectedCampaign?.name || ""}
-                    isHost={isAdmin}
-                    onLeave={() => setViewMode("channel")}
-                    onCallStatusChange={(status) => {
-                      setUpcomingCall((prev) => (prev ? { ...prev, status } : prev));
-                    }}
-                  />
+                ) : viewMode === "call" ? (
+                  <div className="h-full overflow-y-auto p-6">
+                    {!upcomingCall ? (
+                      <div className="flex flex-col items-center justify-center py-16">
+                        <div className="h-16 w-16 rounded-2xl bg-accent/10 flex items-center justify-center mb-4">
+                          <Phone className="h-8 w-8 text-accent opacity-50" />
+                        </div>
+                        <p className="text-sm text-[var(--text-muted)] mb-1">No calls scheduled</p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {isAdmin ? "Use the schedule button above to create one" : "Check back later"}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12">
+                        <div className="h-20 w-20 rounded-2xl bg-accent/10 flex items-center justify-center mb-6">
+                          <Phone className="h-10 w-10 text-accent" />
+                        </div>
+                        <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2 text-center">{upcomingCall.title}</h2>
+                        {upcomingCall.description && (
+                          <p className="text-sm text-[var(--text-muted)] mb-4 text-center max-w-md whitespace-pre-wrap">{upcomingCall.description}</p>
+                        )}
+                        <p className="text-sm text-[var(--text-muted)] mb-6">{selectedCampaign?.name}</p>
+
+                        {upcomingCall.status === "live" ? (
+                          <button
+                            onClick={() => openVoice(upcomingCall)}
+                            className="px-8 py-3 rounded-xl bg-accent text-white text-base font-semibold hover:bg-accent/80 transition-colors flex items-center gap-2"
+                          >
+                            <Phone className="h-5 w-5" />
+                            Join Call
+                          </button>
+                        ) : isAdmin ? (
+                          <button
+                            onClick={() => openVoice(upcomingCall)}
+                            className="px-8 py-3 rounded-xl bg-accent text-white text-base font-semibold hover:bg-accent/80 transition-colors flex items-center gap-2"
+                          >
+                            <Phone className="h-5 w-5" />
+                            Start Call
+                          </button>
+                        ) : (
+                          <div className="text-center">
+                            <p className="text-sm text-amber-400 mb-2">Waiting for host to start</p>
+                            <p className="text-xs text-[var(--text-muted)]">You'll be able to join once the host starts the call</p>
+                          </div>
+                        )}
+
+                        {upcomingCall.status === "scheduled" && (
+                          <div className="mt-6 px-4 py-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-hover)]">
+                            <p className="text-xs text-[var(--text-muted)]">Scheduled for</p>
+                            <p className="text-sm font-medium text-[var(--text-primary)]">
+                              {new Date(upcomingCall.scheduledAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {isAdmin && pastCalls.length > 0 && (
+                      <div className="mt-8 border-t border-[var(--border-color)] pt-6 max-w-2xl mx-auto">
+                        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-[var(--text-muted)]" />
+                          Past Calls
+                        </h3>
+                        <div className="space-y-2">
+                          {pastCalls.map((c) => (
+                            <div key={c.id} className="flex items-center justify-between px-4 py-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-hover)]">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-[var(--text-primary)] truncate">{c.title}</p>
+                                <p className="text-xs text-[var(--text-muted)]">{new Date(c.scheduledAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</p>
+                              </div>
+                              <span className="text-xs text-[var(--text-muted)] px-2 py-1 rounded bg-[var(--bg-input)] flex-shrink-0 ml-2">
+                                {c.status}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : viewMode === "activity" && isAdmin ? (
                   <ActivityFeed campaignId={selectedCampaignId} />
                 ) : viewMode === "ticket" ? (
