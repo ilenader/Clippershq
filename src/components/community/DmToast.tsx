@@ -126,8 +126,8 @@ export function DmToast({ viewerId, viewerRole }: { viewerId: string; viewerRole
         onClick={() => {
           const params = new URLSearchParams({ tab: "ticket", ticketId: toast.ticketId });
           if (toast.campaignId) params.set("campaignId", toast.campaignId);
-          router.push(`/community?${params.toString()}`);
           setToast(null);
+          window.location.href = `/community?${params.toString()}`;
         }}
         className="w-full text-left flex items-start gap-3 p-4 rounded-xl border border-accent/20 bg-[var(--bg-card)] shadow-xl shadow-black/40 hover:border-accent/40 transition-colors cursor-pointer"
       >

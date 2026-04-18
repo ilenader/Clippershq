@@ -81,16 +81,16 @@ export default function CommunityPage() {
   const [unresolvedTicketCount, setUnresolvedTicketCount] = useState(0);
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("servers");
-  const urlCampaignIdRef = useRef<string>("");
+  const initialLoadDone = useRef(false);
 
-  // URL-driven initial state (e.g., ?campaignId=X&tab=ticket&ticketId=Y).
+  // Handle subsequent client-side navigations (not initial load — loadCampaigns handles that).
   useEffect(() => {
+    if (!initialLoadDone.current) return;
     const tab = searchParams.get("tab");
     const ticketId = searchParams.get("ticketId");
     const callId = searchParams.get("callId");
     const cid = searchParams.get("campaignId");
     if (cid) {
-      urlCampaignIdRef.current = cid;
       setSelectedCampaignId(cid);
       setMobileView((prev) => (prev === "servers" ? "channels" : prev));
     }
@@ -103,27 +103,44 @@ export default function CommunityPage() {
     }
   }, [searchParams]);
 
-  // --- Campaign list -----------------------------------------------
   const loadCampaigns = useCallback(async () => {
     try {
       const res = await fetch("/api/community/campaigns");
+      if (!res.ok) return;
       const data = await res.json();
       const list: Campaign[] = Array.isArray(data?.campaigns) ? data.campaigns : [];
       setCampaigns(list);
-      if (!selectedCampaignId && !urlCampaignIdRef.current && list.length > 0) {
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlCampaignId = urlParams.get("campaignId");
+      const urlTab = urlParams.get("tab");
+      const urlTicketId = urlParams.get("ticketId");
+      const urlCallId = urlParams.get("callId");
+
+      if (urlCampaignId && list.some((c) => c.id === urlCampaignId)) {
+        setSelectedCampaignId(urlCampaignId);
+        setMobileView((prev) => (prev === "servers" ? "channels" : prev));
+      } else if (!selectedCampaignId && list.length > 0) {
         const first = list[0].id;
         setSelectedCampaignId(first);
-        if (typeof window !== "undefined") {
-          try {
-            const params = new URLSearchParams(window.location.search);
-            if (!params.get("campaignId")) {
-              params.set("campaignId", first);
-              window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
-            }
-          } catch {}
-        }
+        try {
+          const p = new URLSearchParams(window.location.search);
+          if (!p.get("campaignId")) {
+            p.set("campaignId", first);
+            window.history.replaceState({}, "", `${window.location.pathname}?${p.toString()}`);
+          }
+        } catch {}
       }
-      urlCampaignIdRef.current = "";
+
+      if (urlTab === "ticket" || urlTicketId) {
+        setViewMode("ticket");
+        setMobileView("chat");
+      } else if (urlTab === "voice" || urlCallId) {
+        setViewMode("call");
+        setMobileView("chat");
+      }
+
+      initialLoadDone.current = true;
     } catch {}
     setLoadingCampaigns(false);
   }, [selectedCampaignId]);
