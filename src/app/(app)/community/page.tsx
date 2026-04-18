@@ -208,10 +208,11 @@ export default function CommunityPage() {
   useEffect(() => {
     if (!selectedCampaignId) return;
     loadChannels(selectedCampaignId);
-    if (!searchParams.get("tab") && !searchParams.get("ticketId") && !searchParams.get("callId")) {
+    const currentUrl = new URLSearchParams(window.location.search);
+    if (!currentUrl.get("tab") && !currentUrl.get("ticketId") && !currentUrl.get("callId")) {
       setViewMode("channel");
     }
-  }, [selectedCampaignId, loadChannels, searchParams]);
+  }, [selectedCampaignId, loadChannels]);
 
   // Real-time unread refresh for the current campaign's channels.
   const fetchingRef = useRef(false);
@@ -635,7 +636,7 @@ export default function CommunityPage() {
                   viewerId={viewerId}
                   viewerRole={viewerRole}
                   campaignName={selectedCampaign.name}
-                  initialTicketId={searchParams.get("ticketId") || undefined}
+                  initialTicketId={searchParams.get("ticketId") || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("ticketId") : null) || undefined}
                 />
               ) : selectedChannel ? (
                 selectedChannel.type === "leaderboard" ? (

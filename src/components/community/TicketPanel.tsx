@@ -156,8 +156,10 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, in
     if (tickets.some((t) => t.id === initialTicketId)) {
       setSelectedId(initialTicketId);
       appliedInitialRef.current = initialTicketId;
+    } else if (loadedTicketsOnce && statusFilter !== "all") {
+      setStatusFilter("all");
     }
-  }, [initialTicketId, tickets]);
+  }, [initialTicketId, tickets, loadedTicketsOnce, statusFilter]);
 
   // Real-time ticket updates.
   useEffect(() => {
