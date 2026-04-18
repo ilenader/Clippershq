@@ -92,7 +92,7 @@ export default function CampaignsPage() {
           description="There are no campaigns available right now. Check back soon."
         />
       ) : (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {sorted.map((campaign: any, index: number) => {
             const isJoined = joinedCampaignIds.has(campaign.id);
             const isFav = favorites.includes(campaign.id);
