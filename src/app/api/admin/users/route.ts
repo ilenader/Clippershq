@@ -1,11 +1,11 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session?.user) return NextResponse.json([], { status: 401 });
 
@@ -18,8 +18,16 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const roleFilter = req.nextUrl.searchParams.get("role");
+  const where: any = {};
+  if (roleFilter) {
+    const roles = roleFilter.split(",").map((r) => r.trim()).filter(Boolean);
+    if (roles.length > 0) where.role = { in: roles };
+  }
+
   try {
     const users = await db.user.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       take: 500,
       select: {

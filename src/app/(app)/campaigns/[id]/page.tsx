@@ -261,6 +261,51 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
+      {/* Target Audience */}
+      {campaign.targetAudience && (
+        <Card>
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="h-4 w-4 text-accent" />
+            <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Target Audience</h2>
+          </div>
+          <span className={`inline-flex px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wide ${
+            campaign.targetAudience === "usa" ? "bg-blue-500/15 text-blue-400" :
+            campaign.targetAudience === "first_world" ? "bg-emerald-500/15 text-emerald-400" :
+            campaign.targetAudience === "worldwide" ? "bg-purple-500/15 text-purple-400" :
+            "bg-amber-500/15 text-amber-400"
+          }`}>
+            {campaign.targetAudience === "usa" ? "USA" :
+             campaign.targetAudience === "first_world" ? "First World Countries" :
+             campaign.targetAudience === "worldwide" ? "Worldwide" :
+             (() => {
+               try { return JSON.parse(campaign.targetCountries || "[]").join(", "); }
+               catch { return "Custom"; }
+             })()
+            }
+          </span>
+          {campaign.accountCountries && (() => {
+            try {
+              const entries = Object.entries(JSON.parse(campaign.accountCountries) as Record<string, number>);
+              if (entries.length === 0) return null;
+              return (
+                <div className="mt-3 space-y-1">
+                  <p className="text-xs text-[var(--text-muted)]">Current audience breakdown</p>
+                  {entries.map(([country, pct]) => (
+                    <div key={country} className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-[var(--text-primary)] w-8">{country}</span>
+                      <div className="flex-1 h-2 rounded-full bg-[var(--bg-input)] overflow-hidden">
+                        <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-xs text-[var(--text-muted)] w-8 text-right">{pct}%</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            } catch { return null; }
+          })()}
+        </Card>
+      )}
+
       {/* Paused banner */}
       {campaign.status === "PAUSED" && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3">

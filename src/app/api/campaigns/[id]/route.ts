@@ -39,7 +39,7 @@ export async function GET(
 
     // CLIPPERs: strip sensitive owner/agency fields
     if (role === "CLIPPER") {
-      const { ownerCpm, agencyFee, clientName, aiKnowledge, bannedContent, captionRules, hashtagRules, ...publicFields } = campaign as any;
+      const { ownerCpm, agencyFee, clientName, aiKnowledge, bannedContent, captionRules, hashtagRules, ownerUserId, ...publicFields } = campaign as any;
       return NextResponse.json(publicFields);
     }
 
@@ -57,6 +57,7 @@ const CAMPAIGN_FIELDS = [
   "imageUrl", "bannedContent", "captionRules", "hashtagRules",
   "videoLengthMin", "videoLengthMax", "reviewTiming", "aiKnowledge", "startDate", "endDate",
   "maxClipsPerUserPerDay",
+  "targetAudience", "targetCountries", "accountCountries", "ownerUserId",
 ];
 
 export async function PATCH(

@@ -169,7 +169,7 @@ export default function CampaignsPage() {
 
             return (
               <Link key={campaign.id} href={`/campaigns/${campaign.id}`}>
-                <Card hover className={`h-full ${isPaused ? "opacity-70" : ""}`}>
+                <Card hover className={`relative h-full ${isPaused ? "opacity-70" : ""}`}>
                   {/* Paused banner */}
                   {isPaused && (
                     <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 mb-3">
@@ -243,6 +243,25 @@ export default function CampaignsPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Target audience badge */}
+                  {campaign.targetAudience && (
+                    <span className={`absolute bottom-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${
+                      campaign.targetAudience === "usa" ? "bg-blue-500/15 text-blue-400" :
+                      campaign.targetAudience === "first_world" ? "bg-emerald-500/15 text-emerald-400" :
+                      campaign.targetAudience === "worldwide" ? "bg-purple-500/15 text-purple-400" :
+                      "bg-amber-500/15 text-amber-400"
+                    }`}>
+                      {campaign.targetAudience === "usa" ? "USA" :
+                       campaign.targetAudience === "first_world" ? "First World" :
+                       campaign.targetAudience === "worldwide" ? "Worldwide" :
+                       (() => {
+                         try { return JSON.parse(campaign.targetCountries || "[]").join(", "); }
+                         catch { return "Custom"; }
+                       })()
+                      }
+                    </span>
+                  )}
 
                   {/* Join status / button — clipper only */}
                   {isClipper && (

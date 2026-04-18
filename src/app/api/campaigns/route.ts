@@ -202,6 +202,10 @@ export async function POST(req: NextRequest) {
     if (campaignData.reviewTiming) createData.reviewTiming = campaignData.reviewTiming;
     if (campaignData.startDate) createData.startDate = new Date(campaignData.startDate);
     if (campaignData.endDate) createData.endDate = new Date(campaignData.endDate);
+    if (data.targetAudience) createData.targetAudience = data.targetAudience;
+    if (data.targetCountries) createData.targetCountries = data.targetCountries;
+    if (data.accountCountries) createData.accountCountries = data.accountCountries;
+    if (data.ownerUserId) createData.ownerUserId = data.ownerUserId;
     // Max clips per user per day (validated 1-6, default 3)
     const maxClips = data.maxClipsPerUserPerDay ? parseInt(data.maxClipsPerUserPerDay) : 3;
     createData.maxClipsPerUserPerDay = Math.max(1, Math.min(6, isNaN(maxClips) ? 3 : maxClips));

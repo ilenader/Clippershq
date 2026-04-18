@@ -41,6 +41,10 @@ const defaultForm = {
   captionRules: "", hashtagRules: "",
   aiKnowledge: "",
   startDate: "",
+  targetAudience: "",
+  targetCountriesInput: "",
+  accountCountriesInput: "",
+  ownerUserId: "",
 };
 
 export default function AdminCampaignsPage() {
@@ -64,6 +68,7 @@ export default function AdminCampaignsPage() {
   const [historyTarget, setHistoryTarget] = useState<string | null>(null);
   const [historyEvents, setHistoryEvents] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [ownerUsers, setOwnerUsers] = useState<any[]>([]);
 
   const load = () => {
     const fetches: Promise<any>[] = [
@@ -90,6 +95,15 @@ export default function AdminCampaignsPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (isOwner) {
+      fetch("/api/admin/users?role=OWNER,ADMIN")
+        .then((r) => r.json())
+        .then((data) => setOwnerUsers(Array.isArray(data) ? data : []))
+        .catch(() => {});
+    }
+  }, [isOwner]);
 
   const filteredCampaigns = filterStatuses.length > 0
     ? campaigns.filter((c: any) => filterStatuses.includes(c.status))
@@ -137,6 +151,10 @@ export default function AdminCampaignsPage() {
       imageUrl: c.imageUrl || "", captionRules: c.captionRules || "", hashtagRules: c.hashtagRules || "",
       aiKnowledge: c.aiKnowledge || "",
       startDate: c.startDate ? new Date(c.startDate).toISOString().split("T")[0] : "",
+      targetAudience: c.targetAudience || "",
+      targetCountriesInput: (() => { try { return JSON.parse(c.targetCountries || "[]").join(", "); } catch { return ""; } })(),
+      accountCountriesInput: (() => { try { const obj = JSON.parse(c.accountCountries || "{}"); return Object.entries(obj).map(([k, v]) => `${k}: ${v}%`).join("\n"); } catch { return ""; } })(),
+      ownerUserId: c.ownerUserId || "",
     });
     setShowModal(true);
   };
@@ -173,6 +191,23 @@ export default function AdminCampaignsPage() {
         imageUrl: form.imageUrl, captionRules: form.captionRules, hashtagRules: form.hashtagRules,
         aiKnowledge: form.aiKnowledge,
         startDate: editingId ? form.startDate : new Date().toISOString().split("T")[0],
+        targetAudience: form.targetAudience || null,
+        targetCountries: form.targetAudience === "custom"
+          ? JSON.stringify(form.targetCountriesInput.split(",").map((c) => c.trim()).filter(Boolean))
+          : null,
+        accountCountries: form.accountCountriesInput.trim()
+          ? JSON.stringify(
+              Object.fromEntries(
+                form.accountCountriesInput.split("\n")
+                  .map((line) => {
+                    const [country, pct] = line.split(":").map((s) => s.trim().replace("%", ""));
+                    return [country, parseInt(pct) || 0];
+                  })
+                  .filter(([c]) => c)
+              )
+            )
+          : null,
+        ownerUserId: form.ownerUserId || null,
       };
 
       if (editingId) {
@@ -631,6 +666,70 @@ export default function AdminCampaignsPage() {
           </div>
           <Textarea id="payoutRule" label="Payout rules" value={form.payoutRule} onChange={(e) => updateField("payoutRule", e.target.value)} />
           <Textarea id="aiKnowledge" label="Campaign Instructions for AI Chatbot" placeholder="Paste detailed info about this campaign — where to find content, posting rules, common clipper questions. The AI chatbot will use this to answer questions." value={form.aiKnowledge} onChange={(e) => updateField("aiKnowledge", e.target.value)} />
+          {/* Target Audience */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-[var(--text-primary)]">Target Audience</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: "usa", label: "USA", color: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
+                { value: "first_world", label: "First World Countries", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
+                { value: "worldwide", label: "Worldwide", color: "bg-purple-500/10 text-purple-400 border-purple-500/20" },
+                { value: "custom", label: "Specific Countries", color: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => updateField("targetAudience", form.targetAudience === opt.value ? "" : opt.value)}
+                  className={`px-4 py-3 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
+                    form.targetAudience === opt.value ? opt.color : "border-[var(--border-color)] text-[var(--text-muted)] hover:border-accent/20"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {form.targetAudience === "custom" && (
+              <div className="space-y-2">
+                <label className="text-xs text-[var(--text-muted)]">Select countries (comma-separated codes)</label>
+                <Input
+                  id="targetCountriesInput"
+                  placeholder="US, UK, DE, FR"
+                  value={form.targetCountriesInput}
+                  onChange={(e) => updateField("targetCountriesInput", e.target.value.toUpperCase())}
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-[var(--text-muted)]">Current account audience breakdown (optional)</label>
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)]">If you know which countries the account currently reaches, add them with percentages</p>
+              <Textarea
+                id="accountCountriesInput"
+                placeholder={"US: 45%\nUK: 30%\nDE: 25%"}
+                value={form.accountCountriesInput}
+                onChange={(e) => updateField("accountCountriesInput", e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          {/* Campaign Owner */}
+          {isOwner && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--text-primary)]">Campaign Owner</label>
+              <select
+                value={form.ownerUserId}
+                onChange={(e) => updateField("ownerUserId", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] text-sm text-[var(--text-primary)]"
+              >
+                <option value="">No specific owner (you manage it)</option>
+                {ownerUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.username || u.name} ({u.role})</option>
+                ))}
+              </select>
+              <p className="text-xs text-[var(--text-muted)]">The owner has full control. Admins only manage their assigned campaigns.</p>
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <Input id="soundLink" label="Sound link (optional)" value={form.soundLink} onChange={(e) => updateField("soundLink", e.target.value)} />
             <Input id="assetLink" label="Asset link" value={form.assetLink} onChange={(e) => updateField("assetLink", e.target.value)} />

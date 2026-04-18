@@ -118,6 +118,7 @@ model User {
   communityTicketMessages TicketMessage[]
   scheduledVoiceCalls     ScheduledVoiceCall[]
   messageReactions        MessageReaction[]
+  ownedCampaigns          Campaign[]          @relation("CampaignOwner")
 
   @@index([role])
   @@index([referredById])
@@ -209,10 +210,15 @@ model Campaign {
   archivedAt         DateTime?
   archivedById       String?
   lastBudgetPauseAt  DateTime?
+  targetAudience     String?
+  targetCountries    String?
+  accountCountries   String?
+  ownerUserId        String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
   createdBy        User?   @relation("CampaignsCreated", fields: [createdById], references: [id])
+  ownerUser        User?   @relation("CampaignOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   clips            Clip[]
   notes            Note[]
   campaignAccounts CampaignAccount[]
