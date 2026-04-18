@@ -83,6 +83,7 @@ export default function CommunityPage() {
   const [mobileView, setMobileView] = useState<MobileView>("servers");
   const initialLoadDone = useRef(false);
   const navHandledRef = useRef(false);
+  const skipNextViewResetRef = useRef(false);
 
   // Handle subsequent client-side navigations (not initial load — loadCampaigns handles that).
   useEffect(() => {
@@ -136,6 +137,7 @@ export default function CommunityPage() {
               sessionStorage.setItem("community_initial_ticket", target.ticketId);
             }
             navHandledRef.current = true;
+            skipNextViewResetRef.current = true;
             handled = true;
           }
         }
@@ -241,7 +243,9 @@ export default function CommunityPage() {
   useEffect(() => {
     if (!selectedCampaignId) return;
     loadChannels(selectedCampaignId);
-    if (initialLoadDone.current) {
+    if (skipNextViewResetRef.current) {
+      skipNextViewResetRef.current = false;
+    } else if (initialLoadDone.current) {
       const currentUrl = new URLSearchParams(window.location.search);
       if (!currentUrl.get("tab") && !currentUrl.get("ticketId") && !currentUrl.get("callId")) {
         setViewMode("channel");
