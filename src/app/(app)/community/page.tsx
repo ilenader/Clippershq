@@ -634,7 +634,7 @@ export default function CommunityPage() {
                 : viewMode === "call" ? (upcomingCall?.title || "Voice")
                 : selectedChannel?.name || "Channel"}
             </p>
-            {isAdmin && (
+            {isOwner && (
               <CallScheduler campaignId={selectedCampaignId} onScheduled={() => loadCalls(selectedCampaignId)} />
             )}
           </div>
@@ -662,6 +662,7 @@ export default function CommunityPage() {
                   upcomingCall={upcomingCall}
                   pastCalls={pastCalls}
                   isAdmin={isAdmin}
+                  isOwner={isOwner}
                   campaignName={selectedCampaign.name}
                   campaignId={selectedCampaignId}
                   onJoin={(c) => openVoice(c)}
@@ -745,6 +746,7 @@ function CallStaging({
   upcomingCall,
   pastCalls,
   isAdmin,
+  isOwner,
   campaignName,
   campaignId,
   onJoin,
@@ -753,6 +755,7 @@ function CallStaging({
   upcomingCall: Call | null;
   pastCalls: Call[];
   isAdmin: boolean;
+  isOwner: boolean;
   campaignName: string;
   campaignId: string;
   onJoin: (c: Call) => void;
@@ -767,9 +770,9 @@ function CallStaging({
           </div>
           <p className="text-sm text-[var(--text-muted)] mb-1">No calls scheduled</p>
           <p className="text-xs text-[var(--text-muted)] mb-4">
-            {isAdmin ? "Schedule one with the button above." : "Check back later."}
+            {isOwner ? "Schedule one with the button above." : "Check back later."}
           </p>
-          {isAdmin && (
+          {isOwner && (
             <CallScheduler campaignId={campaignId} onScheduled={onScheduleCallChange} />
           )}
         </div>

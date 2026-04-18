@@ -171,7 +171,7 @@ export function ChannelList({
         </Section>
 
         {/* Voice */}
-        {(upcomingCall || isAdmin || voiceChannel) && (
+        {((upcomingCall && !isAdmin) || isOwner) && (
           <Section label="Voice">
             <PseudoRow
               label={upcomingCall?.title?.toLowerCase().replace(/\s+/g, "-") || "voice"}
