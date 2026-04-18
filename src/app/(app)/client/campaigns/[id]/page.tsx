@@ -8,9 +8,10 @@ import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Film, Heart, MessageCircle, Share2, TrendingUp, ArrowLeft, ExternalLink, Download } from "lucide-react";
+import { Eye, Film, Heart, MessageCircle, Share2, TrendingUp, ArrowLeft, ExternalLink, Download, BarChart3 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatNumber, formatCurrency, formatDate } from "@/lib/utils";
+import { TrackingModal } from "@/components/tracking-modal";
 
 export default function ClientCampaignDetail() {
   const { data: session } = useSession();
@@ -21,6 +22,7 @@ export default function ClientCampaignDetail() {
   const userRole = (session?.user as SessionUser)?.role;
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [trackingClip, setTrackingClip] = useState<any>(null);
 
   useEffect(() => {
     if (session && userRole && userRole !== "CLIENT" && userRole !== "OWNER") {
@@ -150,7 +152,8 @@ export default function ClientCampaignDetail() {
                   <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Likes</th>
                   <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Comments</th>
                   <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Shares</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Clip</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Clip</th>
+                  <th className="text-center px-3 py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Track</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,10 +168,19 @@ export default function ClientCampaignDetail() {
                     <td className="px-3 py-2.5 text-right text-[var(--text-secondary)] tabular-nums">{formatNumber(clip.likes)}</td>
                     <td className="px-3 py-2.5 text-right text-[var(--text-secondary)] tabular-nums">{formatNumber(clip.comments)}</td>
                     <td className="px-3 py-2.5 text-right text-[var(--text-secondary)] tabular-nums">{formatNumber(clip.shares)}</td>
-                    <td className="px-4 py-2.5 text-right">
+                    <td className="px-3 py-2.5 text-right">
                       <a href={clip.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline text-xs">
                         <ExternalLink className="h-3 w-3" /> View
                       </a>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <button
+                        onClick={() => setTrackingClip({ id: clip.id, clipUrl: clip.url, campaign: { name: campaign.name }, createdAt: clip.submitted })}
+                        className="p-1.5 rounded-lg hover:bg-[var(--bg-input)] transition-colors"
+                        title="View tracking"
+                      >
+                        <BarChart3 className="h-4 w-4 text-accent" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -208,6 +220,8 @@ export default function ClientCampaignDetail() {
           </div>
         </Card>
       )}
+
+      <TrackingModal clip={trackingClip} open={!!trackingClip} onClose={() => setTrackingClip(null)} />
     </div>
   );
 }

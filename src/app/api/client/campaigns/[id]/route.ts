@@ -85,6 +85,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Clean clips for client view (no sensitive data)
     const clientClips = clips.map((c: any, i: number) => ({
+      id: c.id,
       num: i + 1,
       platform: c.campaign?.platform || "",
       url: c.clipUrl,

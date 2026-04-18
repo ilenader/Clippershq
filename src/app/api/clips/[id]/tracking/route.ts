@@ -22,7 +22,7 @@ export async function GET(
   if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
-  if (role !== "ADMIN" && role !== "OWNER") {
+  if (role !== "ADMIN" && role !== "OWNER" && role !== "CLIENT") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -30,7 +30,6 @@ export async function GET(
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   try {
-    // Verify admin has access to this clip's campaign
     if (role === "ADMIN") {
       const clip = await db.clip.findUnique({ where: { id }, select: { campaignId: true } });
       if (!clip) return NextResponse.json({ error: "Clip not found" }, { status: 404 });
@@ -38,6 +37,15 @@ export async function GET(
       if (Array.isArray(allowedIds) && !allowedIds.includes(clip.campaignId)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
+    }
+
+    if (role === "CLIENT") {
+      const clip = await db.clip.findUnique({ where: { id }, select: { campaignId: true } });
+      if (!clip) return NextResponse.json({ error: "Clip not found" }, { status: 404 });
+      const access = await db.campaignClient.findUnique({
+        where: { userId_campaignId: { userId: session.user.id, campaignId: clip.campaignId } },
+      });
+      if (!access) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Get all snapshots for this clip (newest first)
