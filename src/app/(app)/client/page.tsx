@@ -12,11 +12,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { TimeframeSelect } from "@/components/ui/timeframe-select";
 import {
   Megaphone, Eye, Film, Heart, MessageCircle, Share2, TrendingUp,
-  Trophy, Download, ChevronDown, ChevronRight, ExternalLink, DollarSign,
+  Trophy, Download, ChevronDown, ChevronRight, ExternalLink, DollarSign, BarChart3,
 } from "lucide-react";
 import { formatNumber, formatCurrency } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { AreaGradientChart } from "@/components/ui/area-gradient-chart";
+import { TrackingModal } from "@/components/tracking-modal";
 
 function PlatformDot({ platform }: { platform: string }) {
   return <span className="inline-block h-2 w-2 rounded-full bg-accent flex-shrink-0" title={platform} />;
@@ -53,6 +54,7 @@ export default function ClientDashboard() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [trackingClip, setTrackingClip] = useState<any>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(false);
   const [timeframeDays, setTimeframeDays] = useState(15);
@@ -439,7 +441,8 @@ export default function ClientDashboard() {
                       <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)] hidden md:table-cell">Comments</th>
                       <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)] hidden md:table-cell">Shares</th>
                       <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Earnings</th>
-                      <th className="text-right px-4 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Clip</th>
+                      <th className="text-right px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Clip</th>
+                      <th className="text-center px-3 py-2 text-xs lg:text-sm font-medium uppercase tracking-wider text-[var(--text-muted)]">Track</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -460,10 +463,19 @@ export default function ClientDashboard() {
                         <td className="px-3 py-2.5 lg:py-3 text-right text-[var(--text-secondary)] tabular-nums hidden md:table-cell">{formatNumber(clip.comments)}</td>
                         <td className="px-3 py-2.5 lg:py-3 text-right text-[var(--text-secondary)] tabular-nums hidden md:table-cell">{formatNumber(clip.shares)}</td>
                         <td className="px-3 py-2.5 lg:py-3 text-right font-medium text-accent tabular-nums">{clip.earnings > 0 ? formatCurrency(clip.earnings) : "\u2014"}</td>
-                        <td className="px-4 py-2.5 lg:py-3 text-right">
+                        <td className="px-3 py-2.5 lg:py-3 text-right">
                           <a href={clip.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline text-xs lg:text-sm">
                             <ExternalLink className="h-3 w-3 lg:h-3.5 lg:w-3.5" /> View
                           </a>
+                        </td>
+                        <td className="px-3 py-2.5 lg:py-3 text-center">
+                          <button
+                            onClick={() => setTrackingClip({ id: clip.id, clipUrl: clip.url, campaign: { name: campaign?.name }, createdAt: clip.submitted })}
+                            className="p-1.5 rounded-lg hover:bg-[var(--bg-input)] transition-colors"
+                            title="View tracking"
+                          >
+                            <BarChart3 className="h-4 w-4 text-accent" />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -527,6 +539,8 @@ export default function ClientDashboard() {
           )}
         </>
       )}
+
+      <TrackingModal clip={trackingClip} open={!!trackingClip} onClose={() => setTrackingClip(null)} />
     </div>
   );
 }

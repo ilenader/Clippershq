@@ -39,7 +39,7 @@ export async function GET() {
       });
       campaignIds = rows.map((r: any) => r.id);
     } else if (role === "ADMIN") {
-      const [teamCampaigns, directAdmins] = await Promise.all([
+      const [teamCampaigns, directAdmins, ownedCampaigns, createdCampaigns] = await Promise.all([
         db.teamCampaign.findMany({
           where: { team: { members: { some: { userId: session.user.id } } } },
           select: { campaignId: true },
@@ -48,10 +48,20 @@ export async function GET() {
           where: { userId: session.user.id },
           select: { campaignId: true },
         }),
+        db.campaign.findMany({
+          where: { ownerUserId: session.user.id },
+          select: { id: true },
+        }),
+        db.campaign.findMany({
+          where: { createdById: session.user.id },
+          select: { id: true },
+        }),
       ]);
       campaignIds = Array.from(new Set<string>([
         ...teamCampaigns.map((t: any) => t.campaignId as string),
         ...directAdmins.map((a: any) => a.campaignId as string),
+        ...ownedCampaigns.map((c: any) => c.id as string),
+        ...createdCampaigns.map((c: any) => c.id as string),
       ]));
     } else {
       // CLIPPER
