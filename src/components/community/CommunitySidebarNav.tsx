@@ -59,13 +59,21 @@ export function CommunitySidebarNav({
     fetchingRef.current = true;
     try {
       const res = await fetch("/api/community/campaigns");
-      if (!res.ok) return;
+      if (!res.ok) {
+        // On first load a failure leaves the empty initial state; on later loads
+        // the stale cache persists. Either way, we must fall through to the
+        // `finally` so fetchingRef doesn't stay stuck at true.
+        return;
+      }
       const data = await res.json();
       const list: CommunityCampaign[] = Array.isArray(data?.campaigns) ? data.campaigns : [];
       setCampaigns(list);
       cacheRef.current = { data: list, time: Date.now() };
-    } catch {}
-    fetchingRef.current = false;
+    } catch {
+      // Network/parse error — keep previous campaigns list if we had one.
+    } finally {
+      fetchingRef.current = false;
+    }
   }, [role]);
 
   useEffect(() => { load(); }, [load]);

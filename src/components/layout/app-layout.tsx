@@ -16,7 +16,11 @@ import { useIsPWA } from "@/hooks/use-pwa";
 import { useAbly } from "@/hooks/use-ably";
 import { DmToast } from "@/components/community/DmToast";
 import { CallBanner } from "@/components/community/CallBanner";
-import VoiceRoom from "@/components/community/VoiceRoom";
+import dynamic from "next/dynamic";
+
+// VoiceRoom pulls in @jitsi/react-sdk (large). Lazy-load so the Jitsi iframe
+// only fetches when someone actually opens a call — other pages stay fast.
+const VoiceRoom = dynamic(() => import("@/components/community/VoiceRoom"), { ssr: false });
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
