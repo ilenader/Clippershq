@@ -41,6 +41,13 @@ const statusColors: Record<TicketStatus, { dot: string; active: string }> = {
 
 export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, initialTicketId }: Props) {
   const isAdminOrOwner = viewerRole === "OWNER" || viewerRole === "ADMIN";
+  const [sessionTicketId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const id = sessionStorage.getItem("community_initial_ticket");
+    if (id) sessionStorage.removeItem("community_initial_ticket");
+    return id;
+  });
+  const effectiveInitialTicketId = initialTicketId || sessionTicketId || undefined;
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | TicketStatus>("all");
@@ -151,15 +158,15 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, in
   // manually.
   const appliedInitialRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!initialTicketId) return;
-    if (appliedInitialRef.current === initialTicketId) return;
-    if (tickets.some((t) => t.id === initialTicketId)) {
-      setSelectedId(initialTicketId);
-      appliedInitialRef.current = initialTicketId;
+    if (!effectiveInitialTicketId) return;
+    if (appliedInitialRef.current === effectiveInitialTicketId) return;
+    if (tickets.some((t) => t.id === effectiveInitialTicketId)) {
+      setSelectedId(effectiveInitialTicketId);
+      appliedInitialRef.current = effectiveInitialTicketId;
     } else if (loadedTicketsOnce && statusFilter !== "all") {
       setStatusFilter("all");
     }
-  }, [initialTicketId, tickets, loadedTicketsOnce, statusFilter]);
+  }, [effectiveInitialTicketId, tickets, loadedTicketsOnce, statusFilter]);
 
   // Real-time ticket updates.
   useEffect(() => {

@@ -111,33 +111,59 @@ export default function CommunityPage() {
       const list: Campaign[] = Array.isArray(data?.campaigns) ? data.campaigns : [];
       setCampaigns(list);
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlCampaignId = urlParams.get("campaignId");
-      const urlTab = urlParams.get("tab");
-      const urlTicketId = urlParams.get("ticketId");
-      const urlCallId = urlParams.get("callId");
-
-      if (urlCampaignId && list.some((c) => c.id === urlCampaignId)) {
-        setSelectedCampaignId(urlCampaignId);
-        setMobileView((prev) => (prev === "servers" ? "channels" : prev));
-      } else if (!selectedCampaignId && list.length > 0) {
-        const first = list[0].id;
-        setSelectedCampaignId(first);
-        try {
-          const p = new URLSearchParams(window.location.search);
-          if (!p.get("campaignId")) {
-            p.set("campaignId", first);
-            window.history.replaceState({}, "", `${window.location.pathname}?${p.toString()}`);
+      // Priority 1: sessionStorage nav target (from DM toast)
+      let handled = false;
+      try {
+        const raw = sessionStorage.getItem("community_nav_target");
+        if (raw) {
+          sessionStorage.removeItem("community_nav_target");
+          const target = JSON.parse(raw);
+          if (target.campaignId && list.some((c: Campaign) => c.id === target.campaignId)) {
+            setSelectedCampaignId(target.campaignId);
+            setMobileView("chat");
+            if (target.tab === "ticket" || target.ticketId) {
+              setViewMode("ticket");
+            } else if (target.tab === "voice") {
+              setViewMode("call");
+            }
+            if (target.ticketId) {
+              sessionStorage.setItem("community_initial_ticket", target.ticketId);
+            }
+            handled = true;
           }
-        } catch {}
-      }
+        }
+      } catch {}
 
-      if (urlTab === "ticket" || urlTicketId) {
-        setViewMode("ticket");
-        setMobileView("chat");
-      } else if (urlTab === "voice" || urlCallId) {
-        setViewMode("call");
-        setMobileView("chat");
+      if (!handled) {
+        // Priority 2: URL params (bookmarks, direct links)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlCampaignId = urlParams.get("campaignId");
+        const urlTab = urlParams.get("tab");
+        const urlTicketId = urlParams.get("ticketId");
+        const urlCallId = urlParams.get("callId");
+
+        if (urlCampaignId && list.some((c) => c.id === urlCampaignId)) {
+          setSelectedCampaignId(urlCampaignId);
+          setMobileView((prev) => (prev === "servers" ? "channels" : prev));
+        } else if (!selectedCampaignId && list.length > 0) {
+          const first = list[0].id;
+          setSelectedCampaignId(first);
+          try {
+            const p = new URLSearchParams(window.location.search);
+            if (!p.get("campaignId")) {
+              p.set("campaignId", first);
+              window.history.replaceState({}, "", `${window.location.pathname}?${p.toString()}`);
+            }
+          } catch {}
+        }
+
+        if (urlTab === "ticket" || urlTicketId) {
+          setViewMode("ticket");
+          setMobileView("chat");
+        } else if (urlTab === "voice" || urlCallId) {
+          setViewMode("call");
+          setMobileView("chat");
+        }
       }
 
       initialLoadDone.current = true;
