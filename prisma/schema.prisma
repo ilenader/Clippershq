@@ -117,6 +117,7 @@ model User {
   communityTickets        CampaignTicket[]
   communityTicketMessages TicketMessage[]
   scheduledVoiceCalls     ScheduledVoiceCall[]
+  messageReactions        MessageReaction[]
 
   @@index([role])
   @@index([referredById])
@@ -708,6 +709,10 @@ model ChannelMessage {
   isPinned  Boolean  @default(false)
   isDeleted Boolean  @default(false)
   deletedBy String?
+  replyToId String?
+  replyTo   ChannelMessage?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   ChannelMessage[] @relation("MessageReplies")
+  reactions MessageReaction[]
   createdAt DateTime @default(now())
 
   @@index([channelId, createdAt])
@@ -789,4 +794,32 @@ model CommunityMute {
 
   @@unique([campaignId, userId])
   @@map("community_mutes")
+}
+
+// Emoji reactions on channel messages. One row per (message, user, emoji).
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   ChannelMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@map("message_reactions")
+}
+
+// Audit trail of clipper joins/leaves on a campaign. Owner/admin-visible only.
+model CommunityActivity {
+  id         String   @id @default(cuid())
+  campaignId String
+  userId     String
+  username   String
+  action     String // "joined" | "left"
+  createdAt  DateTime @default(now())
+
+  @@index([campaignId, createdAt])
+  @@map("community_activity")
 }

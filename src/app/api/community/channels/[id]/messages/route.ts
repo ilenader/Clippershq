@@ -58,7 +58,11 @@ export async function GET(
   try {
     const messages = await db.channelMessage.findMany({
       where: { channelId, ...(searchClause || {}) },
-      include: { user: { select: { id: true, username: true, role: true, image: true } } },
+      include: {
+        user: { select: { id: true, username: true, role: true, image: true } },
+        replyTo: { select: { id: true, content: true, user: { select: { username: true } }, isDeleted: true } },
+        reactions: { select: { emoji: true, userId: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -149,10 +153,26 @@ export async function POST(
     await new Promise((r) => setTimeout(r, 1000));
   }
 
+  // Optional reply target. Verify it belongs to the same channel (no cross-channel replies).
+  let replyToId: string | null = null;
+  if (typeof body.replyToId === "string" && body.replyToId.length > 0) {
+    const target = await db.channelMessage.findUnique({
+      where: { id: body.replyToId },
+      select: { channelId: true, isDeleted: true },
+    });
+    if (target && target.channelId === channelId && !target.isDeleted) {
+      replyToId = body.replyToId;
+    }
+  }
+
   try {
     const message = await db.channelMessage.create({
-      data: { channelId, userId: session.user.id, content },
-      include: { user: { select: { id: true, username: true, role: true, image: true } } },
+      data: { channelId, userId: session.user.id, content, replyToId: replyToId || undefined },
+      include: {
+        user: { select: { id: true, username: true, role: true, image: true } },
+        replyTo: { select: { id: true, content: true, user: { select: { username: true } }, isDeleted: true } },
+        reactions: { select: { emoji: true, userId: true } },
+      },
     });
 
     const subscribers = await getCampaignSubscriberIds(channel.campaignId);
@@ -212,6 +232,58 @@ export async function POST(
   } catch (err: any) {
     console.error("[COMMUNITY] messages POST error:", err?.message);
     return NextResponse.json({ error: "Failed to send message" }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/community/channels/[id]/messages  { messageId, isPinned }
+ * OWNER/ADMIN only. Toggles the pinned flag on a message and broadcasts the change.
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await getSession();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const banCheck = checkBanStatus(session);
+  if (banCheck) return banCheck;
+
+  const role = (session.user as any).role;
+  if (role !== "OWNER" && role !== "ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
+
+  const { id: channelId } = await params;
+  let body: any;
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+  const messageId = typeof body.messageId === "string" ? body.messageId : "";
+  if (!messageId) return NextResponse.json({ error: "messageId required" }, { status: 400 });
+  const isPinned = !!body.isPinned;
+
+  try {
+    const channel = await loadChannelWithCampaign(channelId);
+    if (!channel) return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+
+    const target = await db.channelMessage.findUnique({
+      where: { id: messageId },
+      select: { channelId: true },
+    });
+    if (!target || target.channelId !== channelId) {
+      return NextResponse.json({ error: "Message not found" }, { status: 404 });
+    }
+
+    await db.channelMessage.update({ where: { id: messageId }, data: { isPinned } });
+
+    const subscribers = await getCampaignSubscriberIds(channel.campaignId);
+    publishToUsers(subscribers, "channel_message_pinned", { channelId, messageId, isPinned }).catch(() => {});
+
+    return NextResponse.json({ ok: true, isPinned });
+  } catch (err: any) {
+    console.error("[COMMUNITY] messages PATCH error:", err?.message);
+    return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }
 }
 

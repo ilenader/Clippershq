@@ -86,6 +86,18 @@ export async function POST(req: NextRequest) {
     const join = await db.campaignAccount.create({
       data: { clipAccountId, campaignId },
     });
+    // Community audit trail — owner/admin-visible "joined" entry. Best-effort; ignored on failure.
+    try {
+      const acct = await db.clipAccount.findUnique({
+        where: { id: clipAccountId },
+        select: { userId: true, username: true },
+      });
+      if (acct) {
+        await db.communityActivity.create({
+          data: { campaignId, userId: acct.userId, username: acct.username, action: "joined" },
+        });
+      }
+    } catch {}
     return NextResponse.json(join, { status: 201 });
   } catch (err: any) {
     console.error("DB join failed:", err?.message);
@@ -124,6 +136,12 @@ export async function DELETE(req: NextRequest) {
     await db.campaignAccount.delete({
       where: { clipAccountId_campaignId: { clipAccountId, campaignId } },
     });
+    // Community audit trail — "left" entry.
+    try {
+      await db.communityActivity.create({
+        data: { campaignId, userId: session.user.id, username: account.username, action: "left" },
+      });
+    } catch {}
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Failed to leave campaign" }, { status: 500 });

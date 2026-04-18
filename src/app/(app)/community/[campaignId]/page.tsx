@@ -7,7 +7,7 @@ import Link from "next/link";
 import type { SessionUser } from "@/lib/auth-types";
 import {
   ArrowLeft, Loader2, Megaphone, MessageCircle, Phone, Trophy,
-  Bell, BellOff, AlertCircle,
+  Bell, BellOff, AlertCircle, Users as UsersIcon,
 } from "lucide-react";
 import { CampaignImage } from "@/components/ui/campaign-image";
 import { ChannelChat } from "@/components/community/ChannelChat";
@@ -15,6 +15,7 @@ import { Leaderboard } from "@/components/community/Leaderboard";
 import { TicketPanel } from "@/components/community/TicketPanel";
 import { VoiceRoom } from "@/components/community/VoiceRoom";
 import { CallScheduler } from "@/components/community/CallScheduler";
+import { ActivityFeed } from "@/components/community/ActivityFeed";
 import { CommunityErrorBoundary } from "@/components/community/CommunityErrorBoundary";
 import { toast } from "@/lib/toast";
 
@@ -42,7 +43,7 @@ export default function CampaignCommunityPage() {
   const [muted, setMuted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedChannelId, setSelectedChannelId] = useState("");
-  const [viewMode, setViewMode] = useState<"channel" | "ticket" | "call">("channel");
+  const [viewMode, setViewMode] = useState<"channel" | "ticket" | "call" | "activity">("channel");
   const [upcomingCall, setUpcomingCall] = useState<Call | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -209,6 +210,17 @@ export default function CampaignCommunityPage() {
           <MessageCircle className="h-3 w-3" />
           {isAdmin ? "Tickets" : "Direct"}
         </button>
+        {isAdmin && (
+          <button
+            onClick={() => setViewMode("activity")}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+              viewMode === "activity" ? "bg-accent text-white" : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)]"
+            }`}
+          >
+            <UsersIcon className="h-3 w-3" />
+            Activity
+          </button>
+        )}
         {upcomingCall && (
           <button
             onClick={() => setViewMode("call")}
@@ -227,6 +239,8 @@ export default function CampaignCommunityPage() {
         <CommunityErrorBoundary>
           {viewMode === "call" && upcomingCall ? (
             <VoiceRoom call={upcomingCall} />
+          ) : viewMode === "activity" && isAdmin ? (
+            <ActivityFeed campaignId={campaignId} />
           ) : viewMode === "ticket" ? (
             <TicketPanel campaignId={campaignId} viewerId={viewerId} viewerRole={viewerRole} campaignName={campaign?.name} />
           ) : selectedChannel ? (

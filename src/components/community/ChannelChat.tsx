@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageBubble, type Message } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { toast } from "@/lib/toast";
-import { ArrowDown, Loader2, Megaphone, MessageCircle, Search, X } from "lucide-react";
+import { ArrowDown, ChevronDown, Loader2, Megaphone, MessageCircle, Pin, Search, X } from "lucide-react";
 
 function MessageSkeleton() {
   return (
@@ -47,6 +47,8 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
   const [searchActive, setSearchActive] = useState(false);
   const [searchResults, setSearchResults] = useState<Message[] | null>(null);
   const [typingUsers, setTypingUsers] = useState<Map<string, { username: string; until: number }>>(new Map());
+  const [replyTo, setReplyTo] = useState<{ id: string; username: string; content: string } | null>(null);
+  const [pinnedOpen, setPinnedOpen] = useState(true);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomAnchorRef = useRef<HTMLDivElement>(null);
@@ -181,11 +183,33 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
         prev.map((m) => (m.id === detail.messageId ? { ...m, isDeleted: true } : m)),
       );
     };
+    const onPinned = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || detail.channelId !== channelId) return;
+      setMessages((prev) => prev.map((m) => m.id === detail.messageId ? { ...m, isPinned: !!detail.isPinned } : m));
+    };
+    const onReaction = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || detail.channelId !== channelId) return;
+      setMessages((prev) => prev.map((m) => {
+        if (m.id !== detail.messageId) return m;
+        const reactions = [...(m.reactions || [])];
+        const idx = reactions.findIndex((r) => r.userId === detail.userId && r.emoji === detail.emoji);
+        if (detail.action === "remove" && idx >= 0) reactions.splice(idx, 1);
+        if (detail.action === "add" && idx < 0) reactions.push({ userId: detail.userId, emoji: detail.emoji });
+        return { ...m, reactions };
+      }));
+    };
+
     window.addEventListener("sse:channel_message", onMessage);
     window.addEventListener("sse:channel_message_deleted", onDeleted);
+    window.addEventListener("sse:channel_message_pinned", onPinned);
+    window.addEventListener("sse:channel_reaction", onReaction);
     return () => {
       window.removeEventListener("sse:channel_message", onMessage);
       window.removeEventListener("sse:channel_message_deleted", onDeleted);
+      window.removeEventListener("sse:channel_message_pinned", onPinned);
+      window.removeEventListener("sse:channel_reaction", onReaction);
     };
   }, [channelId, viewerId, scrollToBottom]);
 
@@ -279,7 +303,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
         const res = await fetch(`/api/community/channels/${channelId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({ content, replyToId: replyTo?.id || undefined }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to send");
@@ -289,14 +313,55 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
           if (withoutTemp.some((m) => m.id === data.id)) return withoutTemp;
           return [...withoutTemp, data];
         });
+        setReplyTo(null);
       } catch (err: any) {
         // Remove the optimistic bubble on failure so the user doesn't see a ghost.
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         toast.error(err.message || "Could not send message");
       }
     },
-    [channelId, scrollToBottom, viewerId],
+    [channelId, scrollToBottom, viewerId, replyTo],
   );
+
+  const handleReply = useCallback((m: { id: string; username: string; content: string }) => {
+    setReplyTo(m);
+  }, []);
+
+  const handlePin = useCallback(async (id: string, nextPinned: boolean) => {
+    try {
+      const res = await fetch(`/api/community/channels/${channelId}/messages`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: id, isPinned: nextPinned }),
+      });
+      if (!res.ok) throw new Error();
+      // Optimistic — Ably echo will confirm.
+      setMessages((prev) => prev.map((m) => m.id === id ? { ...m, isPinned: nextPinned } : m));
+    } catch {
+      toast.error("Could not update pin");
+    }
+  }, [channelId]);
+
+  const handleReact = useCallback(async (messageId: string, emoji: string) => {
+    // Optimistic toggle: update the reaction count immediately so UI feels instant.
+    setMessages((prev) => prev.map((m) => {
+      if (m.id !== messageId) return m;
+      const existing = (m.reactions || []).findIndex((r) => r.userId === viewerId && r.emoji === emoji);
+      const nextReactions = [...(m.reactions || [])];
+      if (existing >= 0) nextReactions.splice(existing, 1);
+      else nextReactions.push({ userId: viewerId, emoji });
+      return { ...m, reactions: nextReactions };
+    }));
+    try {
+      await fetch("/api/community/reactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId, emoji }),
+      });
+    } catch {
+      toast.error("Could not save reaction");
+    }
+  }, [viewerId]);
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -335,6 +400,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
 
   const displayMessages = searchActive && searchResults ? searchResults : messages;
   const typingList = Array.from(typingUsers.values()).map((t) => t.username);
+  const pinnedMessages = messages.filter((m) => m.isPinned && !m.isDeleted);
 
   return (
     <div className="relative flex flex-col h-full min-h-0">
@@ -367,6 +433,31 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
           )}
         </div>
       )}
+      {pinnedMessages.length > 0 && !searchActive && (
+        <div className="border-b border-[var(--border-color)] bg-accent/5 px-3 sm:px-4 py-2">
+          <button
+            onClick={() => setPinnedOpen((o) => !o)}
+            className="flex items-center gap-1.5 text-xs font-medium text-accent hover:opacity-80 transition-opacity"
+          >
+            <Pin className="h-3 w-3" />
+            {pinnedMessages.length} pinned message{pinnedMessages.length === 1 ? "" : "s"}
+            <ChevronDown className={`h-3 w-3 transition-transform ${pinnedOpen ? "" : "-rotate-90"}`} />
+          </button>
+          {pinnedOpen && (
+            <div className="mt-2 space-y-1">
+              {pinnedMessages.slice(0, 5).map((m) => (
+                <p key={m.id} className="text-xs text-[var(--text-secondary)] truncate">
+                  <span className="font-semibold text-accent">{m.user?.username || "user"}: </span>
+                  {m.content}
+                </p>
+              ))}
+              {pinnedMessages.length > 5 && (
+                <p className="text-[10px] text-[var(--text-muted)]">+{pinnedMessages.length - 5} more pinned</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       <div
         ref={scrollRef}
         onScroll={searchActive ? undefined : handleScroll}
@@ -394,6 +485,9 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
                   viewerId={viewerId}
                   viewerRole={viewerRole}
                   onDelete={handleDelete}
+                  onReply={handleReply}
+                  onPin={handlePin}
+                  onReact={handleReact}
                   showAvatar={true}
                 />
               ))}
@@ -426,6 +520,9 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
                 viewerId={viewerId}
                 viewerRole={viewerRole}
                 onDelete={handleDelete}
+                onReply={handleReply}
+                onPin={handlePin}
+                onReact={handleReact}
                 showAvatar={shouldShowAvatar(i)}
               />
             ))}
@@ -458,6 +555,8 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
         onSend={handleSend}
         onTyping={channelType === "leaderboard" ? undefined : pingTyping}
         lockedReason={locked}
+        replyTo={replyTo}
+        onCancelReply={() => setReplyTo(null)}
         placeholder={
           channelType === "announcement"
             ? "Write an announcement…"
