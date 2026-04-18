@@ -29,6 +29,7 @@ import {
 import { useState } from "react";
 import { useInstallPrompt } from "@/hooks/use-pwa";
 import { PWAInstallInstructions } from "@/components/pwa-install-popup";
+import { CommunitySidebarNav } from "@/components/community/CommunitySidebarNav";
 
 interface NavItem {
   label: string;
@@ -176,6 +177,11 @@ export function Sidebar({ role }: SidebarProps) {
                   </Link>
                 );
               })}
+              {/* Community expandable block — inserts after the first nav section
+                  (for CLIPPER this is the only section; for ADMIN/OWNER it's "Overview"). */}
+              {i === 0 && !isClient && (
+                <CommunitySidebarNav role={role} />
+              )}
             </div>
           </div>
         ))}
