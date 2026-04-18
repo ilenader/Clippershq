@@ -174,19 +174,24 @@ export function nextHourMark(): Date {
 }
 
 /**
- * Add the interval then snap forward to the next :00 hour boundary.
- * Sub-hour intervals are added raw (no alignment).
+ * Snap the next check to a :00 hour boundary that respects the interval.
+ * Starts from the next :00, then adds (interval/60 - 1) extra hours.
+ * 10-minute safety floor prevents checks that are too soon.
  */
 export function roundToNextSlot(intervalMin: number): Date {
   if (intervalMin < 60) {
     return new Date(Date.now() + intervalMin * 60_000);
   }
-  const raw = new Date(Date.now() + intervalMin * 60_000);
-  if (raw.getMinutes() !== 0 || raw.getSeconds() !== 0) {
-    raw.setMinutes(0, 0, 0);
-    raw.setHours(raw.getHours() + 1);
+  const now = Date.now();
+  const next = new Date(now);
+  next.setMinutes(0, 0, 0);
+  next.setHours(next.getHours() + 1);
+  const hoursToAdd = Math.max(0, Math.floor(intervalMin / 60) - 1);
+  next.setHours(next.getHours() + hoursToAdd);
+  if (next.getTime() - now < 10 * 60_000) {
+    next.setHours(next.getHours() + 1);
   }
-  return raw;
+  return next;
 }
 
 /**
