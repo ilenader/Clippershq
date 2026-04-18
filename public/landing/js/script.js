@@ -455,8 +455,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.head.appendChild(s);
 })();
 
-// Meteor/background animation deferred until after page load — never blocks first paint
-window.addEventListener('load', function() {
+// Meteor/background animation — kick off as soon as HTML parses so meteors are
+// visible immediately instead of waiting for the full `load` event + images.
+document.addEventListener('DOMContentLoaded', function() {
   var bg = document.getElementById('vanta-bg');
   if (!bg) return;
 
@@ -486,7 +487,7 @@ window.addEventListener('load', function() {
     var dot = document.createElement('span');
     dot.className = 'meteor-dot';
     var left     = i * (100 / COUNT);
-    var delay    = (Math.random() * 5).toFixed(2);
+    var delay    = (Math.random() * 2).toFixed(2);
     var duration = (3 + Math.random() * 7).toFixed(2);
     dot.style.cssText = 'left:' + left + '%;animation:meteor-fall ' + duration + 's linear ' + delay + 's infinite;';
 

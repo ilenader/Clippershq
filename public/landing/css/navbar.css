@@ -106,6 +106,7 @@ body {
   flex-grow: 0;
 }
 #navbar.floating .nav-inner .logo {
+  margin-left: 20px;
   margin-right: 4px;
 }
 
@@ -192,15 +193,15 @@ body {
   font-size: 1rem;
   font-weight: 500;
   font-family: 'Manrope', sans-serif;
-  color: rgba(0,0,0,0.75);
+  color: #ffffff;
   border-radius: 100px;
   transition: var(--trans);
   white-space: nowrap;
   display: inline-block;
 }
 .nav-links li a:hover {
-  color: #000;
-  background: rgba(255,255,255,0.09);
+  color: #ffffff;
+  background: rgba(255,255,255,0.15);
 }
 .nav-links li a.nav-cta {
   padding: 10px 24px;

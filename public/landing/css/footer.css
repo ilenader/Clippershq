@@ -60,11 +60,11 @@
 .footer-col ul li { margin-bottom: 12px; }
 .footer-col ul li a {
   font-size: 0.9rem;
-  color: var(--text-muted);
+  color: var(--white);
   transition: var(--trans);
-  font-weight: 300;
+  font-weight: 400;
 }
-.footer-col ul li a:hover { color: var(--white); padding-left: 4px; }
+.footer-col ul li a:hover { color: var(--white); padding-left: 4px; opacity: 0.8; }
 
 .footer-bottom {
   max-width: 1200px;
