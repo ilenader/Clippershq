@@ -121,11 +121,16 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, in
   }, [campaignId, loadTickets]);
 
   // Auto-select the ticket specified via ?ticketId= (e.g., after a DM-toast click).
-  // Applied after tickets load so the ticket row exists in state before selection.
+  // Applies exactly once per initialTicketId value — so a later real-time refresh
+  // of `tickets` won't silently yank the user away from a ticket they picked
+  // manually.
+  const appliedInitialRef = useRef<string | null>(null);
   useEffect(() => {
     if (!initialTicketId) return;
+    if (appliedInitialRef.current === initialTicketId) return;
     if (tickets.some((t) => t.id === initialTicketId)) {
       setSelectedId(initialTicketId);
+      appliedInitialRef.current = initialTicketId;
     }
   }, [initialTicketId, tickets]);
 

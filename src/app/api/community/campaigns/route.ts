@@ -76,38 +76,69 @@ export async function GET() {
 
     // Unread counts — one round-trip per campaign. Acceptable up to ~50 campaigns per user.
     // For each: find channels, find last-read per channel, sum messages created after lastRead.
+    // ALSO: add unread ticket messages so DM activity contributes to the sidebar badge.
     const enriched = await Promise.all(
       campaigns.map(async (c: any) => {
+        let totalUnread = 0;
+
+        // Channel unread — sum across all of the campaign's channels.
         const channels = await db.channel.findMany({
           where: { campaignId: c.id },
           select: { id: true },
         });
-        if (channels.length === 0) return { ...c, totalUnread: 0 };
+        if (channels.length > 0) {
+          const channelIds: string[] = channels.map((ch: any) => ch.id as string);
+          const reads = await db.channelReadStatus.findMany({
+            where: { userId: session.user.id, channelId: { in: channelIds } },
+            select: { channelId: true, lastReadAt: true },
+          });
+          const readByChannel: Record<string, Date> = {};
+          for (const r of reads) readByChannel[r.channelId] = new Date(r.lastReadAt);
 
-        const channelIds: string[] = channels.map((ch: any) => ch.id as string);
-        const reads = await db.channelReadStatus.findMany({
-          where: { userId: session.user.id, channelId: { in: channelIds } },
-          select: { channelId: true, lastReadAt: true },
-        });
-        const readByChannel: Record<string, Date> = {};
-        for (const r of reads) readByChannel[r.channelId] = new Date(r.lastReadAt);
+          await Promise.all(
+            channelIds.map(async (chId) => {
+              const lastRead = readByChannel[chId] || new Date(0);
+              const count = await db.channelMessage.count({
+                where: {
+                  channelId: chId,
+                  isDeleted: false,
+                  userId: { not: session.user.id },
+                  createdAt: { gt: lastRead },
+                },
+              });
+              totalUnread += count;
+            }),
+          );
+        }
 
-        // Sum unread across the campaign's channels. Exclude own messages and deleted ones.
-        let totalUnread = 0;
-        await Promise.all(
-          channelIds.map(async (chId) => {
-            const lastRead = readByChannel[chId] || new Date(0);
-            const count = await db.channelMessage.count({
+        // Ticket unread — best-effort. Clippers count DMs addressed to them (their
+        // own ticket). Owners/admins count every unread clipper message across all
+        // of the campaign's tickets.
+        try {
+          if (role === "CLIPPER") {
+            const ticket = await db.campaignTicket.findFirst({
+              where: { campaignId: c.id, userId: session.user.id },
+              select: { id: true },
+            });
+            if (ticket) {
+              totalUnread += await db.ticketMessage.count({
+                where: {
+                  ticketId: ticket.id,
+                  userId: { not: session.user.id },
+                  isRead: false,
+                },
+              });
+            }
+          } else if (role === "OWNER" || role === "ADMIN") {
+            totalUnread += await db.ticketMessage.count({
               where: {
-                channelId: chId,
-                isDeleted: false,
+                ticket: { campaignId: c.id },
                 userId: { not: session.user.id },
-                createdAt: { gt: lastRead },
+                isRead: false,
               },
             });
-            totalUnread += count;
-          }),
-        );
+          }
+        } catch {}
 
         return { ...c, totalUnread };
       }),

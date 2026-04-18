@@ -78,15 +78,18 @@ export function CommunitySidebarNav({
 
   useEffect(() => { load(); }, [load]);
 
-  // Ably: refresh unread totals when any channel message arrives / is deleted.
-  // Invalidate the cache so the refetch isn't served the stale copy.
+  // Ably: refresh unread totals on channel + ticket activity. Invalidate the cache
+  // so the refetch isn't served a stale copy. ticket_message is included because
+  // the campaign totalUnread now folds in unread DMs too.
   useEffect(() => {
     const handler = () => { cacheRef.current = null; load({ skipCache: true }); };
     window.addEventListener("sse:channel_message", handler);
     window.addEventListener("sse:channel_message_deleted", handler);
+    window.addEventListener("sse:ticket_message", handler);
     return () => {
       window.removeEventListener("sse:channel_message", handler);
       window.removeEventListener("sse:channel_message_deleted", handler);
+      window.removeEventListener("sse:ticket_message", handler);
     };
   }, [load]);
 
@@ -140,10 +143,10 @@ export function CommunitySidebarNav({
                   key={c.id}
                   href={`/community?campaignId=${encodeURIComponent(c.id)}`}
                   className={cn(
-                    "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors",
+                    "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-200",
                     isActive
-                      ? "bg-accent/10 text-accent"
-                      : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]",
+                      ? "bg-accent/10 text-accent border-l-2 border-accent pl-[calc(0.75rem-2px)]"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] hover:translate-x-0.5",
                   )}
                 >
                   {c.imageUrl ? (
