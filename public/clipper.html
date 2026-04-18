@@ -117,6 +117,22 @@
     }
     .discord-cta svg { flex-shrink: 0; }
 
+    .cta-pill {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 18px 42px; background: #2596be; color: #fff;
+      font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 1.1rem;
+      border-radius: 999px; text-decoration: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .cta-pill:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(37, 150, 190, 0.3);
+    }
+    .cta-pill:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px rgba(37, 150, 190, 0.2);
+    }
+
     /* ── PHONE MOCKUP SIDEBARS ── */
     .hero-phone {
       position: absolute;
@@ -564,8 +580,8 @@
         Join the Clippers HQ network. Work on content for top brands and creators, set your own hours, and get paid for every clip.
       </p>
       <div class="reveal" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;">
-        <a href="/login" style="display:inline-flex;align-items:center;justify-content:center;padding:18px 42px;background:#2596be;color:#ffffff;font-family:'Manrope',sans-serif;font-weight:700;font-size:1.1rem;border-radius:999px;text-decoration:none;transition:all 0.2s ease;">Start Clipping</a>
-        <a href="/brands" style="display:inline-flex;align-items:center;justify-content:center;padding:18px 42px;background:#2596be;color:#ffffff;border:1px solid rgba(255,255,255,0.2);font-family:'Manrope',sans-serif;font-weight:700;font-size:1.1rem;border-radius:999px;text-decoration:none;transition:all 0.2s ease;">Launch a Campaign</a>
+        <a href="/login" class="cta-pill">Start Clipping</a>
+        <a href="/brands" class="cta-pill">Launch a Campaign</a>
       </div>
     </div>
   </section>
@@ -709,8 +725,8 @@
     <h2 class="reveal">Ready to start earning?</h2>
     <p class="reveal">Sign up, join campaigns, and start getting paid for your clips.</p>
     <div class="reveal" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;">
-      <a href="/login" style="display:inline-flex;align-items:center;justify-content:center;padding:18px 42px;background:#2596be;color:#ffffff;font-family:'Manrope',sans-serif;font-weight:700;font-size:1.1rem;border-radius:999px;text-decoration:none;transition:all 0.2s ease;">Start Clipping</a>
-      <a href="/brands" style="display:inline-flex;align-items:center;justify-content:center;padding:18px 42px;background:#2596be;color:#ffffff;border:1px solid rgba(255,255,255,0.2);font-family:'Manrope',sans-serif;font-weight:700;font-size:1.1rem;border-radius:999px;text-decoration:none;transition:all 0.2s ease;">Launch a Campaign</a>
+      <a href="/login" class="cta-pill">Start Clipping</a>
+      <a href="/brands" class="cta-pill">Launch a Campaign</a>
     </div>
   </section>
 

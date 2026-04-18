@@ -83,27 +83,42 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
 
-      // Block banned users from signing in (Discord path). Also migrates the
-      // user's `username` field to the unique Discord handle — fixes existing
-      // users whose username was historically stored as display name.
       if (db && account?.provider === "discord" && account?.providerAccountId) {
         try {
+          // Ban check via discordId
           const existing = await db.user.findFirst({
             where: { discordId: account.providerAccountId },
-            select: { id: true, status: true, username: true },
+            select: { id: true, status: true },
           });
           if (existing?.status === "BANNED") {
             return false;
           }
-          const discordUsername = (profile as any)?.username;
-          if (existing && typeof discordUsername === "string" && discordUsername && existing.username !== discordUsername) {
-            await db.user.update({
-              where: { id: existing.id },
-              data: { username: discordUsername },
-            }).catch(() => {});
-          }
         } catch (err: any) {
           console.error("[AUTH] Ban check DB error:", err?.message);
+        }
+
+        // Sync Discord username using user.id (resolved by PrismaAdapter)
+        const discordUsername = (profile as any)?.username;
+        if (user?.id && typeof discordUsername === "string" && discordUsername) {
+          try {
+            const current = await db.user.findUnique({
+              where: { id: user.id },
+              select: { username: true, discordId: true },
+            });
+            const updates: Record<string, string> = {};
+            if (current && current.username !== discordUsername) {
+              updates.username = discordUsername;
+            }
+            if (current && !current.discordId) {
+              updates.discordId = account.providerAccountId;
+            }
+            if (Object.keys(updates).length > 0) {
+              await db.user.update({ where: { id: user.id }, data: updates });
+              console.log("[AUTH] Synced Discord user:", { userId: user.id, ...updates });
+            }
+          } catch (err: any) {
+            console.error("[AUTH] Username sync error:", err?.message);
+          }
         }
       }
 

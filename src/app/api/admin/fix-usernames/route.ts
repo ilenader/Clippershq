@@ -10,24 +10,41 @@ export async function POST() {
   if ((session.user as any).role !== "OWNER") return NextResponse.json({ error: "Owner only" }, { status: 403 });
   if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 503 });
 
-  const users = await db.user.findMany({
-    where: { discordId: { not: null } },
-    select: { id: true, username: true, name: true },
+  const accounts = await db.account.findMany({
+    where: { provider: "discord" },
+    select: { userId: true, providerAccountId: true },
     take: 500,
   });
 
   let fixed = 0;
-  for (const u of users) {
-    if (!u.username || u.username === "user") {
-      if (u.name && u.name !== "user") {
-        await db.user.update({
-          where: { id: u.id },
-          data: { username: u.name },
-        }).catch(() => {});
+  for (const acc of accounts) {
+    try {
+      const user = await db.user.findUnique({
+        where: { id: acc.userId },
+        select: { id: true, username: true, name: true, discordId: true },
+      });
+      if (!user) continue;
+
+      const updates: Record<string, string> = {};
+      if (!user.discordId) {
+        updates.discordId = acc.providerAccountId;
+      }
+      if (!user.username || user.username === "user") {
+        if (user.name && user.name !== "user") {
+          updates.username = user.name;
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await db.user.update({ where: { id: user.id }, data: updates });
         fixed++;
       }
-    }
+    } catch {}
   }
 
-  return NextResponse.json({ total: users.length, fixed });
+  return NextResponse.json({
+    total: accounts.length,
+    fixed,
+    message: "Fixed discordId linkage and placeholder usernames. Users get correct names on next login.",
+  });
 }
