@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { CampaignImage } from "@/components/ui/campaign-image";
 import {
   ArrowLeft, ExternalLink, UserPlus, CheckCircle, Music, LinkIcon, LogOut,
   FolderOpen, Play, DollarSign, Eye, Film, Target, ChevronDown, ChevronRight,
@@ -235,80 +234,68 @@ export default function CampaignDetailPage() {
         Back to campaigns
       </button>
 
-      {/* ── 1. HEADER ─────────────────────────────────────────── */}
-      <div className="flex items-start gap-4 sm:gap-5">
-        <div className="h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 overflow-hidden rounded-2xl border border-[var(--border-color)]">
-          <CampaignImage src={campaign.imageUrl} name={campaign.name} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <h1 className="text-2xl lg:text-3xl font-bold text-[var(--text-primary)] leading-tight truncate">{campaign.name}</h1>
-            <Badge variant={campaign.status.toLowerCase() as any}>{campaign.status}</Badge>
-          </div>
-          {platforms.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {platforms.map((p) => (
-                <span
-                  key={p}
-                  className="inline-flex items-center gap-1 rounded-md bg-accent/10 border border-accent/20 px-2 py-0.5 text-[11px] font-medium text-accent"
-                >
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
-                  {p}
-                </span>
-              ))}
+      {/* ── 1. HEADER — image background ─────────────────────── */}
+      <div className="relative w-full h-48 lg:h-64 rounded-xl overflow-hidden border border-[var(--border-color)]">
+        {campaign.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={campaign.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-accent/5" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/50" />
+        <div className="absolute bottom-0 inset-x-0 p-6">
+          <div className="flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-xl lg:text-2xl font-bold text-white drop-shadow-lg line-clamp-2">{campaign.name}</h1>
+              <div className="flex items-center gap-3 mt-1">
+                {platforms.length > 0 && <span className="text-sm text-white/60">{platforms.join(" \u00b7 ")}</span>}
+                {campaign.targetAudience && (
+                  <span className={`text-xs font-semibold ${
+                    campaign.targetAudience === "usa" ? "text-blue-400" :
+                    campaign.targetAudience === "first_world" ? "text-emerald-400" :
+                    campaign.targetAudience === "worldwide" ? "text-purple-400" :
+                    "text-amber-400"
+                  }`}>
+                    {campaign.targetAudience === "usa" ? "USA Audience" :
+                     campaign.targetAudience === "first_world" ? "First World" :
+                     campaign.targetAudience === "worldwide" ? "Worldwide" :
+                     (() => { try { return JSON.parse(campaign.targetCountries || "[]").slice(0, 3).join(", "); } catch { return "Custom"; } })()
+                    }
+                  </span>
+                )}
+              </div>
             </div>
-          )}
+            <Badge variant={campaign.status.toLowerCase() as any} className="flex-shrink-0">{campaign.status}</Badge>
+          </div>
         </div>
       </div>
 
-      {/* Target Audience */}
-      {campaign.targetAudience && (
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <Target className="h-4 w-4 text-accent" />
-            <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Target Audience</h2>
-          </div>
-          <span className={`inline-flex px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wide ${
-            campaign.targetAudience === "usa" ? "bg-blue-500/15 text-blue-400" :
-            campaign.targetAudience === "first_world" ? "bg-emerald-500/15 text-emerald-400" :
-            campaign.targetAudience === "worldwide" ? "bg-purple-500/15 text-purple-400" :
-            "bg-amber-500/15 text-amber-400"
-          }`}>
-            {campaign.targetAudience === "usa" ? "USA" :
-             campaign.targetAudience === "first_world" ? "First World Countries" :
-             campaign.targetAudience === "worldwide" ? "Worldwide" :
-             (() => {
-               try {
-                 const countries: string[] = JSON.parse(campaign.targetCountries || "[]");
-                 const display = countries.slice(0, 3).join(", ");
-                 return countries.length > 3 ? display + "\u2026" : display;
-               }
-               catch { return "Custom"; }
-             })()
-            }
-          </span>
-          {campaign.accountCountries && (() => {
-            try {
-              const entries = Object.entries(JSON.parse(campaign.accountCountries) as Record<string, number>);
-              if (entries.length === 0) return null;
-              return (
-                <div className="mt-3 space-y-1">
-                  <p className="text-xs text-[var(--text-muted)]">Current audience breakdown</p>
-                  {entries.map(([country, pct]) => (
-                    <div key={country} className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-[var(--text-primary)] w-12 truncate">{country}</span>
-                      <div className="flex-1 h-2 rounded-full bg-[var(--bg-input)] overflow-hidden">
-                        <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="text-xs text-[var(--text-muted)] w-8 text-right">{pct}%</span>
+      {/* Account audience breakdown — shown below header if data exists */}
+      {campaign.accountCountries && (() => {
+        try {
+          const entries = Object.entries(JSON.parse(campaign.accountCountries) as Record<string, number>);
+          if (entries.length === 0) return null;
+          return (
+            <Card>
+              <div className="flex items-center gap-2 mb-3">
+                <Target className="h-4 w-4 text-accent" />
+                <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Audience Breakdown</h2>
+              </div>
+              <div className="space-y-1">
+                {entries.map(([country, pct]) => (
+                  <div key={country} className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-[var(--text-primary)] w-12 truncate">{country}</span>
+                    <div className="flex-1 h-2 rounded-full bg-[var(--bg-input)] overflow-hidden">
+                      <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
                     </div>
-                  ))}
-                </div>
-              );
-            } catch { return null; }
-          })()}
-        </Card>
-      )}
+                    <span className="text-xs text-[var(--text-muted)] w-8 text-right">{pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        } catch { return null; }
+      })()}
 
       {/* Paused banner */}
       {campaign.status === "PAUSED" && (
