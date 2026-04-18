@@ -174,18 +174,19 @@ export function nextHourMark(): Date {
 }
 
 /**
- * Snap the next check time to an exact :00 hour boundary.
- * For intervals >= 60 min, always returns the next :00.
- * For sub-hour intervals (error retries), adds the interval raw.
+ * Add the interval then snap forward to the next :00 hour boundary.
+ * Sub-hour intervals are added raw (no alignment).
  */
 export function roundToNextSlot(intervalMin: number): Date {
-  if (intervalMin >= 60) {
-    const next = new Date();
-    next.setMinutes(0, 0, 0);
-    next.setHours(next.getHours() + 1);
-    return next;
+  if (intervalMin < 60) {
+    return new Date(Date.now() + intervalMin * 60_000);
   }
-  return new Date(Date.now() + intervalMin * 60_000);
+  const raw = new Date(Date.now() + intervalMin * 60_000);
+  if (raw.getMinutes() !== 0 || raw.getSeconds() !== 0) {
+    raw.setMinutes(0, 0, 0);
+    raw.setHours(raw.getHours() + 1);
+  }
+  return raw;
 }
 
 /**
@@ -226,10 +227,10 @@ async function processTrackingJob(
       } catch (fetchErr: any) {
         await db.trackingJob.update({
           where: { id: job.id },
-          data: { nextCheckAt: nextHourMark(), lastCheckedAt: new Date() },
+          data: { nextCheckAt: roundToNextSlot(60), lastCheckedAt: new Date() },
         }).catch(() => {});
-        console.log(`[TRACKING] Clip ${clip.id}: individual fetch also failed, retry at next hour`);
-        details.push(`Clip ${clip.id}: fetch failed, retry at next hour`);
+        console.log(`[TRACKING] Clip ${clip.id}: individual fetch also failed, retry in ~1h`);
+        details.push(`Clip ${clip.id}: fetch failed, retry in ~1h`);
         return { success: true, detail: "fetch-failed" };
       }
     }
@@ -283,7 +284,7 @@ async function processTrackingJob(
         }),
         db.trackingJob.update({
           where: { id: job.id },
-          data: { lastCheckedAt: new Date(), nextCheckAt: nextHourMark() },
+          data: { lastCheckedAt: new Date(), nextCheckAt: roundToNextSlot(job.checkIntervalMin || 60) },
         }),
       ]);
     }
@@ -607,7 +608,7 @@ async function processTrackingJob(
           // Slow tracking to daily
           await db.trackingJob.update({
             where: { id: job.id },
-            data: { nextCheckAt: nextHourMark(), lastCheckedAt: new Date(), checkIntervalMin: 1440 },
+            data: { nextCheckAt: roundToNextSlot(1440), lastCheckedAt: new Date(), checkIntervalMin: 1440 },
           }).catch(() => {});
           // Notify all owners
           try {
@@ -629,7 +630,7 @@ async function processTrackingJob(
 
     await db.trackingJob.update({
       where: { id: job.id },
-      data: { nextCheckAt: nextHourMark(), lastCheckedAt: new Date() },
+      data: { nextCheckAt: roundToNextSlot(60), lastCheckedAt: new Date() },
     }).catch(() => {});
     return { success: false, error: err.message };
   }
