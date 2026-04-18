@@ -33,14 +33,13 @@ const statusOptions = [
  */
 function formatNextCheck(nextCheckAt: string | Date | null | undefined): { text: string; color: string } {
   if (!nextCheckAt) return { text: "Not scheduled", color: "text-[var(--text-muted)]" };
-  const next = new Date(nextCheckAt);
-  const diffMin = Math.round((next.getTime() - Date.now()) / 60000);
-  if (diffMin <= 0) return { text: "Checking soon", color: "text-amber-400" };
-  if (diffMin <= 60) return { text: `Next: ${diffMin}min`, color: "text-[var(--text-muted)]" };
-  return {
-    text: `Next: ${next.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
-    color: "text-[var(--text-muted)]",
-  };
+  const diff = new Date(nextCheckAt).getTime() - Date.now();
+  if (diff <= 0) return { text: "Checking soon", color: "text-amber-400" };
+  const totalMin = Math.floor(diff / 60000);
+  const hours = Math.floor(totalMin / 60);
+  const minutes = totalMin % 60;
+  const countdown = hours === 0 ? `${minutes}m` : minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+  return { text: `Next: in ${countdown}`, color: "text-[var(--text-muted)]" };
 }
 
 const fraudColors: Record<FraudLevel, { bg: string; text: string; border: string }> = {

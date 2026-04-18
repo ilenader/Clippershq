@@ -40,6 +40,17 @@ function formatDateTime(dateStr: string): string {
   return `${d.getMonth() + 1}/${d.getDate()} ${formatTime(dateStr)}`;
 }
 
+function formatCountdown(dateStr: string): string {
+  const diff = new Date(dateStr).getTime() - Date.now();
+  if (diff <= 0) return "any moment";
+  const totalMin = Math.floor(diff / 60000);
+  const hours = Math.floor(totalMin / 60);
+  const minutes = totalMin % 60;
+  if (hours === 0) return `in ${minutes}m`;
+  if (minutes === 0) return `in ${hours}h`;
+  return `in ${hours}h ${minutes}m`;
+}
+
 function intervalLabel(min: number): string {
   if (min <= 60) return "Every 1h";
   if (min <= 120) return "Every 2h";
@@ -104,7 +115,7 @@ export function TrackingModal({ clip, open, onClose }: TrackingModalProps) {
                 <span className="text-[var(--text-muted)] ml-2">· {computeActualInterval(jobInfo.nextCheckAt, jobInfo.lastCheckedAt) || intervalLabel(jobInfo.checkIntervalMin)}</span>
               </p>
               <p className="text-[var(--text-muted)]">
-                Next check: {formatDateTime(jobInfo.nextCheckAt)}
+                Next check: {formatCountdown(jobInfo.nextCheckAt)}
                 {jobInfo.lastCheckedAt && ` · Last: ${formatDateTime(jobInfo.lastCheckedAt)}`}
               </p>
             </div>
