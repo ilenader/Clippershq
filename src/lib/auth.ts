@@ -18,6 +18,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           scope: "identify email guilds guilds.join",
         },
       },
+      // Override the default NextAuth Discord provider. The default maps
+      // `global_name` (the mutable display name) → user.name, which then gets
+      // copied into our `username` field on signup. That means if a user changes
+      // their Discord display name, the next fresh signup would store a
+      // different name. Using `profile.username` (the stable, unique handle)
+      // keeps usernames consistent — @ankara stays @ankara.
+      profile(profile: any) {
+        const format = typeof profile.avatar === "string" && profile.avatar.startsWith("a_") ? "gif" : "png";
+        const image = profile.avatar
+          ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.${format}`
+          : null;
+        return {
+          id: String(profile.id),
+          name: profile.username,
+          email: profile.email,
+          image,
+        };
+      },
     }),
     ...(process.env.GOOGLE_CLIENT_ID ? [Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -65,15 +83,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
 
-      // Block banned users from signing in (Discord path)
+      // Block banned users from signing in (Discord path). Also migrates the
+      // user's `username` field to the unique Discord handle — fixes existing
+      // users whose username was historically stored as display name.
       if (db && account?.provider === "discord" && account?.providerAccountId) {
         try {
           const existing = await db.user.findFirst({
             where: { discordId: account.providerAccountId },
-            select: { status: true },
+            select: { id: true, status: true, username: true },
           });
           if (existing?.status === "BANNED") {
             return false;
+          }
+          const discordUsername = (profile as any)?.username;
+          if (existing && typeof discordUsername === "string" && discordUsername && existing.username !== discordUsername) {
+            await db.user.update({
+              where: { id: existing.id },
+              data: { username: discordUsername },
+            }).catch(() => {});
           }
         } catch (err: any) {
           console.error("[AUTH] Ban check DB error:", err?.message);
