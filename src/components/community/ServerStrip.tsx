@@ -11,11 +11,13 @@ interface Props {
   campaigns: StripCampaign[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  compact?: boolean;
 }
 
-export function ServerStrip({ campaigns, selectedId, onSelect }: Props) {
+export function ServerStrip({ campaigns, selectedId, onSelect, compact }: Props) {
+  const iconSize = compact ? "h-10 w-10" : "h-12 w-12";
   return (
-    <div className="w-[72px] flex-shrink-0 bg-[var(--bg-primary)] flex flex-col py-3 gap-2 overflow-y-auto border-r border-[var(--border-color)]">
+    <div className={`${compact ? "w-14" : "w-[72px]"} flex-shrink-0 bg-[var(--bg-primary)] flex flex-col ${compact ? "py-2 gap-1.5" : "py-3 gap-2"} overflow-y-auto border-r border-[var(--border-color)]`}>
       {campaigns.map((c) => {
         const active = selectedId === c.id;
         const unread = c.totalUnread || 0;
@@ -26,16 +28,15 @@ export function ServerStrip({ campaigns, selectedId, onSelect }: Props) {
             className="relative group w-full flex justify-center pl-[3px]"
             aria-label={c.name}
           >
-            {/* Active pill — flush with left wall */}
             {active && (
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-10 bg-white rounded-r-full transition-all duration-200" />
+              <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] ${compact ? "h-8" : "h-10"} bg-white rounded-r-full transition-all duration-200`} />
             )}
             {!active && (
               <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-0 group-hover:h-5 bg-white rounded-r-full transition-all duration-200" />
             )}
 
             <div
-              className={`h-12 w-12 overflow-hidden transition-all duration-200 ${
+              className={`${iconSize} overflow-hidden transition-all duration-200 ${
                 active ? "rounded-xl" : "rounded-2xl group-hover:rounded-xl"
               }`}
             >

@@ -130,6 +130,12 @@ export default function CommunityPage() {
 
   useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
 
+  useEffect(() => {
+    if (selectedCampaignId && mobileView === "servers") {
+      setMobileView("channels");
+    }
+  }, [selectedCampaignId, mobileView]);
+
   // Real-time: refresh campaigns when channel or ticket activity arrives.
   useEffect(() => {
     const handler = () => { loadCampaigns(); };
@@ -456,16 +462,25 @@ export default function CommunityPage() {
 
   return (
     <div className="-m-4 lg:-m-6 flex h-[calc(100vh-56px)] min-h-0 bg-[var(--bg-primary)]">
-      {/* Server strip — always visible on desktop, only the first mobile pane */}
-      <div className={showingServers ? "flex w-full lg:w-auto" : "hidden lg:flex"}>
+      {/* Desktop: server strip always visible */}
+      <div className="hidden lg:flex">
         <ServerStrip
           campaigns={stripCampaigns}
           selectedId={selectedCampaignId || null}
           onSelect={handleCampaignSelect}
         />
-        {/* Mobile "servers" view fills the rest with a welcome card. */}
-        {showingServers && (
-          <div className="flex-1 flex items-center justify-center p-6 lg:hidden">
+      </div>
+
+      {/* Mobile: servers view — only when no campaigns or loading */}
+      {showingServers && (
+        <div className="flex w-full lg:hidden">
+          <ServerStrip
+            campaigns={stripCampaigns}
+            selectedId={selectedCampaignId || null}
+            onSelect={handleCampaignSelect}
+            compact
+          />
+          <div className="flex-1 flex items-center justify-center p-6">
             <div className="text-center max-w-xs">
               <MessageCircle className="h-12 w-12 text-accent/30 mx-auto mb-3" />
               <p className="text-base font-semibold text-[var(--text-primary)] mb-1">Community</p>
@@ -477,12 +492,48 @@ export default function CommunityPage() {
               </p>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Channel list — only when a campaign is selected */}
+      {/* Mobile: channels view — strip + channel list side by side */}
+      {showingChannels && selectedCampaign && (
+        <div className="flex w-full lg:hidden">
+          <ServerStrip
+            campaigns={stripCampaigns}
+            selectedId={selectedCampaignId || null}
+            onSelect={handleCampaignSelect}
+            compact
+          />
+          <div className="flex-1 min-w-0">
+            <ChannelList
+              campaignName={selectedCampaign.name}
+              campaignImageUrl={selectedCampaign.imageUrl}
+              channels={channels}
+              active={activeKey}
+              onSelectChannel={handleChannelSelect}
+              onSelectTicket={handleTicketSelect}
+              onSelectActivity={handleActivitySelect}
+              onSelectVoice={handleVoiceSelect}
+              upcomingCall={upcomingCall ? { id: upcomingCall.id, title: upcomingCall.title, status: upcomingCall.status } : null}
+              ticketUnread={unresolvedTicketCount}
+              isAdmin={isAdmin}
+              isOwner={isOwner}
+              username={username}
+              userImage={userImage}
+              userRole={viewerRole}
+              muted={muted}
+              onToggleMute={toggleMute}
+              onAddChannel={() => setShowAddChannel(true)}
+              onDeleteChannel={handleDeleteChannel}
+              onRenameChannel={handleRenameChannel}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Desktop: channel list */}
       {selectedCampaign && (
-        <div className={showingChannels ? "flex w-full lg:w-auto" : "hidden lg:flex"}>
+        <div className="hidden lg:flex">
           <ChannelList
             campaignName={selectedCampaign.name}
             campaignImageUrl={selectedCampaign.imageUrl}
@@ -504,7 +555,6 @@ export default function CommunityPage() {
             onAddChannel={() => setShowAddChannel(true)}
             onDeleteChannel={handleDeleteChannel}
             onRenameChannel={handleRenameChannel}
-            onBack={() => setMobileView("servers")}
           />
         </div>
       )}
