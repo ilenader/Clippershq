@@ -54,7 +54,8 @@ export async function GET(req: NextRequest) {
           select: { id: true },
         });
         if (!recentStat) {
-          await db.trackingJob.update({ where: { id: job.id }, data: { nextCheckAt: new Date() } });
+          const nh = new Date(); nh.setMinutes(0,0,0); nh.setHours(nh.getHours()+1);
+          await db.trackingJob.update({ where: { id: job.id }, data: { nextCheckAt: nh } });
           resetCount++;
         }
       }

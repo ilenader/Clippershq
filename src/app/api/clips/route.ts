@@ -368,15 +368,16 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Create tracking job for trackable clips — first check soon (unaligned) so new
-      // submissions don't wait until the next hour-aligned slot; subsequent checks align via roundToNextSlot.
       if (platform === "tiktok" || platform === "instagram") {
+        const firstCheck = new Date();
+        firstCheck.setMinutes(0, 0, 0);
+        firstCheck.setHours(firstCheck.getHours() + 1);
         await tx.trackingJob.create({
           data: {
             clipId: newClip.id,
             campaignId: data.campaignId,
-            nextCheckAt: new Date(Date.now() + 5 * 60_000),
-            checkIntervalMin: 60, // Phase 1: every 1 hour
+            nextCheckAt: firstCheck,
+            checkIntervalMin: 60,
             isActive: true,
           },
         });

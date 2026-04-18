@@ -42,7 +42,7 @@ export async function POST() {
         data: {
           clipId: clip.id,
           campaignId: clip.campaignId,
-          nextCheckAt: new Date(),
+          nextCheckAt: (() => { const d = new Date(); d.setMinutes(0,0,0); d.setHours(d.getHours()+1); return d; })(),
           checkIntervalMin: 60,
           isActive: true,
         },
@@ -68,7 +68,7 @@ export async function POST() {
   if (inactiveJobs.length > 0) {
     const result = await db.trackingJob.updateMany({
       where: { id: { in: inactiveJobs.map((j: any) => j.id) } },
-      data: { isActive: true, nextCheckAt: new Date() },
+      data: { isActive: true, nextCheckAt: (() => { const d = new Date(); d.setMinutes(0,0,0); d.setHours(d.getHours()+1); return d; })() },
     });
     reactivated = result.count;
     console.log(`[FIX-TRACKING] Reactivated ${reactivated} jobs`);

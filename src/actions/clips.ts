@@ -104,8 +104,7 @@ export async function submitClip(data: {
         data: {
           clipId: newClip.id,
           campaignId: data.campaignId,
-          // First check in ~5 minutes — unaligned so new clips don't wait for the next hour slot
-          nextCheckAt: new Date(Date.now() + 5 * 60_000),
+          nextCheckAt: (() => { const d = new Date(); d.setMinutes(0,0,0); d.setHours(d.getHours()+1); return d; })(),
           checkIntervalMin: 60,
           isActive: true,
         },

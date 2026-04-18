@@ -128,9 +128,11 @@ export async function POST(req: NextRequest) {
         data: { clipId: newClip.id, views: fetchedStats.views, likes: fetchedStats.likes, comments: fetchedStats.comments, shares: fetchedStats.shares },
       });
 
-      // Tracking job: first check in ~5 minutes (unaligned), subsequent checks align to full hours
+      const firstCheck = new Date();
+      firstCheck.setMinutes(0, 0, 0);
+      firstCheck.setHours(firstCheck.getHours() + 1);
       await tx.trackingJob.create({
-        data: { clipId: newClip.id, campaignId, nextCheckAt: new Date(Date.now() + 5 * 60_000), checkIntervalMin: 120, isActive: true },
+        data: { clipId: newClip.id, campaignId, nextCheckAt: firstCheck, checkIntervalMin: 60, isActive: true },
       });
 
       return newClip;

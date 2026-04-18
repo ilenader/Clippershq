@@ -44,7 +44,7 @@ export async function POST(
     // Reactivate all tracking jobs for this campaign
     const reactivated = await db.trackingJob.updateMany({
       where: { campaignId: id, isActive: false },
-      data: { isActive: true, nextCheckAt: new Date(Date.now() + 60 * 60 * 1000) },
+      data: { isActive: true, nextCheckAt: (() => { const d = new Date(); d.setMinutes(0,0,0); d.setHours(d.getHours()+1); return d; })() },
     });
     console.log(`[RESTORE] Reactivated ${reactivated.count} tracking jobs for campaign:`, id);
 

@@ -240,20 +240,22 @@ export async function POST(
       try {
         const existingJob = await db.trackingJob.findFirst({ where: { clipId: id } });
         if (!existingJob) {
+          const nh = new Date(); nh.setMinutes(0,0,0); nh.setHours(nh.getHours()+1);
           await db.trackingJob.create({
             data: {
               clipId: id,
               campaignId: clip.campaignId,
-              nextCheckAt: new Date(),
+              nextCheckAt: nh,
               checkIntervalMin: 60,
               isActive: true,
             },
           });
           console.log("[TRACKING] Created missing tracking job for clip:", id);
         } else if (!existingJob.isActive) {
+          const nh2 = new Date(); nh2.setMinutes(0,0,0); nh2.setHours(nh2.getHours()+1);
           await db.trackingJob.update({
             where: { id: existingJob.id },
-            data: { isActive: true, nextCheckAt: new Date() },
+            data: { isActive: true, nextCheckAt: nh2 },
           });
           console.log("[TRACKING] Reactivated tracking job for clip:", id);
         }

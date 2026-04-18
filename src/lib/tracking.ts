@@ -165,35 +165,27 @@ async function getNextInterval(
   return Math.max(interval, 5);
 }
 
+/** Returns the next :00 hour mark from now. */
+export function nextHourMark(): Date {
+  const next = new Date();
+  next.setMinutes(0, 0, 0);
+  next.setHours(next.getHours() + 1);
+  return next;
+}
+
 /**
- * Round the next check time to the nearest full UTC hour so clips cluster together.
- * Alignment lets the per-platform Apify batch pick up ALL due clips in one run per cron tick.
- * Minutes 0-29 round down to current hour; 30-59 round up. A 10-minute safety floor
- * prevents re-checking within the same cron window.
+ * Snap the next check time to an exact :00 hour boundary.
+ * For intervals >= 60 min, always returns the next :00.
+ * For sub-hour intervals (error retries), adds the interval raw.
  */
 export function roundToNextSlot(intervalMin: number): Date {
-  const rawNext = new Date(Date.now() + intervalMin * 60_000);
-
-  const rounded = new Date(rawNext);
-  const minutes = rounded.getMinutes();
-
-  if (minutes >= 30) {
-    // Round up to next hour
-    rounded.setMinutes(0, 0, 0);
-    rounded.setHours(rounded.getHours() + 1);
-  } else {
-    // Round down to current hour
-    rounded.setMinutes(0, 0, 0);
+  if (intervalMin >= 60) {
+    const next = new Date();
+    next.setMinutes(0, 0, 0);
+    next.setHours(next.getHours() + 1);
+    return next;
   }
-
-  // Safety: rounded time must be at least 10 minutes from now, else push to next hour.
-  const minNext = new Date(Date.now() + 10 * 60_000);
-  if (rounded <= minNext) {
-    rounded.setHours(rounded.getHours() + 1);
-    rounded.setMinutes(0, 0, 0);
-  }
-
-  return rounded;
+  return new Date(Date.now() + intervalMin * 60_000);
 }
 
 /**
@@ -234,10 +226,10 @@ async function processTrackingJob(
       } catch (fetchErr: any) {
         await db.trackingJob.update({
           where: { id: job.id },
-          data: { nextCheckAt: new Date(Date.now() + 30 * 60 * 1000), lastCheckedAt: new Date() },
+          data: { nextCheckAt: nextHourMark(), lastCheckedAt: new Date() },
         }).catch(() => {});
-        console.log(`[TRACKING] Clip ${clip.id}: individual fetch also failed, retry in 30min`);
-        details.push(`Clip ${clip.id}: fetch failed, retry in 30min`);
+        console.log(`[TRACKING] Clip ${clip.id}: individual fetch also failed, retry at next hour`);
+        details.push(`Clip ${clip.id}: fetch failed, retry at next hour`);
         return { success: true, detail: "fetch-failed" };
       }
     }
@@ -291,7 +283,7 @@ async function processTrackingJob(
         }),
         db.trackingJob.update({
           where: { id: job.id },
-          data: { lastCheckedAt: new Date(), nextCheckAt: new Date(Date.now() + 10 * 60_000) },
+          data: { lastCheckedAt: new Date(), nextCheckAt: nextHourMark() },
         }),
       ]);
     }
@@ -615,7 +607,7 @@ async function processTrackingJob(
           // Slow tracking to daily
           await db.trackingJob.update({
             where: { id: job.id },
-            data: { nextCheckAt: new Date(Date.now() + 1440 * 60 * 1000), lastCheckedAt: new Date(), checkIntervalMin: 1440 },
+            data: { nextCheckAt: nextHourMark(), lastCheckedAt: new Date(), checkIntervalMin: 1440 },
           }).catch(() => {});
           // Notify all owners
           try {
@@ -635,10 +627,9 @@ async function processTrackingJob(
       }
     }
 
-    // Retry in 30 min on error
     await db.trackingJob.update({
       where: { id: job.id },
-      data: { nextCheckAt: new Date(Date.now() + 30 * 60 * 1000), lastCheckedAt: new Date() },
+      data: { nextCheckAt: nextHourMark(), lastCheckedAt: new Date() },
     }).catch(() => {});
     return { success: false, error: err.message };
   }
