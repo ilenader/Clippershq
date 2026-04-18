@@ -139,16 +139,16 @@ function Row({ entry, isMe }: { entry: Entry; isMe: boolean }) {
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className={`text-sm lg:text-base font-medium truncate ${isMe ? "text-accent" : "text-[var(--text-primary)]"}`}>
+        <p className={`text-sm lg:text-lg font-medium truncate ${isMe ? "text-accent" : "text-[var(--text-primary)]"}`}>
           {isMe ? "You" : entry.username}
         </p>
-        <p className="text-xs text-[var(--text-muted)]">
+        <p className="text-xs lg:text-sm text-[var(--text-muted)]">
           {entry.clipCount} clip{entry.clipCount === 1 ? "" : "s"}
         </p>
       </div>
 
       <div className="text-right">
-        <p className="text-sm lg:text-base font-bold text-accent tabular-nums">
+        <p className="text-sm lg:text-lg font-bold text-accent tabular-nums">
           {formatNumber(entry.totalViews)}
         </p>
         {entry.rankChange > 0 && (

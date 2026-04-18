@@ -1,6 +1,19 @@
 self.addEventListener('install', (e) => { self.skipWaiting(); });
 self.addEventListener('activate', (e) => { e.waitUntil(clients.claim()); });
-self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request)); });
+self.addEventListener('fetch', (e) => {
+  // Don't intercept non-GET requests or auth-sensitive API routes — let the
+  // browser handle them natively. Wrapping them in respondWith + fetch produces
+  // spurious "FetchEvent resulted in a network error" console warnings and
+  // can interfere with streaming/keep-alive requests (Ably, SSE, etc.).
+  if (e.request.method !== 'GET') return;
+  try {
+    const url = new URL(e.request.url);
+    if (url.pathname.startsWith('/api/community')) return;
+    if (url.pathname.startsWith('/api/ably-token')) return;
+    if (url.pathname.startsWith('/api/notifications/sse')) return;
+  } catch {}
+  e.respondWith(fetch(e.request));
+});
 
 // Push notifications
 self.addEventListener('push', (e) => {

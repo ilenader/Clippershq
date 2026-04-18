@@ -166,7 +166,7 @@ export function MessageBubble({
               onClick={() => {
                 if (isOwner && message.user?.id) router.push(`/admin/users/${message.user.id}`);
               }}
-              className={`text-sm font-semibold truncate max-w-[150px] sm:max-w-[200px] ${roleStyle?.name || "text-[var(--text-primary)]"} ${isOwner ? "hover:underline cursor-pointer" : "cursor-default"}`}
+              className={`text-sm lg:text-base font-semibold truncate max-w-[150px] sm:max-w-[200px] ${roleStyle?.name || "text-[var(--text-primary)]"} ${isOwner ? "hover:underline cursor-pointer" : "cursor-default"}`}
             >
               {username}
             </button>
@@ -175,7 +175,7 @@ export function MessageBubble({
                 {role}
               </span>
             )}
-            <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
+            <span className="text-[11px] lg:text-xs text-[var(--text-muted)] tabular-nums">
               {formatMessageTime(message.createdAt)}
             </span>
             {message.isPinned && (

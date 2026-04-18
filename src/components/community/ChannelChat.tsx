@@ -187,7 +187,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
       const detail = (e as CustomEvent).detail;
       if (!detail || detail.channelId !== channelId) return;
       const incoming: Message = {
-        id: detail.messageId,
+        id: detail.messageId || detail.id,
         content: detail.content,
         createdAt: detail.createdAt || new Date().toISOString(),
         userId: detail.userId,
@@ -195,6 +195,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
           id: detail.userId,
           username: detail.username || "user",
           role: detail.role || "CLIPPER",
+          image: detail.image || null,
         },
       };
       setMessages((prev) => {
@@ -452,8 +453,8 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
       {/* Channel header — shows the channel name persistently inside the chat area
           so the context is visible below the campaign tabs on desktop and mobile. */}
       <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
-        <HeaderIcon className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
-        <h2 className="text-sm lg:text-base font-semibold text-[var(--text-primary)] truncate">
+        <HeaderIcon className="h-4 w-4 lg:h-5 lg:w-5 text-[var(--text-muted)] flex-shrink-0" />
+        <h2 className="text-base lg:text-lg font-semibold text-[var(--text-primary)] truncate">
           {channelName}
         </h2>
       </div>
@@ -467,7 +468,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
               placeholder="Search messages…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-9 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] text-xs lg:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-accent/40 focus:outline-none transition-colors"
+              className="w-full pl-9 pr-9 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] text-sm lg:text-base text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-accent/40 focus:outline-none transition-colors"
             />
             {searchQuery && (
               <button

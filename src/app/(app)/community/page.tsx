@@ -200,6 +200,38 @@ export default function CommunityPage() {
       .catch(() => setPastCalls([]));
   }, [selectedCampaignId, isAdmin]);
 
+  // Unresolved ticket count for the admin Tickets-tab badge.
+  const [unresolvedTicketCount, setUnresolvedTicketCount] = useState(0);
+  useEffect(() => {
+    if (!selectedCampaignId || !isAdmin) { setUnresolvedTicketCount(0); return; }
+    let cancelled = false;
+    fetch(`/api/community/tickets?campaignId=${encodeURIComponent(selectedCampaignId)}&limit=100`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const list: any[] = Array.isArray(data?.tickets) ? data.tickets : [];
+        setUnresolvedTicketCount(list.filter((t) => t.status !== "resolved").length);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [selectedCampaignId, isAdmin]);
+  // Refresh the count when a new ticket message arrives.
+  useEffect(() => {
+    const handler = () => {
+      if (!selectedCampaignId || !isAdmin) return;
+      fetch(`/api/community/tickets?campaignId=${encodeURIComponent(selectedCampaignId)}&limit=100`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data) return;
+          const list: any[] = Array.isArray(data?.tickets) ? data.tickets : [];
+          setUnresolvedTicketCount(list.filter((t) => t.status !== "resolved").length);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("sse:ticket_message", handler);
+    return () => window.removeEventListener("sse:ticket_message", handler);
+  }, [selectedCampaignId, isAdmin]);
+
   // Keep the page's call state in sync with server-side lifecycle events.
   useEffect(() => {
     const handler = (e: any) => {
@@ -438,6 +470,11 @@ export default function CommunityPage() {
               >
                 <MessageCircle className="h-3.5 w-3.5" />
                 {isAdmin ? "Tickets" : "Direct"}
+                {isAdmin && unresolvedTicketCount > 0 && viewMode !== "ticket" && (
+                  <span className="ml-0.5 h-4 min-w-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-1 tabular-nums">
+                    {unresolvedTicketCount > 99 ? "99+" : unresolvedTicketCount}
+                  </span>
+                )}
               </button>
 
               {isAdmin && (
@@ -569,7 +606,7 @@ export default function CommunityPage() {
                 ) : viewMode === "activity" && isAdmin ? (
                   <ActivityFeed campaignId={selectedCampaignId} />
                 ) : viewMode === "ticket" ? (
-                  <TicketPanel campaignId={selectedCampaignId} viewerId={viewerId} viewerRole={viewerRole} campaignName={selectedCampaign?.name} />
+                  <TicketPanel campaignId={selectedCampaignId} viewerId={viewerId} viewerRole={viewerRole} campaignName={selectedCampaign?.name} initialTicketId={searchParams.get("ticketId") || undefined} />
                 ) : selectedChannel ? (
                   selectedChannel.type === "leaderboard" ? (
                     <Leaderboard channelId={selectedChannel.id} viewerId={viewerId} />
@@ -617,10 +654,10 @@ function CampaignRow({
         <CampaignImage src={campaign.imageUrl} name={campaign.name} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${active ? "text-accent" : "text-[var(--text-primary)]"}`}>
+        <p className={`text-sm lg:text-base font-medium truncate ${active ? "text-accent" : "text-[var(--text-primary)]"}`}>
           {campaign.name}
         </p>
-        <p className="text-[11px] text-[var(--text-muted)] truncate">{campaign.platform}</p>
+        <p className="text-[11px] lg:text-xs text-[var(--text-muted)] truncate">{campaign.platform}</p>
       </div>
       {unread > 0 && (
         <span className="flex-shrink-0 h-5 min-w-5 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center px-1.5 tabular-nums">

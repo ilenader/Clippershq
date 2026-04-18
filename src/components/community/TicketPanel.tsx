@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, MessageCircle, Search, StickyNote, X } from "lucide-react";
+import { ArrowLeft, Loader2, MessageCircle, PanelLeftClose, PanelLeftOpen, Search, StickyNote, X } from "lucide-react";
 import { MessageBubble, type Message } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { formatRelative } from "@/lib/utils";
@@ -26,6 +26,9 @@ interface Props {
   viewerRole: "CLIPPER" | "ADMIN" | "OWNER" | "CLIENT";
   /** Campaign display name — used in the CLIPPER welcome banner. */
   campaignName?: string;
+  /** When provided (e.g., from ?ticketId= URL param after a DM-toast click),
+   *  auto-selects this ticket once it appears in the loaded list. */
+  initialTicketId?: string;
 }
 
 const statusColors: Record<TicketStatus, { dot: string; active: string }> = {
@@ -35,7 +38,7 @@ const statusColors: Record<TicketStatus, { dot: string; active: string }> = {
   resolved: { dot: "bg-emerald-400", active: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" },
 };
 
-export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName }: Props) {
+export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, initialTicketId }: Props) {
   const isAdminOrOwner = viewerRole === "OWNER" || viewerRole === "ADMIN";
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -48,6 +51,8 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName }: 
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Desktop-only collapse of the ticket list panel so admins get a wider chat view.
+  const [listCollapsed, setListCollapsed] = useState(false);
 
   const loadTickets = useCallback(async (opts?: { append?: boolean; cursor?: string | null }) => {
     if (fetchingRef.current) return;
@@ -111,6 +116,15 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName }: 
     setLoadedTicketsOnce(false);
     loadTickets();
   }, [campaignId, loadTickets]);
+
+  // Auto-select the ticket specified via ?ticketId= (e.g., after a DM-toast click).
+  // Applied after tickets load so the ticket row exists in state before selection.
+  useEffect(() => {
+    if (!initialTicketId) return;
+    if (tickets.some((t) => t.id === initialTicketId)) {
+      setSelectedId(initialTicketId);
+    }
+  }, [initialTicketId, tickets]);
 
   // Real-time ticket updates.
   useEffect(() => {
@@ -191,8 +205,21 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName }: 
   // OWNER/ADMIN: list + detail.
   return (
     <div className="flex h-full min-h-0">
-      {/* LIST */}
-      <div className="w-72 lg:w-80 flex-shrink-0 border-r border-[var(--border-color)] bg-[var(--bg-card)] flex flex-col min-h-0">
+      {/* LIST — full-width on mobile when no ticket selected, hidden when one is.
+          On desktop it's a sidebar that can be collapsed to a thin expand strip. */}
+      <div className={`${selectedId ? "hidden lg:flex" : "flex"} ${listCollapsed ? "lg:hidden" : "lg:flex"} w-full lg:w-80 flex-shrink-0 border-r border-[var(--border-color)] bg-[var(--bg-card)] flex-col min-h-0`}>
+        {/* Panel header with desktop collapse toggle */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-color)]">
+          <h3 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Tickets</h3>
+          <button
+            onClick={() => setListCollapsed(true)}
+            className="hidden lg:flex p-1 rounded hover:bg-[var(--bg-input)] items-center justify-center"
+            aria-label="Collapse ticket list"
+            title="Collapse"
+          >
+            <PanelLeftClose className="h-4 w-4 text-[var(--text-muted)]" />
+          </button>
+        </div>
         {/* Filters */}
         <div className="p-3 border-b border-[var(--border-color)] space-y-2">
           <div className="relative">
@@ -213,7 +240,7 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName }: 
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
-                  className={`text-[11px] font-medium px-2 py-1 rounded-md transition-colors ${
+                  className={`text-[11px] lg:text-sm font-medium px-2 py-1 rounded-md transition-colors ${
                     isActive
                       ? "bg-accent/15 text-accent"
                       : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)]"
@@ -271,16 +298,16 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName }: 
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                  <p className="text-sm lg:text-base font-medium text-[var(--text-primary)] truncate">
                     {t.user?.username || "Clipper"}
                   </p>
                   {t.lastMessageAt && (
-                    <span className="text-[10px] text-[var(--text-muted)] flex-shrink-0 tabular-nums">
+                    <span className="text-[10px] lg:text-[11px] text-[var(--text-muted)] flex-shrink-0 tabular-nums">
                       {formatRelative(t.lastMessageAt)}
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-[var(--text-muted)] truncate">
+                <p className="text-xs lg:text-sm text-[var(--text-muted)] truncate">
                   {t.lastMessage?.content || "No messages yet"}
                 </p>
               </div>
@@ -308,8 +335,28 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName }: 
         </div>
       </div>
 
-      {/* DETAIL */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+      {/* Collapsed strip — only visible on desktop when the list is collapsed. */}
+      {listCollapsed && (
+        <button
+          onClick={() => setListCollapsed(false)}
+          className="hidden lg:flex items-center justify-center w-8 border-r border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] transition-colors"
+          aria-label="Expand ticket list"
+          title="Expand tickets"
+        >
+          <PanelLeftOpen className="h-4 w-4 text-[var(--text-muted)]" />
+        </button>
+      )}
+
+      {/* DETAIL — hidden on mobile when no ticket selected. Always visible on desktop. */}
+      <div className={`${!selectedId ? "hidden lg:flex" : "flex"} flex-1 min-w-0 flex-col min-h-0`}>
+        {selectedId && (
+          <button
+            onClick={() => setSelectedId(null)}
+            className="lg:hidden flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-[var(--text-secondary)] border-b border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to tickets
+          </button>
+        )}
         {!selected ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">

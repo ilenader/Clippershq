@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 interface Toast {
   ticketId: string;
+  campaignId?: string | null;
   senderName: string;
   messagePreview?: string;
   campaignName?: string;
@@ -63,6 +64,7 @@ export function DmToast({ viewerId, viewerRole }: { viewerId: string; viewerRole
         const msg = (data.messages || [])[0];
         setToast({
           ticketId: detail.ticketId,
+          campaignId: detail.campaignId || null,
           senderName: msg?.user?.username || "Team",
           messagePreview: msg?.content,
           campaignName: detail.campaignName,
@@ -71,6 +73,7 @@ export function DmToast({ viewerId, viewerRole }: { viewerId: string; viewerRole
       } catch {
         setToast({
           ticketId: detail.ticketId,
+          campaignId: detail.campaignId || null,
           senderName: "Team",
           campaignName: detail.campaignName,
           arrivedAt: Date.now(),
@@ -121,7 +124,9 @@ export function DmToast({ viewerId, viewerRole }: { viewerId: string; viewerRole
       `}</style>
       <button
         onClick={() => {
-          router.push(`/community?ticketId=${encodeURIComponent(toast.ticketId)}&tab=ticket`);
+          const params = new URLSearchParams({ tab: "ticket", ticketId: toast.ticketId });
+          if (toast.campaignId) params.set("campaignId", toast.campaignId);
+          router.push(`/community?${params.toString()}`);
           setToast(null);
         }}
         className="w-full text-left flex items-start gap-3 p-4 rounded-xl border border-accent/20 bg-[var(--bg-card)] shadow-xl shadow-black/40 hover:border-accent/40 transition-colors cursor-pointer"

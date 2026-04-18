@@ -180,8 +180,11 @@ export async function POST(
       channelId,
       channelName: channel.name,
       messageId: message.id,
+      id: message.id,
       userId: session.user.id,
-      username: (message.user as any)?.username,
+      username: (message.user as any)?.username || (message.user as any)?.name || "user",
+      role: (message.user as any)?.role || "CLIPPER",
+      image: (message.user as any)?.image || null,
       content: message.content,
       createdAt: message.createdAt,
     }).catch(() => {});
