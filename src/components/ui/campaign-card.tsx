@@ -100,7 +100,7 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
           )}
 
           {/* Top gradient ONLY */}
-          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 to-transparent" />
+          <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-black/90 via-black/60 to-transparent" />
 
           {/* Name overlay */}
           <div className="absolute top-0 inset-x-0 p-4 pr-12">

@@ -30,10 +30,10 @@ export function ServerStrip({ campaigns, selectedId, onSelect }: Props) {
         aria-label="Community home"
       >
         <div
-          className={`h-12 w-12 flex items-center justify-center transition-all duration-200 ${
+          className={`h-12 w-12 flex items-center justify-center transition-all duration-200 group-hover:scale-110 ${
             !selectedId
               ? "bg-accent rounded-xl"
-              : "bg-[var(--bg-card)] rounded-2xl hover:bg-accent hover:rounded-xl"
+              : "bg-[var(--bg-card)] rounded-2xl group-hover:bg-accent group-hover:rounded-xl"
           }`}
         >
           <MessageCircle className="h-5 w-5 text-white" />
@@ -59,8 +59,8 @@ export function ServerStrip({ campaigns, selectedId, onSelect }: Props) {
             aria-label={c.name}
           >
             <div
-              className={`h-12 w-12 overflow-hidden transition-all duration-200 ${
-                active ? "rounded-xl" : "rounded-2xl hover:rounded-xl"
+              className={`h-12 w-12 overflow-hidden transition-all duration-200 group-hover:scale-110 ${
+                active ? "rounded-xl" : "rounded-2xl group-hover:rounded-xl"
               }`}
             >
               {c.imageUrl ? (
@@ -73,13 +73,13 @@ export function ServerStrip({ campaigns, selectedId, onSelect }: Props) {
               )}
             </div>
 
-            {/* Active indicator */}
+            {/* Active indicator — tall pill flush with left edge */}
             {active && (
-              <span className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-1 h-5 bg-white rounded-r-full" />
+              <span className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-1 h-10 bg-white rounded-r-full transition-all duration-200" />
             )}
-            {/* Hover indicator (grows on hover) */}
+            {/* Hover indicator — shorter pill appears on hover */}
             {!active && (
-              <span className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-1 h-0 group-hover:h-3 bg-white rounded-r-full transition-all duration-200" />
+              <span className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-1 h-0 group-hover:h-5 bg-white rounded-r-full transition-all duration-200" />
             )}
 
             {/* Unread badge */}

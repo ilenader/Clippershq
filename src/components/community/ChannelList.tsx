@@ -223,7 +223,7 @@ export function ChannelList({
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="px-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+      <p className="px-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--text-muted)]/60 mb-1 select-none">
         {label}
       </p>
       <div className="space-y-0.5">{children}</div>
@@ -280,13 +280,14 @@ function ChannelRow({
         if (editing) return;
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); }
       }}
-      className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer ${
+      className={`relative group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-all duration-150 cursor-pointer ${
         active
-          ? "bg-[var(--bg-input)] text-[var(--text-primary)]"
-          : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
+          ? "bg-accent/10 text-accent font-semibold"
+          : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] hover:pl-3"
       }`}
     >
-      <Icon className="h-4 w-4 flex-shrink-0" />
+      {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-accent rounded-r-full" />}
+      <Icon className={`h-4 w-4 flex-shrink-0 ${active ? "text-accent" : ""}`} />
       {editing ? (
         <input
           ref={editRef}
@@ -374,13 +375,14 @@ function PseudoRow({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
+      className={`relative w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-all duration-150 ${
         active
-          ? "bg-[var(--bg-input)] text-[var(--text-primary)]"
-          : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
+          ? "bg-accent/10 text-accent font-semibold"
+          : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] hover:pl-3"
       }`}
     >
-      <Icon className="h-4 w-4 flex-shrink-0" />
+      {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-accent rounded-r-full" />}
+      <Icon className={`h-4 w-4 flex-shrink-0 ${active ? "text-accent" : ""}`} />
       <span className="text-sm truncate flex-1 text-left">{label}</span>
       {badge && (
         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 animate-pulse">
