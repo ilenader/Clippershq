@@ -123,6 +123,7 @@ export default function CommunityPage() {
           } catch {}
         }
       }
+      urlCampaignIdRef.current = "";
     } catch {}
     setLoadingCampaigns(false);
   }, [selectedCampaignId]);
