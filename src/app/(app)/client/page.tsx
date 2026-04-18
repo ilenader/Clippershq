@@ -488,18 +488,11 @@ export default function ClientDashboard() {
           {/* ─── F) DAILY BREAKDOWN (collapsible) ─── */}
           {filteredDailyBreakdown.length > 0 && (
             <Card>
-              <button
-                onClick={() => setDailyOpen(!dailyOpen)}
-                className="flex items-center justify-between w-full text-left cursor-pointer"
-              >
-                <h3 className="text-sm lg:text-base font-semibold text-[var(--text-primary)]">Daily Breakdown</h3>
-                {dailyOpen
-                  ? <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
-                  : <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />
-                }
-              </button>
-              {dailyOpen && (
-                <div className="overflow-x-auto -mx-4 sm:-mx-5 mt-4">
+              <h3 className="text-sm lg:text-base font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-accent" />
+                Daily Breakdown
+              </h3>
+              <div className="overflow-x-auto -mx-4 sm:-mx-5">
                   <table className="w-full text-sm lg:text-base">
                     <thead>
                       <tr className="border-b border-[var(--border-color)]">
@@ -534,7 +527,6 @@ export default function ClientDashboard() {
                     </tbody>
                   </table>
                 </div>
-              )}
             </Card>
           )}
         </>
