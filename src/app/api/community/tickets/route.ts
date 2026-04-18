@@ -64,6 +64,38 @@ export async function GET(req: NextRequest) {
     );
 
     const nextCursor = hasMore ? enriched[enriched.length - 1].id : null;
+
+    // For OWNER/ADMIN: also return clippers who haven't messaged yet
+    if (role === "OWNER" || role === "ADMIN") {
+      const campaignAccounts = await db.campaignAccount.findMany({
+        where: { campaignId },
+        select: { clipAccount: { select: { userId: true, user: { select: { id: true, username: true, name: true, image: true } } } } },
+        take: 500,
+      });
+      const ticketUserIds = new Set(page.map((t: any) => t.userId));
+      const seen = new Set<string>();
+      const noConversation = [];
+      for (const ca of campaignAccounts) {
+        const u = ca.clipAccount?.user;
+        if (u && !ticketUserIds.has(u.id) && !seen.has(u.id)) {
+          seen.add(u.id);
+          noConversation.push({
+            id: `no-convo-${u.id}`,
+            userId: u.id,
+            campaignId,
+            status: "no_conversation",
+            notes: null,
+            lastMessageAt: null,
+            createdAt: null,
+            user: { id: u.id, username: u.username || u.name || "Clipper", image: u.image },
+            unread: 0,
+            lastMessage: null,
+          });
+        }
+      }
+      return NextResponse.json({ tickets: enriched, noConversation, hasMore, nextCursor });
+    }
+
     return NextResponse.json({ tickets: enriched, hasMore, nextCursor });
   } catch (err: any) {
     console.error("[COMMUNITY] tickets GET error:", err?.message);
@@ -96,10 +128,23 @@ export async function POST(req: NextRequest) {
   const hasAccess = await userHasCampaignCommunityAccess(session.user.id, role, campaignId);
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // OWNER/ADMIN can create a ticket for a specific clipper
+  const targetUserId = (role === "OWNER" || role === "ADMIN") && typeof body.userId === "string" && body.userId
+    ? body.userId
+    : session.user.id;
+
+  if (targetUserId !== session.user.id) {
+    const membership = await db.campaignAccount.findFirst({
+      where: { campaignId, clipAccount: { userId: targetUserId } },
+      select: { id: true },
+    });
+    if (!membership) return NextResponse.json({ error: "User is not in this campaign" }, { status: 400 });
+  }
+
   try {
     const ticket = await db.campaignTicket.upsert({
-      where: { campaignId_userId: { campaignId, userId: session.user.id } },
-      create: { campaignId, userId: session.user.id, status: "open" },
+      where: { campaignId_userId: { campaignId, userId: targetUserId } },
+      create: { campaignId, userId: targetUserId, status: "open" },
       update: {},
       include: { user: { select: { id: true, username: true, image: true } } },
     });

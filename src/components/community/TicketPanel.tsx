@@ -7,7 +7,7 @@ import { MessageInput } from "./MessageInput";
 import { formatRelative } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 
-type TicketStatus = "open" | "waiting" | "pending" | "resolved";
+type TicketStatus = "open" | "waiting" | "pending" | "resolved" | "no_conversation";
 
 interface Ticket {
   id: string;
@@ -32,10 +32,11 @@ interface Props {
 }
 
 const statusColors: Record<TicketStatus, { dot: string; active: string }> = {
-  open:     { dot: "bg-blue-400",    active: "bg-blue-500/15 text-blue-400 border border-blue-500/30" },
-  waiting:  { dot: "bg-amber-400",   active: "bg-amber-500/15 text-amber-400 border border-amber-500/30" },
-  pending:  { dot: "bg-purple-400",  active: "bg-purple-500/15 text-purple-400 border border-purple-500/30" },
-  resolved: { dot: "bg-emerald-400", active: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" },
+  open:            { dot: "bg-blue-400",    active: "bg-blue-500/15 text-blue-400 border border-blue-500/30" },
+  waiting:         { dot: "bg-amber-400",   active: "bg-amber-500/15 text-amber-400 border border-amber-500/30" },
+  pending:         { dot: "bg-purple-400",  active: "bg-purple-500/15 text-purple-400 border border-purple-500/30" },
+  resolved:        { dot: "bg-emerald-400", active: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" },
+  no_conversation: { dot: "bg-zinc-400",    active: "bg-zinc-500/15 text-zinc-400 border border-zinc-500/30" },
 };
 
 export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, initialTicketId }: Props) {
@@ -46,6 +47,7 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, in
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadedTicketsOnce, setLoadedTicketsOnce] = useState(false);
+  const [noConvoClippers, setNoConvoClippers] = useState<Ticket[]>([]);
   const fetchingRef = useRef(false);
 
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -73,6 +75,9 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, in
       setTickets((prev) => (append ? [...prev, ...list] : list));
       setHasMore(more);
       setNextCursor(cursor);
+      if (!append && data?.noConversation) {
+        setNoConvoClippers(data.noConversation);
+      }
 
       // Select existing ticket if one exists. Never auto-CREATE — CLIPPER must click
       // "Start a Conversation" first. Functional setState so this callback doesn't
@@ -112,11 +117,31 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, in
     }
   }, [campaignId]);
 
+  const startDmWith = useCallback(async (userId: string) => {
+    try {
+      const res = await fetch("/api/community/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaignId, userId }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      const ticket = data?.ticket || data;
+      if (!ticket?.id) throw new Error("Bad response");
+      setTickets((prev) => [{ ...ticket, unread: 0, lastMessage: null }, ...prev]);
+      setNoConvoClippers((prev) => prev.filter((c) => c.userId !== userId));
+      setSelectedId(ticket.id);
+    } catch {
+      toast.error("Failed to start conversation");
+    }
+  }, [campaignId]);
+
   useEffect(() => {
     setLoading(true);
     setTickets([]);
     setSelectedId(null);
     setLoadedTicketsOnce(false);
+    setNoConvoClippers([]);
     loadTickets();
   }, [campaignId, loadTickets]);
 
@@ -141,24 +166,24 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, in
     return () => window.removeEventListener("sse:ticket_message", handler);
   }, [loadTickets]);
 
-  // Filter + search.
   const filtered = useMemo(() => {
-    let rows = tickets;
-    if (statusFilter !== "all") rows = rows.filter((t) => t.status === statusFilter);
+    let rows: Ticket[] = statusFilter === "no_conversation"
+      ? noConvoClippers
+      : statusFilter === "all" ? tickets : tickets.filter((t) => t.status === statusFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       rows = rows.filter((t) => (t.user?.username || "").toLowerCase().includes(q));
     }
     return rows;
-  }, [tickets, statusFilter, search]);
+  }, [tickets, noConvoClippers, statusFilter, search]);
 
   const counts = useMemo(() => {
-    const c = { all: tickets.length, open: 0, waiting: 0, pending: 0, resolved: 0 };
+    const c: Record<string, number> = { all: tickets.length, open: 0, waiting: 0, pending: 0, resolved: 0, no_conversation: noConvoClippers.length };
     for (const t of tickets) c[t.status] = (c[t.status] || 0) + 1;
     return c;
-  }, [tickets]);
+  }, [tickets, noConvoClippers]);
 
-  const selected = tickets.find((t) => t.id === selectedId) || null;
+  const selected = selectedId ? tickets.find((t) => t.id === selectedId) || null : null;
 
   if (!isAdminOrOwner) {
     // CLIPPER: single ticket view, no list.
@@ -241,20 +266,21 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, in
             />
           </div>
           <div className="flex flex-wrap gap-1">
-            {(["all", "open", "waiting", "pending", "resolved"] as const).map((s) => {
+            {(["all", "open", "waiting", "pending", "resolved", ...(isAdminOrOwner ? ["no_conversation"] : [])] as const).map((s) => {
               const isActive = statusFilter === s;
-              const count = counts[s];
+              const count = counts[s as string] || 0;
+              const label = s === "all" ? "All" : s === "no_conversation" ? "No DM" : s[0].toUpperCase() + s.slice(1);
               return (
                 <button
                   key={s}
-                  onClick={() => setStatusFilter(s)}
+                  onClick={() => setStatusFilter(s as any)}
                   className={`text-[11px] lg:text-sm font-medium px-2 py-1 rounded-md transition-colors ${
                     isActive
                       ? "bg-accent/15 text-accent"
                       : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)]"
                   }`}
                 >
-                  {s === "all" ? "All" : s[0].toUpperCase() + s.slice(1)}
+                  {label}
                   {count > 0 && <span className="ml-1 tabular-nums opacity-70">({count})</span>}
                 </button>
               );
@@ -292,42 +318,70 @@ export function TicketPanel({ campaignId, viewerId, viewerRole, campaignName, in
             </div>
           )}
           {filtered.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setSelectedId(t.id)}
-              className={`w-full text-left flex items-center gap-3 px-3 py-3 border-b border-[var(--border-subtle)] transition-colors ${
-                selectedId === t.id
-                  ? "bg-accent/10 border-l-2 border-l-accent"
-                  : "hover:bg-[var(--bg-card-hover)] border-l-2 border-l-transparent"
-              }`}
-            >
-              <div className="h-9 w-9 rounded-full bg-accent/15 border border-accent/20 flex items-center justify-center text-accent text-xs font-bold uppercase flex-shrink-0">
-                {(t.user?.username || "?")[0]}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
+            t.status === "no_conversation" ? (
+              <div
+                key={t.id}
+                className="w-full flex items-center gap-3 px-3 py-3 border-b border-[var(--border-subtle)]"
+              >
+                {t.user?.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={t.user.image} alt="" className="h-9 w-9 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <div className="h-9 w-9 rounded-full bg-accent/15 border border-accent/20 flex items-center justify-center text-accent text-xs font-bold uppercase flex-shrink-0">
+                    {(t.user?.username || "?")[0]}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
                   <p className="text-sm lg:text-base font-medium text-[var(--text-primary)] truncate">
                     {t.user?.username || "Clipper"}
                   </p>
-                  {t.lastMessageAt && (
-                    <span className="text-[10px] lg:text-[11px] text-[var(--text-muted)] flex-shrink-0 tabular-nums">
-                      {formatRelative(t.lastMessageAt)}
+                  <p className="text-xs text-[var(--text-muted)]">No messages yet</p>
+                </div>
+                <button
+                  onClick={() => startDmWith(t.userId)}
+                  className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/80 transition-colors flex-shrink-0"
+                >
+                  Start DM
+                </button>
+              </div>
+            ) : (
+              <button
+                key={t.id}
+                onClick={() => setSelectedId(t.id)}
+                className={`w-full text-left flex items-center gap-3 px-3 py-3 border-b border-[var(--border-subtle)] transition-colors ${
+                  selectedId === t.id
+                    ? "bg-accent/10 border-l-2 border-l-accent"
+                    : "hover:bg-[var(--bg-card-hover)] border-l-2 border-l-transparent"
+                }`}
+              >
+                <div className="h-9 w-9 rounded-full bg-accent/15 border border-accent/20 flex items-center justify-center text-accent text-xs font-bold uppercase flex-shrink-0">
+                  {(t.user?.username || "?")[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm lg:text-base font-medium text-[var(--text-primary)] truncate">
+                      {t.user?.username || "Clipper"}
+                    </p>
+                    {t.lastMessageAt && (
+                      <span className="text-[10px] lg:text-[11px] text-[var(--text-muted)] flex-shrink-0 tabular-nums">
+                        {formatRelative(t.lastMessageAt)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs lg:text-sm text-[var(--text-muted)] truncate">
+                    {t.lastMessage?.content || "No messages yet"}
+                  </p>
+                </div>
+                <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                  <span className={`h-2 w-2 rounded-full ${statusColors[t.status]?.dot || "bg-zinc-400"}`} />
+                  {t.unread > 0 && (
+                    <span className="h-4 min-w-4 rounded-full bg-accent text-white text-[9px] font-bold flex items-center justify-center px-1 tabular-nums">
+                      {t.unread}
                     </span>
                   )}
                 </div>
-                <p className="text-xs lg:text-sm text-[var(--text-muted)] truncate">
-                  {t.lastMessage?.content || "No messages yet"}
-                </p>
-              </div>
-              <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                <span className={`h-2 w-2 rounded-full ${statusColors[t.status].dot}`} />
-                {t.unread > 0 && (
-                  <span className="h-4 min-w-4 rounded-full bg-accent text-white text-[9px] font-bold flex items-center justify-center px-1 tabular-nums">
-                    {t.unread}
-                  </span>
-                )}
-              </div>
-            </button>
+              </button>
+            )
           ))}
           {hasMore && (
             <div className="p-3">
