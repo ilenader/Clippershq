@@ -4,7 +4,7 @@
 import { db } from "@/lib/db";
 
 /** Allowed values for Channel.type. Anything outside this list is coerced to "general". */
-export const VALID_CHANNEL_TYPES = ["general", "announcement", "leaderboard", "voice"] as const;
+export const VALID_CHANNEL_TYPES = ["general", "announcement", "leaderboard", "voice", "private"] as const;
 export type ChannelType = typeof VALID_CHANNEL_TYPES[number];
 
 function isValidChannelType(t: string): t is ChannelType {

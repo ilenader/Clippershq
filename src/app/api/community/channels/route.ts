@@ -64,7 +64,12 @@ export async function GET(req: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ channels: channelsWithMeta, muted: !!mute });
+    // Private channels are OWNER/ADMIN-only. CLIPPERs shouldn't even know they exist.
+    const visibleChannels = role === "CLIPPER"
+      ? channelsWithMeta.filter((ch: any) => ch.type !== "private")
+      : channelsWithMeta;
+
+    return NextResponse.json({ channels: visibleChannels, muted: !!mute });
   } catch (err: any) {
     console.error("[COMMUNITY] channels GET error:", err?.message);
     return NextResponse.json({ error: "Failed to load channels" }, { status: 500 });

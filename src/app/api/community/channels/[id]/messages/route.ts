@@ -129,6 +129,9 @@ export async function POST(
   if (channel.type === "announcement" && role !== "OWNER" && role !== "ADMIN") {
     return NextResponse.json({ error: "Only admins can post announcements" }, { status: 403 });
   }
+  if (channel.type === "private" && role !== "OWNER" && role !== "ADMIN") {
+    return NextResponse.json({ error: "This channel is private" }, { status: 403 });
+  }
   if (channel.type === "leaderboard") {
     return NextResponse.json({ error: "Leaderboard is auto-generated" }, { status: 403 });
   }
