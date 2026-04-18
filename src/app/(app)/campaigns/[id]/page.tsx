@@ -278,7 +278,11 @@ export default function CampaignDetailPage() {
              campaign.targetAudience === "first_world" ? "First World Countries" :
              campaign.targetAudience === "worldwide" ? "Worldwide" :
              (() => {
-               try { return JSON.parse(campaign.targetCountries || "[]").join(", "); }
+               try {
+                 const countries: string[] = JSON.parse(campaign.targetCountries || "[]");
+                 const display = countries.slice(0, 3).join(", ");
+                 return countries.length > 3 ? display + "\u2026" : display;
+               }
                catch { return "Custom"; }
              })()
             }
@@ -292,7 +296,7 @@ export default function CampaignDetailPage() {
                   <p className="text-xs text-[var(--text-muted)]">Current audience breakdown</p>
                   {entries.map(([country, pct]) => (
                     <div key={country} className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-[var(--text-primary)] w-8">{country}</span>
+                      <span className="text-xs font-medium text-[var(--text-primary)] w-12 truncate">{country}</span>
                       <div className="flex-1 h-2 rounded-full bg-[var(--bg-input)] overflow-hidden">
                         <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
                       </div>

@@ -79,9 +79,15 @@ export async function PATCH(
   const rl = checkRateLimit(`campaign-edit:${session.user.id}`, 20, 3_600_000);
   if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
+  const VALID_AUDIENCES = ["usa", "first_world", "worldwide", "custom"];
+
   try {
     const { id } = await params;
     const raw = await req.json();
+
+    if (raw.targetAudience && !VALID_AUDIENCES.includes(raw.targetAudience)) {
+      return NextResponse.json({ error: "Invalid target audience" }, { status: 400 });
+    }
 
     // ── ADMIN: must create pending edit, never direct save ──
     if (role === "ADMIN") {
@@ -90,15 +96,15 @@ export async function PATCH(
       // Verify admin has access to this campaign (creator OR assigned via CampaignAdmin/team)
       const campaign = await db.campaign.findUnique({
         where: { id },
-        select: { createdById: true, name: true, clientName: true, platform: true, budget: true, clipperCpm: true, ownerCpm: true, agencyFee: true, pricingModel: true, minViews: true, maxPayoutPerClip: true, maxClipsPerUserPerDay: true, requirements: true, examples: true, soundLink: true, assetLink: true, imageUrl: true, captionRules: true, hashtagRules: true, aiKnowledge: true, payoutRule: true, startDate: true },
+        select: { createdById: true, ownerUserId: true, name: true, clientName: true, platform: true, budget: true, clipperCpm: true, ownerCpm: true, agencyFee: true, pricingModel: true, minViews: true, maxPayoutPerClip: true, maxClipsPerUserPerDay: true, requirements: true, examples: true, soundLink: true, assetLink: true, imageUrl: true, captionRules: true, hashtagRules: true, aiKnowledge: true, payoutRule: true, startDate: true },
       });
       if (!campaign) {
         return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
       }
 
-      // Allow if creator, directly assigned, or member of a team with this campaign
+      // Allow if creator, assigned owner, directly assigned, or member of a team with this campaign
       const isCreator = campaign.createdById === session.user.id;
-      let hasAccess = isCreator;
+      let hasAccess = isCreator || campaign.ownerUserId === session.user.id;
       if (!hasAccess) {
         const directAssign = await db.campaignAdmin.findUnique({
           where: { userId_campaignId: { userId: session.user.id, campaignId: id } },

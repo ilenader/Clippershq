@@ -91,6 +91,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Name and platform are required" }, { status: 400 });
   }
 
+  const VALID_AUDIENCES = ["usa", "first_world", "worldwide", "custom"];
+  if (data.targetAudience && !VALID_AUDIENCES.includes(data.targetAudience)) {
+    return NextResponse.json({ error: "Invalid target audience" }, { status: 400 });
+  }
+
   // String length caps (defense vs. payload bombs)
   const stringCaps: Record<string, number> = {
     name: 200, clientName: 200, platform: 100, payoutRule: 500,

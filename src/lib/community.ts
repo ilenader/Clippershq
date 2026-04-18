@@ -120,7 +120,11 @@ export async function checkCommunityAccess(
   if (role === "CLIENT") return false;
 
   if (role === "ADMIN") {
-    const [teamAccess, directAdmin] = await Promise.all([
+    const [assignedOwner, teamAccess, directAdmin] = await Promise.all([
+      db.campaign.findFirst({
+        where: { id: campaignId, ownerUserId: userId },
+        select: { id: true },
+      }),
       db.teamCampaign.findFirst({
         where: { campaignId, team: { members: { some: { userId } } } },
         select: { id: true },
@@ -130,7 +134,7 @@ export async function checkCommunityAccess(
         select: { id: true },
       }),
     ]);
-    return !!(teamAccess || directAdmin);
+    return !!(assignedOwner || teamAccess || directAdmin);
   }
 
   // CLIPPER (or any other role) — must have joined the campaign.

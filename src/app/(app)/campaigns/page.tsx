@@ -256,7 +256,11 @@ export default function CampaignsPage() {
                        campaign.targetAudience === "first_world" ? "First World" :
                        campaign.targetAudience === "worldwide" ? "Worldwide" :
                        (() => {
-                         try { return JSON.parse(campaign.targetCountries || "[]").join(", "); }
+                         try {
+                           const countries: string[] = JSON.parse(campaign.targetCountries || "[]");
+                           const display = countries.slice(0, 3).join(", ");
+                           return countries.length > 3 ? display + "\u2026" : display;
+                         }
                          catch { return "Custom"; }
                        })()
                       }

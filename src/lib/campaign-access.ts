@@ -12,7 +12,7 @@ export async function getUserCampaignIds(userId: string, role: string): Promise<
   if (!db) return [];
 
   try {
-    const [directAssignments, created, teamMemberships] = await Promise.all([
+    const [directAssignments, created, owned, teamMemberships] = await Promise.all([
       // Direct campaign assignments
       db.campaignAdmin.findMany({
         where: { userId },
@@ -21,6 +21,11 @@ export async function getUserCampaignIds(userId: string, role: string): Promise<
       // Campaigns created by this user
       db.campaign.findMany({
         where: { createdById: userId },
+        select: { id: true },
+      }),
+      // Campaigns where user is assigned owner
+      db.campaign.findMany({
+        where: { ownerUserId: userId },
         select: { id: true },
       }),
       // Team-based access: find user's teams, then find team campaigns
@@ -33,6 +38,7 @@ export async function getUserCampaignIds(userId: string, role: string): Promise<
     const ids = new Set<string>();
     for (const a of directAssignments) ids.add(a.campaignId);
     for (const c of created) ids.add(c.id);
+    for (const o of owned) ids.add(o.id);
 
     // Get campaigns from all user's teams
     if (teamMemberships.length > 0) {
