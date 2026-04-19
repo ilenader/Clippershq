@@ -68,7 +68,7 @@ export function MessageInput({
 
   if (lockedReason) {
     return (
-      <div className="sticky bottom-0 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent pt-4 pb-3 px-3 sm:px-4">
+      <div className="flex-shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-primary)] pt-3 pb-3 px-3 sm:px-4">
         <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/5 border border-amber-500/15">
           <Lock className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
           <p className="text-xs text-amber-400">{lockedReason}</p>
@@ -81,7 +81,7 @@ export function MessageInput({
   const nearLimit = charCount > maxLength * 0.9;
 
   return (
-    <div className="sticky bottom-0 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent pt-4 pb-3 px-3 sm:px-4">
+    <div className="flex-shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-primary)] pt-3 pb-3 px-3 sm:px-4">
       {replyTo && (
         <div className="flex items-center justify-between gap-2 px-3 py-2 mb-2 rounded-lg border border-accent/20 bg-accent/5">
           <div className="flex items-center gap-2 min-w-0">

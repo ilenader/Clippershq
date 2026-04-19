@@ -639,7 +639,7 @@ export default function CommunityPage() {
             )}
           </div>
 
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             <CommunityErrorBoundary>
               {loadingChannels ? (
                 <div className="flex-1 flex items-center justify-center py-20">

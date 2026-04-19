@@ -635,7 +635,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
       )}
 
       {typingList.length > 0 && !searchActive && (
-        <div className="px-4 pb-0.5">
+        <div className="flex-shrink-0 px-4 pb-0.5">
           <p className="text-xs text-[var(--text-muted)] italic animate-pulse">
             {typingList.slice(0, 3).join(", ")}
             {typingList.length > 3 && ` +${typingList.length - 3} more`}
