@@ -153,6 +153,9 @@ export async function POST(
   if (content.length > 2000) {
     return NextResponse.json({ error: "Message is too long (max 2000 chars)" }, { status: 400 });
   }
+  // Transient clientId (not stored) — echoed back in the response and Ably payload so
+  // the sender can match the real message to its optimistic temp and keep the React key stable.
+  const clientId = typeof body.clientId === "string" && body.clientId.length <= 80 ? body.clientId : null;
 
   // Rate limit: 5 per 60s. Don't block — just delay a beat.
   const rl = checkRateLimit(`community-msg:${session.user.id}`, 5, 60_000);
@@ -188,6 +191,7 @@ export async function POST(
       channelName: channel.name,
       messageId: message.id,
       id: message.id,
+      clientId,
       userId: session.user.id,
       username: (message.user as any)?.username || (message.user as any)?.name || "user",
       name: (message.user as any)?.name || null,
@@ -239,7 +243,7 @@ export async function POST(
       })();
     }
 
-    return NextResponse.json(message, { status: 201 });
+    return NextResponse.json({ ...message, clientId }, { status: 201 });
   } catch (err: any) {
     console.error("[COMMUNITY] messages POST error:", err?.message);
     return NextResponse.json({ error: "Failed to send message" }, { status: 500 });

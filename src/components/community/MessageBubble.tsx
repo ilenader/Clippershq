@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { memo, useRef, useState, useEffect } from "react";
 import { Pin, Reply, SmilePlus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -24,6 +24,9 @@ export interface Reaction {
 
 export interface Message {
   id: string;
+  /** Stable client-generated id attached to optimistic temp messages. Echoed back by the
+   *  server on the real message so the sender can match real→temp and keep the React key. */
+  clientId?: string | null;
   content: string;
   isPinned?: boolean;
   isDeleted?: boolean;
@@ -91,7 +94,7 @@ export const REACTION_GLYPHS: Record<string, string> = {
   eyes: "👀",
 };
 
-export function MessageBubble({
+function MessageBubbleInner({
   message, viewerRole, viewerId,
   channelType,
   onDelete, onReply, onPin, onReact,
@@ -325,3 +328,7 @@ export function MessageBubble({
     </div>
   );
 }
+
+// Memo'd export: skips re-render when neighbors update, so replacing one temp→real
+// doesn't cause every sibling MessageBubble to re-render.
+export const MessageBubble = memo(MessageBubbleInner);

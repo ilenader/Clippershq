@@ -194,6 +194,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
       if (!detail || detail.channelId !== channelId) return;
       const incoming: Message = {
         id: detail.messageId || detail.id,
+        clientId: detail.clientId || null,
         content: detail.content,
         createdAt: detail.createdAt || new Date().toISOString(),
         userId: detail.userId,
@@ -208,9 +209,20 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
       setMessages((prev) => {
         // If the real message already landed (POST response beat the SSE echo), no-op.
         if (prev.some((m) => m.id === incoming.id)) return prev;
-        // Find a matching optimistic temp message from the same user within 10s and
-        // replace it IN PLACE. Keeping the array index stable prevents the unmount/remount
-        // flicker you'd get from .filter()+append.
+
+        // Preferred match: clientId — exact, unambiguous, stable across the swap.
+        if (incoming.clientId) {
+          const idx = prev.findIndex((m) => m.clientId === incoming.clientId);
+          if (idx >= 0) {
+            const next = prev.slice();
+            // Preserve clientId + createdAt from the temp so the React key and timestamp
+            // don't jitter when the real message takes its place.
+            next[idx] = { ...incoming, clientId: prev[idx].clientId, createdAt: prev[idx].createdAt };
+            return next;
+          }
+        }
+
+        // Fallback: legacy content+user+age match (handles clients that didn't send a clientId).
         const tempIndex = prev.findIndex((m) => {
           if (!String(m.id).startsWith("temp-")) return false;
           if (m.userId !== incoming.userId) return false;
@@ -220,7 +232,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
         });
         if (tempIndex >= 0) {
           const next = prev.slice();
-          next[tempIndex] = incoming;
+          next[tempIndex] = { ...incoming, clientId: prev[tempIndex].clientId, createdAt: prev[tempIndex].createdAt };
           return next;
         }
         return [...prev, incoming];
@@ -341,9 +353,12 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
     async (content: string) => {
       // Immediate optimistic append with a temporary id. Replaced by either the POST response
       // (this function) or the Ably echo (above) — whichever wins first.
+      // clientId stays stable across the temp→real swap so the React key never changes.
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const clientId = tempId;
       const optimistic: Message = {
         id: tempId,
+        clientId,
         content,
         createdAt: new Date().toISOString(),
         userId: viewerId,
@@ -356,23 +371,24 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
         const res = await fetch(`/api/community/channels/${channelId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content, replyToId: replyTo?.id || undefined }),
+          body: JSON.stringify({ content, clientId, replyToId: replyTo?.id || undefined }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to send");
-        // Swap temp → real IN PLACE (or no-op if Ably already replaced it).
+        // Swap temp → real IN PLACE. Preserve clientId + createdAt from the temp so the
+        // React key (m.clientId) stays stable and the displayed timestamp doesn't jitter.
         setMessages((prev) => {
+          // If SSE already swapped the temp with the real message, we're done.
           if (prev.some((m) => m.id === data.id)) {
-            // Real already landed via SSE — drop the temp if it's still somehow here.
             return prev.filter((m) => m.id !== tempId);
           }
-          const tempIndex = prev.findIndex((m) => m.id === tempId);
-          if (tempIndex >= 0) {
+          const idx = prev.findIndex((m) => m.clientId === clientId || m.id === tempId);
+          if (idx >= 0) {
             const next = prev.slice();
-            next[tempIndex] = data;
+            next[idx] = { ...data, clientId, createdAt: prev[idx].createdAt };
             return next;
           }
-          return [...prev, data];
+          return [...prev, { ...data, clientId }];
         });
         setReplyTo(null);
       } catch (err: any) {
@@ -610,7 +626,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
               const sameDay = prev && new Date(prev.createdAt).toDateString() === new Date(m.createdAt).toDateString();
               const showSeparator = !sameDay;
               return (
-                <Fragment key={m.id}>
+                <Fragment key={m.clientId || m.id}>
                   {showSeparator && (
                     <div className="flex items-center gap-3 px-4 py-3">
                       <div className="flex-1 h-px bg-[var(--border-color)]" />
