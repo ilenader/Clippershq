@@ -141,7 +141,20 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
 
       if (apifyRes.ok) {
         const apifyData = await apifyRes.json();
-        const bio = apifyData?.[0]?.biography || apifyData?.[0]?.bio || "";
+        const d = apifyData?.[0] || {};
+        console.log(`[VERIFY] Apify response keys:`, Object.keys(d));
+        console.log(`[VERIFY] Apify response[0] (first 500 chars):`, JSON.stringify(d).substring(0, 500));
+        console.log(`[VERIFY] Profile pic fields:`, {
+          profilePicUrl: d.profilePicUrl,
+          profilePicUrlHD: d.profilePicUrlHD,
+          profilePicture: d.profilePicture,
+          profile_pic_url: d.profile_pic_url,
+          profile_pic_url_hd: d.profile_pic_url_hd,
+          avatarUrl: d.avatarUrl,
+          profileImage: d.profileImage,
+        });
+
+        const bio = d.biography || d.bio || "";
         console.log(`[VERIFY] Apify returned bio: "${String(bio).substring(0, 200)}"`);
 
         const codeUpper = code.trim().toUpperCase();
@@ -150,8 +163,14 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
         console.log(`[VERIFY] Code "${code}" found in bio: ${foundInBio}`);
 
         if (foundInBio) {
-          const profileImageUrl = apifyData?.[0]?.profilePicUrlHD || apifyData?.[0]?.profilePicUrl || undefined;
-          console.log(`[VERIFY] ✓ Code found via Apify${profileImageUrl ? `, profilePic: ${profileImageUrl.substring(0, 80)}…` : ""}`);
+          const profileImageUrl =
+            d.profilePicUrlHD || d.profilePicUrl || d.profilePicture ||
+            d.profile_pic_url_hd || d.profile_pic_url ||
+            d.avatarUrl || d.profileImage ||
+            d.user?.profilePicUrl || d.user?.profile_pic_url_hd ||
+            d.graphql?.user?.profile_pic_url_hd ||
+            undefined;
+          console.log(`[VERIFY] ✓ Code found via Apify, profilePic: ${profileImageUrl ? profileImageUrl.substring(0, 100) : "none"}`);
           return { found: true, profileImageUrl };
         }
         console.log(`[VERIFY] ✗ Apify: code not found in bio`);
