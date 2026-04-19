@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
       where,
       orderBy: { createdAt: "desc" },
     });
+    console.log(`[ACCOUNTS] Returning ${accounts.length} accounts. profileImageUrls:`, accounts.map((a: any) => ({ id: a.id, pic: a.profileImageUrl || "none" })));
     return NextResponse.json(accounts);
   } catch {
     return NextResponse.json([]);
