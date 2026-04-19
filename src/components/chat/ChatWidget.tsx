@@ -579,8 +579,8 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
       {/* Chat panel — fullscreen-ish up to md, then floating desktop panel */}
       <div
         className={`fixed z-50 flex flex-col overflow-hidden border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-elevated)] transition-all duration-300 origin-bottom-right
-          inset-0 rounded-none
-          md:inset-auto md:bottom-3 md:right-3 md:rounded-2xl md:w-[420px] md:h-[min(600px,calc(100vh-120px))]
+          top-0 left-0 right-0 h-[100dvh] rounded-none
+          md:inset-auto md:bottom-3 md:right-3 md:rounded-2xl md:w-[420px] md:h-[min(600px,calc(100dvh-120px))]
           lg:bottom-[88px] lg:right-6 lg:w-[460px] lg:h-[660px] ${
           open ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-95 pointer-events-none"
         }`}
@@ -1018,7 +1018,10 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
             )}
 
             {/* Input */}
-            <div className="border-t border-[var(--border-color)] px-5 py-3.5">
+            <div
+              className="border-t border-[var(--border-color)] px-5 pt-3.5"
+              style={{ paddingBottom: "calc(0.875rem + env(safe-area-inset-bottom, 0px))" }}
+            >
               <div className="flex items-end gap-2.5">
                 <textarea ref={inputRef} value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)} onKeyDown={handleKeyDown}
