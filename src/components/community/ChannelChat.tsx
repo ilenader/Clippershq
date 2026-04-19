@@ -515,7 +515,7 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
       <div
         ref={scrollRef}
         onScroll={searchActive ? undefined : handleScroll}
-        className="flex-1 overflow-y-auto min-h-0 flex flex-col"
+        className="flex-1 overflow-y-auto overscroll-contain min-h-0 flex flex-col"
       >
         {loadingMore && (
           <div className="flex items-center justify-center py-3">

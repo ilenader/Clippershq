@@ -64,6 +64,28 @@ export default function CommunityPage() {
     if (session && viewerRole === "CLIENT") router.replace("/client");
   }, [session, viewerRole, router]);
 
+  // Lock document scroll while on /community so a stray drag can't shift the
+  // whole page and push the chat input behind the mobile browser toolbar.
+  // Restored on unmount — other pages remain scrollable.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehavior,
+    };
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.overscrollBehavior = prev.bodyOverscroll;
+    };
+  }, []);
+
   const isAdmin = viewerRole === "OWNER" || viewerRole === "ADMIN";
   const isOwner = viewerRole === "OWNER";
 

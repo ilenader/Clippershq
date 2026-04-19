@@ -311,7 +311,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="hidden lg:block">
           <Navbar />
         </div>
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6 animate-[fadeIn_200ms_ease-out]">{children}</main>
+        <main className={`flex-1 overflow-x-hidden animate-[fadeIn_200ms_ease-out] ${
+          pathname?.startsWith("/community")
+            ? "overflow-hidden p-4 lg:p-6"
+            : "overflow-y-auto p-4 lg:p-6"
+        }`}>{children}</main>
       </div>
       {/* Hide the support ChatWidget on /community — the community has its own
           chat + ticket UI, so the floating bubble would be redundant there. */}
