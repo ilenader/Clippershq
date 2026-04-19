@@ -243,10 +243,11 @@ export default function AccountsPage() {
               onClick={() => setSelectedAccountId(account.id)}
               className="relative flex flex-row sm:flex-col items-center gap-3 sm:gap-0 p-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-accent/30 hover:bg-[var(--bg-card-hover)] hover:shadow-md hover:shadow-accent/5 transition-all duration-200 cursor-pointer min-h-0 sm:min-h-[110px] group"
             >
-              <div className={`h-12 w-12 sm:h-10 sm:w-10 lg:h-12 lg:w-12 flex-shrink-0 rounded-full overflow-hidden flex items-center justify-center sm:mb-1.5 ring-2 ring-transparent group-hover:ring-accent/30 transition-all duration-200 ${platformBgColor(account.platform)} relative`}>
-                <span className="text-sm sm:text-base font-bold text-white">{platformLetter(account.platform)}</span>
-                {account.profileImageUrl && (
-                  <img src={account.profileImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              <div className={`h-12 w-12 sm:h-10 sm:w-10 lg:h-12 lg:w-12 flex-shrink-0 rounded-full overflow-hidden flex items-center justify-center sm:mb-1.5 ring-2 ring-transparent group-hover:ring-accent/30 transition-all duration-200 ${account.profileImageUrl ? "bg-black" : platformBgColor(account.platform)}`}>
+                {account.profileImageUrl ? (
+                  <img src={account.profileImageUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-sm sm:text-base font-bold text-white">{platformLetter(account.platform)}</span>
                 )}
               </div>
               <div className="flex-1 sm:flex-none sm:w-full min-w-0">
