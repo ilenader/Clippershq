@@ -236,34 +236,36 @@ export default function AccountsPage() {
           action={<Button onClick={() => { setShowModal(true); setPendingVerify(null); }} icon={<Plus className="h-4 w-4" />}>Add Account</Button>}
         />
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
           {accounts.map((account: any) => (
             <div
               key={account.id}
               onClick={() => setSelectedAccountId(account.id)}
-              className="relative flex flex-col items-center p-2 sm:p-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-accent/30 hover:bg-[var(--bg-card-hover)] hover:shadow-md hover:shadow-accent/5 transition-all duration-200 cursor-pointer min-h-[90px] sm:min-h-[110px] group"
+              className="relative flex flex-row sm:flex-col items-center gap-3 sm:gap-0 p-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-accent/30 hover:bg-[var(--bg-card-hover)] hover:shadow-md hover:shadow-accent/5 transition-all duration-200 cursor-pointer min-h-0 sm:min-h-[110px] group"
             >
-              <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full overflow-hidden flex items-center justify-center mb-1.5 ring-2 ring-transparent group-hover:ring-accent/30 transition-all duration-200 ${platformBgColor(account.platform)} relative`}>
+              <div className={`h-12 w-12 sm:h-10 sm:w-10 lg:h-12 lg:w-12 flex-shrink-0 rounded-full overflow-hidden flex items-center justify-center sm:mb-1.5 ring-2 ring-transparent group-hover:ring-accent/30 transition-all duration-200 ${platformBgColor(account.platform)} relative`}>
                 <span className="text-sm sm:text-base font-bold text-white">{platformLetter(account.platform)}</span>
                 {account.profileImageUrl && (
                   <img src={account.profileImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                 )}
               </div>
-              <p className="text-[10px] sm:text-xs font-medium text-[var(--text-primary)] truncate w-full text-center">
-                {account.username}
-              </p>
-              <p className="text-[8px] sm:text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
-                {account.platform}
-              </p>
-              <div className={`h-1.5 w-1.5 rounded-full mt-1 ${statusDotColor(account.status)}`} />
+              <div className="flex-1 sm:flex-none sm:w-full min-w-0">
+                <p className="text-sm sm:text-[10px] lg:text-xs font-medium text-[var(--text-primary)] truncate sm:text-center sm:w-full">
+                  {account.username}
+                </p>
+                <p className="text-xs sm:text-[8px] lg:text-[10px] text-[var(--text-muted)] uppercase tracking-wider sm:text-center truncate">
+                  {account.platform}
+                </p>
+              </div>
+              <div className={`h-2 w-2 sm:h-1.5 sm:w-1.5 rounded-full sm:mt-1 flex-shrink-0 ${statusDotColor(account.status)}`} />
             </div>
           ))}
           <div
             onClick={() => { setShowModal(true); setPendingVerify(null); }}
-            className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl border border-dashed border-[var(--border-color)] hover:border-accent/50 hover:bg-[var(--bg-card-hover)] transition-all duration-200 cursor-pointer min-h-[90px] sm:min-h-[110px] group"
+            className="flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-xl border border-dashed border-[var(--border-color)] hover:border-accent/50 hover:bg-[var(--bg-card-hover)] transition-all duration-200 cursor-pointer min-h-0 sm:min-h-[110px] group"
           >
-            <Plus className="h-5 w-5 text-[var(--text-muted)] group-hover:text-accent transition-colors" />
-            <p className="text-[8px] sm:text-[10px] text-[var(--text-muted)] mt-1 group-hover:text-accent transition-colors">Add</p>
+            <Plus className="h-5 w-5 text-[var(--text-muted)] group-hover:text-accent transition-colors flex-shrink-0" />
+            <p className="text-sm sm:text-[8px] lg:text-[10px] text-[var(--text-muted)] sm:mt-1 group-hover:text-accent transition-colors">Add</p>
           </div>
         </div>
       )}
