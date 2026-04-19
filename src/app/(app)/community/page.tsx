@@ -518,7 +518,7 @@ export default function CommunityPage() {
   const showingServers = mobileView === "servers";
 
   return (
-    <div className="-m-4 lg:-m-6 flex h-[calc(100vh-56px)] min-h-0 bg-[var(--bg-primary)]">
+    <div className="-m-4 lg:-m-6 flex h-[calc(100dvh-56px)] min-h-0 bg-[var(--bg-primary)]">
       {/* Desktop: server strip always visible */}
       <div className="hidden lg:flex">
         <ServerStrip
