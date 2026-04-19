@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import type { SessionUser } from "@/lib/auth-types";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +49,28 @@ const healthColors: Record<string, { bg: string; text: string; border: string }>
   SUSPICIOUS: { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/20" },
 };
 
+function platformBgColor(p: string) {
+  switch (p?.toUpperCase()) {
+    case "TIKTOK": return "bg-pink-500/80";
+    case "INSTAGRAM": return "bg-purple-500/80";
+    case "YOUTUBE": return "bg-red-500/80";
+    default: return "bg-accent/80";
+  }
+}
+
+function platformLetter(p: string) {
+  return (p || "?").charAt(0).toUpperCase();
+}
+
+function statusDotColor(s: string) {
+  switch (s) {
+    case "APPROVED": return "bg-emerald-400";
+    case "PENDING": case "VERIFIED": return "bg-amber-400";
+    case "REJECTED": return "bg-red-400";
+    default: return "bg-[var(--text-muted)]";
+  }
+}
+
 export default function AccountsPage() {
   const { data: session } = useSession();
   const router = useRouter();
@@ -79,6 +100,7 @@ export default function AccountsPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [verifyCooldown, setVerifyCooldown] = useState<string | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
 
   useEffect(() => {
     if (cooldownSeconds <= 0) { setVerifyCooldown(null); return; }
@@ -160,6 +182,7 @@ export default function AccountsPage() {
       const res = await fetch(`/api/accounts/${accountId}`, { method: "DELETE" });
       if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Failed to cancel"); }
       toast.success("Account removed.");
+      setSelectedAccountId(null);
       load();
     } catch (err: any) { toast.error(err.message || "Failed to cancel."); }
     setDeleting(null);
@@ -174,6 +197,7 @@ export default function AccountsPage() {
         toast.success(data.message || "Account verified and approved!");
         setPendingVerify(null);
         setShowModal(false);
+        setSelectedAccountId(null);
         load();
       } else {
         toast.error(data.message || "Code not found in bio yet. Update your bio and try again in a few seconds.");
@@ -186,16 +210,18 @@ export default function AccountsPage() {
 
   const copyCode = (code: string) => { navigator.clipboard.writeText(code); toast.success("Code copied!"); };
 
+  const selectedAccount = selectedAccountId ? accounts.find((a: any) => a.id === selectedAccountId) || null : null;
+
   if (loading) {
     return <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-color)] border-t-accent" /></div>;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">My Accounts</h1>
-          <p className="text-base text-[var(--text-secondary)]">Submit and manage your social media accounts.</p>
+          <h1 className="text-lg sm:text-2xl font-bold text-[var(--text-primary)]">My Accounts</h1>
+          <p className="text-sm text-[var(--text-secondary)]">Submit and manage your social media accounts.</p>
         </div>
         <Button onClick={() => { setShowModal(true); setPendingVerify(null); }} icon={<Plus className="h-4 w-4" />} className="whitespace-nowrap">
           Add Account
@@ -210,107 +236,118 @@ export default function AccountsPage() {
           action={<Button onClick={() => { setShowModal(true); setPendingVerify(null); }} icon={<Plus className="h-4 w-4" />}>Add Account</Button>}
         />
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2">
-          {accounts.map((account: any) => {
-            const stats = account.status === "APPROVED" ? getAccountStats(account.id) : null;
-            const hc = stats ? healthColors[stats.health] : null;
-            return (
-              <Card key={account.id} className="p-3.5">
-                {/* Header: username + platform + status */}
-                <div className="flex items-start justify-between mb-2.5">
-                  <div>
-                    <p className="text-base lg:text-lg font-semibold text-[var(--text-primary)]">{account.username}</p>
-                    <Badge variant={(statusBadge[account.status] || "pending") as any} className="mt-0.5">
-                      {account.platform} · {statusDisplay[account.status] || account.status}
-                    </Badge>
-                  </div>
-                  {stats && hc && stats.health === "GOOD" && (
-                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${hc.bg} ${hc.text} ${hc.border}`}>
-                      {stats.health}
-                    </span>
-                  )}
-                </div>
-
-                {/* Niche + country — OWNER only */}
-                {userRole === "OWNER" && (account.contentNiche || account.country) && (
-                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-[var(--text-muted)] mt-1">
-                    {account.contentNiche && <span>Niche: {account.contentNiche}</span>}
-                    {account.country && <span>Country: {account.country}</span>}
-                  </div>
-                )}
-
-                {/* Stats grid for APPROVED accounts */}
-                {stats && stats.clipCount > 0 && (
-                  <div className="grid grid-cols-4 gap-2 pt-2.5 border-t border-[var(--border-subtle)]">
-                    <div>
-                      <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalViews.toLocaleString()}</p>
-                      <p className="text-xs lg:text-sm text-[var(--text-muted)]">Views</p>
-                    </div>
-                    <div>
-                      <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalLikes.toLocaleString()}</p>
-                      <p className="text-xs lg:text-sm text-[var(--text-muted)]">Likes</p>
-                    </div>
-                    <div>
-                      <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalComments.toLocaleString()}</p>
-                      <p className="text-xs lg:text-sm text-[var(--text-muted)]">Comments</p>
-                    </div>
-                    <div>
-                      <p className="text-sm lg:text-base font-semibold text-[var(--text-primary)] tabular-nums">{stats.clipCount}</p>
-                      <p className="text-xs lg:text-sm text-[var(--text-muted)]">Clips</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Verification for PENDING */}
-                {account.verificationCode && account.status === "PENDING" && (
-                  <div className="mt-4 rounded-xl border border-accent/20 bg-accent/5 px-5 py-4">
-                    <p className="text-sm font-medium text-accent mb-2">Verification code</p>
-                    <div className="flex items-center gap-2 mb-3">
-                      <code className="text-xl font-bold text-accent tracking-[0.2em]">{account.verificationCode}</code>
-                      <button onClick={() => copyCode(account.verificationCode)} className="rounded-md p-1.5 text-accent hover:bg-accent/10 transition-colors cursor-pointer">
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <p className="text-sm text-[var(--text-muted)] mb-3">Add this code to your {account.platform} bio, wait a few seconds, then click verify.</p>
-                    <Button size="sm" className={`w-full ${verifyCooldown === account.id ? "opacity-50 cursor-not-allowed" : ""}`} loading={checking === account.id} disabled={verifyCooldown === account.id} onClick={() => checkVerification(account.id)} icon={<CheckCircle className="h-4 w-4" />}>
-                      {verifyCooldown === account.id ? `Wait ${cooldownSeconds}s` : "Verify now"}
-                    </Button>
-                  </div>
-                )}
-
-                {/* Approved indicator + remove */}
-                {account.status === "APPROVED" && (
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-base text-accent">
-                      <CheckCircle className="h-4 w-4" />
-                      <span className="font-medium">Verified and approved</span>
-                    </div>
-                    <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/5" loading={deleting === account.id} onClick={() => cancelAccount(account.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>
-                      Remove
-                    </Button>
-                  </div>
-                )}
-
-                {/* Remove button for non-APPROVED */}
-                {account.status !== "APPROVED" && (
-                  <div className="mt-3">
-                    <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/5" loading={deleting === account.id} onClick={() => cancelAccount(account.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>
-                      Remove
-                    </Button>
-                  </div>
-                )}
-
-                {/* Rejection reason */}
-                {account.status === "REJECTED" && account.rejectionReason && (
-                  <div className="mt-3 rounded-xl bg-red-500/5 border border-red-500/10 px-4 py-3 text-sm text-red-400">
-                    Reason: {account.rejectionReason}
-                  </div>
-                )}
-              </Card>
-            );
-          })}
+        <div className="grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
+          {accounts.map((account: any) => (
+            <div
+              key={account.id}
+              onClick={() => setSelectedAccountId(account.id)}
+              className="relative flex flex-col items-center p-2 sm:p-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-accent/30 hover:bg-[var(--bg-card-hover)] hover:shadow-md hover:shadow-accent/5 transition-all duration-200 cursor-pointer min-h-[90px] sm:min-h-[110px] group"
+            >
+              <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center mb-1.5 ring-2 ring-transparent group-hover:ring-accent/30 transition-all duration-200 ${platformBgColor(account.platform)}`}>
+                <span className="text-sm sm:text-base font-bold text-white">{platformLetter(account.platform)}</span>
+              </div>
+              <p className="text-[10px] sm:text-xs font-medium text-[var(--text-primary)] truncate w-full text-center">
+                {account.username}
+              </p>
+              <p className="text-[8px] sm:text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
+                {account.platform}
+              </p>
+              <div className={`h-1.5 w-1.5 rounded-full mt-1 ${statusDotColor(account.status)}`} />
+            </div>
+          ))}
+          <div
+            onClick={() => { setShowModal(true); setPendingVerify(null); }}
+            className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl border border-dashed border-[var(--border-color)] hover:border-accent/50 hover:bg-[var(--bg-card-hover)] transition-all duration-200 cursor-pointer min-h-[90px] sm:min-h-[110px] group"
+          >
+            <Plus className="h-5 w-5 text-[var(--text-muted)] group-hover:text-accent transition-colors" />
+            <p className="text-[8px] sm:text-[10px] text-[var(--text-muted)] mt-1 group-hover:text-accent transition-colors">Add</p>
+          </div>
         </div>
       )}
+
+      {/* Account detail modal */}
+      {selectedAccount && (() => {
+        const stats = selectedAccount.status === "APPROVED" ? getAccountStats(selectedAccount.id) : null;
+        const hc = stats ? healthColors[stats.health] : null;
+        return (
+          <Modal open={true} onClose={() => setSelectedAccountId(null)} title={selectedAccount.username}>
+            <div className="space-y-4 py-2">
+              <div className="flex items-center justify-between">
+                <Badge variant={(statusBadge[selectedAccount.status] || "pending") as any}>
+                  {selectedAccount.platform} · {statusDisplay[selectedAccount.status] || selectedAccount.status}
+                </Badge>
+                {stats && hc && stats.health === "GOOD" && (
+                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${hc.bg} ${hc.text} ${hc.border}`}>
+                    {stats.health}
+                  </span>
+                )}
+              </div>
+
+              {userRole === "OWNER" && (selectedAccount.contentNiche || selectedAccount.country) && (
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-[var(--text-muted)]">
+                  {selectedAccount.contentNiche && <span>Niche: {selectedAccount.contentNiche}</span>}
+                  {selectedAccount.country && <span>Country: {selectedAccount.country}</span>}
+                </div>
+              )}
+
+              {stats && stats.clipCount > 0 && (
+                <div className="grid grid-cols-4 gap-2 pt-3 border-t border-[var(--border-subtle)]">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalViews.toLocaleString()}</p>
+                    <p className="text-xs text-[var(--text-muted)]">Views</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalLikes.toLocaleString()}</p>
+                    <p className="text-xs text-[var(--text-muted)]">Likes</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.totalComments.toLocaleString()}</p>
+                    <p className="text-xs text-[var(--text-muted)]">Comments</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)] tabular-nums">{stats.clipCount}</p>
+                    <p className="text-xs text-[var(--text-muted)]">Clips</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedAccount.verificationCode && selectedAccount.status === "PENDING" && (
+                <div className="rounded-xl border border-accent/20 bg-accent/5 px-5 py-4">
+                  <p className="text-sm font-medium text-accent mb-2">Verification code</p>
+                  <div className="flex items-center gap-2 mb-3">
+                    <code className="text-xl font-bold text-accent tracking-[0.2em]">{selectedAccount.verificationCode}</code>
+                    <button onClick={() => copyCode(selectedAccount.verificationCode)} className="rounded-md p-1.5 text-accent hover:bg-accent/10 transition-colors cursor-pointer">
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-sm text-[var(--text-muted)] mb-3">Add this code to your {selectedAccount.platform} bio, wait a few seconds, then click verify.</p>
+                  <Button size="sm" className={`w-full ${verifyCooldown === selectedAccount.id ? "opacity-50 cursor-not-allowed" : ""}`} loading={checking === selectedAccount.id} disabled={verifyCooldown === selectedAccount.id} onClick={() => checkVerification(selectedAccount.id)} icon={<CheckCircle className="h-4 w-4" />}>
+                    {verifyCooldown === selectedAccount.id ? `Wait ${cooldownSeconds}s` : "Verify now"}
+                  </Button>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)]">
+                {selectedAccount.status === "APPROVED" && (
+                  <div className="flex items-center gap-1.5 text-sm text-accent">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="font-medium">Verified and approved</span>
+                  </div>
+                )}
+                <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/5 ml-auto" loading={deleting === selectedAccount.id} onClick={() => cancelAccount(selectedAccount.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>
+                  Remove
+                </Button>
+              </div>
+
+              {selectedAccount.status === "REJECTED" && selectedAccount.rejectionReason && (
+                <div className="rounded-xl bg-red-500/5 border border-red-500/10 px-4 py-3 text-sm text-red-400">
+                  Reason: {selectedAccount.rejectionReason}
+                </div>
+              )}
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* Submit / Verify Modal */}
       <Modal open={showModal} onClose={() => { setShowModal(false); setPendingVerify(null); }} title={pendingVerify ? "Verify your account" : "Add account"}>
@@ -338,7 +375,7 @@ export default function AccountsPage() {
                 <li>Go to your {pendingVerify.platform} profile</li>
                 <li>Paste the code anywhere in your bio</li>
                 <li>Make sure your account is set to PUBLIC (not private)</li>
-                <li>Wait a few seconds, then click "Verify now" below</li>
+                <li>Wait a few seconds, then click &quot;Verify now&quot; below</li>
               </ol>
             </div>
             <div className="flex gap-3">
