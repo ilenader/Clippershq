@@ -87,6 +87,46 @@ export default function CommunityPage() {
     };
   }, []);
 
+  // iOS fires the focus event and its native "scroll the input into view"
+  // animation BEFORE `visualViewport` has resized for the keyboard. During that
+  // window (~300 ms) the document is scrolled up while our container is still
+  // at full pre-keyboard height, so the input shoots above the visible area and
+  // only falls back once typing starts and the resize lands. Fix: pin
+  // window.scrollY to 0 for 500 ms after any input/textarea focus, mobile only.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.innerWidth >= 1024) return; // desktop unaffected
+
+    let lockInterval: ReturnType<typeof setInterval> | null = null;
+    let lockTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const startLock = () => {
+      window.scrollTo(0, 0);
+      document.body.scrollTop = 0;
+      if (lockInterval) clearInterval(lockInterval);
+      if (lockTimeout) clearTimeout(lockTimeout);
+      lockInterval = setInterval(() => {
+        if (window.scrollY !== 0) window.scrollTo(0, 0);
+        if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
+      }, 10);
+      lockTimeout = setTimeout(() => {
+        if (lockInterval) { clearInterval(lockInterval); lockInterval = null; }
+      }, 500);
+    };
+
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT")) startLock();
+    };
+
+    document.addEventListener("focusin", onFocusIn);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      if (lockInterval) clearInterval(lockInterval);
+      if (lockTimeout) clearTimeout(lockTimeout);
+    };
+  }, []);
+
   const isAdmin = viewerRole === "OWNER" || viewerRole === "ADMIN";
   const isOwner = viewerRole === "OWNER";
 
