@@ -264,7 +264,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen bg-[var(--bg-primary)] transition-theme">
+    <div className="flex h-[100dvh] bg-[var(--bg-primary)] transition-theme">
       {/* Desktop sidebar */}
       <div className="hidden lg:block">
         <Sidebar role={effectiveRole} />
