@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { MessageBubble, type Message } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
+import { MuteUserDialog } from "./MuteUserDialog";
 import { toast } from "@/lib/toast";
 import { AlertCircle, ArrowDown, ChevronDown, Loader2, Megaphone, MessageCircle, Pin, Search, Trophy, X } from "lucide-react";
 
@@ -47,13 +48,15 @@ interface Props {
   channelId: string;
   channelType: string;
   channelName: string;
+  /** Campaign owning this channel — needed for the moderation mute feature. */
+  campaignId: string;
   viewerId: string;
   viewerRole: "CLIPPER" | "ADMIN" | "OWNER" | "CLIENT";
 }
 
 const PAGE_SIZE = 50;
 
-export function ChannelChat({ channelId, channelType, channelName, viewerId, viewerRole }: Props) {
+export function ChannelChat({ channelId, channelType, channelName, campaignId, viewerId, viewerRole }: Props) {
   const isAdminOrOwner = viewerRole === "OWNER" || viewerRole === "ADMIN";
   const [messages, setMessages] = useState<Message[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -67,6 +70,10 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
   const [replyTo, setReplyTo] = useState<{ id: string; username: string; content: string } | null>(null);
   const [pinnedOpen, setPinnedOpen] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Moderation mute state.
+  const [mutedUntil, setMutedUntil] = useState<Date | null>(null);
+  const [muteDialog, setMuteDialog] = useState<{ userId: string; username: string } | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomAnchorRef = useRef<HTMLDivElement>(null);
@@ -194,7 +201,6 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
       if (!detail || detail.channelId !== channelId) return;
       const incoming: Message = {
         id: detail.messageId || detail.id,
-        clientId: detail.clientId || null,
         content: detail.content,
         createdAt: detail.createdAt || new Date().toISOString(),
         userId: detail.userId,
@@ -206,37 +212,9 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
           image: detail.image || null,
         },
       };
-      setMessages((prev) => {
-        // If the real message already landed (POST response beat the SSE echo), no-op.
-        if (prev.some((m) => m.id === incoming.id)) return prev;
-
-        // Preferred match: clientId — exact, unambiguous, stable across the swap.
-        if (incoming.clientId) {
-          const idx = prev.findIndex((m) => m.clientId === incoming.clientId);
-          if (idx >= 0) {
-            const next = prev.slice();
-            // Preserve clientId + createdAt from the temp so the React key and timestamp
-            // don't jitter when the real message takes its place.
-            next[idx] = { ...incoming, clientId: prev[idx].clientId, createdAt: prev[idx].createdAt };
-            return next;
-          }
-        }
-
-        // Fallback: legacy content+user+age match (handles clients that didn't send a clientId).
-        const tempIndex = prev.findIndex((m) => {
-          if (!String(m.id).startsWith("temp-")) return false;
-          if (m.userId !== incoming.userId) return false;
-          if (m.content !== incoming.content) return false;
-          const age = Date.now() - new Date(m.createdAt).getTime();
-          return age <= 10_000;
-        });
-        if (tempIndex >= 0) {
-          const next = prev.slice();
-          next[tempIndex] = { ...incoming, clientId: prev[tempIndex].clientId, createdAt: prev[tempIndex].createdAt };
-          return next;
-        }
-        return [...prev, incoming];
-      });
+      // No optimistic temp — the POST response already appended the sender's own message,
+      // so we just dedupe by id and append incoming messages from other users.
+      setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
       if (nearBottomRef.current || detail.userId === viewerId) {
         setTimeout(() => scrollToBottom(true), 20);
       }
@@ -309,6 +287,54 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
     };
   }, [channelId, viewerId]);
 
+  // Fetch the viewer's own moderation mute status for this campaign. Refetches whenever
+  // we switch into a different campaign's community. OWNER is never mutable so skip.
+  useEffect(() => {
+    if (!campaignId || viewerRole === "OWNER") { setMutedUntil(null); return; }
+    let cancelled = false;
+    fetch(`/api/community/mutes/me?campaignId=${encodeURIComponent(campaignId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.muted && data.expiresAt) setMutedUntil(new Date(data.expiresAt));
+        else setMutedUntil(null);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [campaignId, viewerRole]);
+
+  // Live mute updates via Ably.
+  useEffect(() => {
+    if (!campaignId) return;
+    const onMuted = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || detail.campaignId !== campaignId) return;
+      if (detail.userId !== viewerId) return;
+      if (detail.expiresAt) setMutedUntil(new Date(detail.expiresAt));
+    };
+    const onUnmuted = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || detail.campaignId !== campaignId) return;
+      if (detail.userId !== viewerId) return;
+      setMutedUntil(null);
+    };
+    window.addEventListener("sse:user_muted", onMuted);
+    window.addEventListener("sse:user_unmuted", onUnmuted);
+    return () => {
+      window.removeEventListener("sse:user_muted", onMuted);
+      window.removeEventListener("sse:user_unmuted", onUnmuted);
+    };
+  }, [campaignId, viewerId]);
+
+  // Auto-clear mutedUntil once it expires locally so the input unlocks without a refresh.
+  useEffect(() => {
+    if (!mutedUntil) return;
+    const ms = mutedUntil.getTime() - Date.now();
+    if (ms <= 0) { setMutedUntil(null); return; }
+    const t = setTimeout(() => setMutedUntil(null), ms + 500);
+    return () => clearTimeout(t);
+  }, [mutedUntil]);
+
   // OWNER/ADMIN search — debounce 500ms, query server-side ILIKE, render results in place.
   useEffect(() => {
     if (!isAdminOrOwner) return;
@@ -351,53 +377,24 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
 
   const handleSend = useCallback(
     async (content: string) => {
-      // Immediate optimistic append with a temporary id. Replaced by either the POST response
-      // (this function) or the Ably echo (above) — whichever wins first.
-      // clientId stays stable across the temp→real swap so the React key never changes.
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const clientId = tempId;
-      const optimistic: Message = {
-        id: tempId,
-        clientId,
-        content,
-        createdAt: new Date().toISOString(),
-        userId: viewerId,
-        user: { id: viewerId, username: "You", role: "CLIPPER" },
-      };
-      setMessages((prev) => [...prev, optimistic]);
-      setTimeout(() => scrollToBottom(true), 10);
-
+      // Mirror the ticket-chat pattern: no optimistic temp. POST first, then append the
+      // server-returned message exactly once. Eliminates the temp→real swap flicker entirely.
       try {
         const res = await fetch(`/api/community/channels/${channelId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content, clientId, replyToId: replyTo?.id || undefined }),
+          body: JSON.stringify({ content, replyToId: replyTo?.id || undefined }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to send");
-        // Swap temp → real IN PLACE. Preserve clientId + createdAt from the temp so the
-        // React key (m.clientId) stays stable and the displayed timestamp doesn't jitter.
-        setMessages((prev) => {
-          // If SSE already swapped the temp with the real message, we're done.
-          if (prev.some((m) => m.id === data.id)) {
-            return prev.filter((m) => m.id !== tempId);
-          }
-          const idx = prev.findIndex((m) => m.clientId === clientId || m.id === tempId);
-          if (idx >= 0) {
-            const next = prev.slice();
-            next[idx] = { ...data, clientId, createdAt: prev[idx].createdAt };
-            return next;
-          }
-          return [...prev, { ...data, clientId }];
-        });
+        setMessages((prev) => (prev.some((m) => m.id === data.id) ? prev : [...prev, data]));
         setReplyTo(null);
+        setTimeout(() => scrollToBottom(true), 20);
       } catch (err: any) {
-        // Remove the optimistic bubble on failure so the user doesn't see a ghost.
-        setMessages((prev) => prev.filter((m) => m.id !== tempId));
         toast.error(err.message || "Could not send message");
       }
     },
-    [channelId, scrollToBottom, viewerId, replyTo],
+    [channelId, scrollToBottom, replyTo],
   );
 
   const handleReply = useCallback((m: { id: string; username: string; content: string }) => {
@@ -595,6 +592,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
                   onReply={handleReply}
                   onPin={handlePin}
                   onReact={handleReact}
+                  onMute={isAdminOrOwner ? setMuteDialog : undefined}
                   showAvatar={true}
                   searchQuery={searchQuery}
                 />
@@ -626,7 +624,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
               const sameDay = prev && new Date(prev.createdAt).toDateString() === new Date(m.createdAt).toDateString();
               const showSeparator = !sameDay;
               return (
-                <Fragment key={m.clientId || m.id}>
+                <Fragment key={m.id}>
                   {showSeparator && (
                     <div className="flex items-center gap-3 px-4 py-3">
                       <div className="flex-1 h-px bg-[var(--border-color)]" />
@@ -645,6 +643,7 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
                     onReply={handleReply}
                     onPin={handlePin}
                     onReact={handleReact}
+                    onMute={isAdminOrOwner ? setMuteDialog : undefined}
                     showAvatar={shouldShowAvatar(i)}
                   />
                 </Fragment>
@@ -681,11 +680,19 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
         lockedReason={locked}
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
+        mutedUntil={mutedUntil}
         placeholder={
           channelType === "announcement"
             ? "Write an announcement…"
             : `Message #${channelName}…`
         }
+      />
+
+      <MuteUserDialog
+        open={!!muteDialog}
+        onClose={() => setMuteDialog(null)}
+        campaignId={campaignId}
+        target={muteDialog}
       />
     </div>
   );

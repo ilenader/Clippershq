@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useRef, useState, useEffect } from "react";
-import { Pin, Reply, SmilePlus, Trash2 } from "lucide-react";
+import { Pin, Reply, SmilePlus, Trash2, VolumeX } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 /** Discord-style message timestamp: time for today, "Yesterday at …" for yesterday,
@@ -61,6 +61,8 @@ interface Props {
   onReply?: (m: { id: string; username: string; content: string }) => void;
   onPin?: (id: string, nextPinned: boolean) => void;
   onReact?: (messageId: string, emoji: string) => void;
+  /** Staff-only: opens the mute dialog targeted at this message's author. */
+  onMute?: (target: { userId: string; username: string }) => void;
   showAvatar?: boolean;
   /** When set and non-empty, matching substrings in the message content are highlighted. */
   searchQuery?: string;
@@ -97,7 +99,7 @@ export const REACTION_GLYPHS: Record<string, string> = {
 function MessageBubbleInner({
   message, viewerRole, viewerId,
   channelType,
-  onDelete, onReply, onPin, onReact,
+  onDelete, onReply, onPin, onReact, onMute,
   showAvatar = true,
   searchQuery,
 }: Props) {
@@ -311,6 +313,16 @@ function MessageBubbleInner({
               aria-label={message.isPinned ? "Unpin message" : "Pin message"}
             >
               <Pin className={`h-3.5 w-3.5 ${message.isPinned ? "text-accent" : "text-[var(--text-muted)]"}`} />
+            </button>
+          )}
+          {canModerate && onMute && message.userId !== viewerId && role !== "OWNER" && (
+            <button
+              onClick={() => onMute({ userId: message.userId, username })}
+              className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 rounded-lg flex items-center justify-center hover:bg-amber-500/10"
+              title="Mute user"
+              aria-label="Mute user"
+            >
+              <VolumeX className="h-3.5 w-3.5 text-amber-400" />
             </button>
           )}
           {canDelete && onDelete && (

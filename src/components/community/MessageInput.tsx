@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Send, Lock, Reply, X } from "lucide-react";
+import { Send, Lock, Reply, X, VolumeX } from "lucide-react";
 
 interface Props {
   onSend: (content: string) => Promise<void> | void;
@@ -15,6 +15,21 @@ interface Props {
   /** Active reply target. When present, shows a preview bar above the textarea. */
   replyTo?: { id: string; username: string; content: string } | null;
   onCancelReply?: () => void;
+  /** Moderation mute expiry. When in the future, disables the input and shows a banner. */
+  mutedUntil?: Date | null;
+}
+
+function formatMuteRemaining(until: Date): string {
+  const ms = until.getTime() - Date.now();
+  if (ms <= 0) return "moments";
+  const totalSec = Math.ceil(ms / 1000);
+  if (totalSec < 60) return `${totalSec}s`;
+  const totalMin = Math.ceil(totalSec / 60);
+  if (totalMin < 60) return `${totalMin} minute${totalMin === 1 ? "" : "s"}`;
+  const totalHr = Math.ceil(totalMin / 60);
+  if (totalHr < 24) return `${totalHr} hour${totalHr === 1 ? "" : "s"}`;
+  const totalDay = Math.ceil(totalHr / 24);
+  return `${totalDay} day${totalDay === 1 ? "" : "s"}`;
 }
 
 export function MessageInput({
@@ -26,11 +41,21 @@ export function MessageInput({
   onTyping,
   replyTo,
   onCancelReply,
+  mutedUntil,
 }: Props) {
   const [value, setValue] = useState("");
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingThrottleRef = useRef<number>(0);
+  const isMuted = !!mutedUntil && mutedUntil.getTime() > Date.now();
+
+  // Re-render every second while muted so the remaining countdown stays fresh.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (!isMuted) return;
+    const t = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [isMuted]);
 
   const signalTyping = () => {
     if (!onTyping) return;
@@ -65,6 +90,22 @@ export function MessageInput({
       setTimeout(() => textareaRef.current?.focus(), 50);
     }
   };
+
+  if (isMuted && mutedUntil) {
+    return (
+      <div
+        className="flex-shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-primary)] pt-3 px-3 sm:px-4"
+        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+      >
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/5 border border-amber-500/15">
+          <VolumeX className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
+          <p className="text-xs text-amber-400">
+            You are muted. Try again in {formatMuteRemaining(mutedUntil)}.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (lockedReason) {
     return (

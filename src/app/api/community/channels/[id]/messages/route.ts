@@ -163,6 +163,25 @@ export async function POST(
     await new Promise((r) => setTimeout(r, 1000));
   }
 
+  // Moderation mute gate — blocks channel posting only (tickets/DMs are unaffected).
+  // OWNER is never mutable (enforced at the mute API), but double-check here defensively.
+  if (role !== "OWNER") {
+    const mute = await db.communityModerationMute.findUnique({
+      where: { campaignId_userId: { campaignId: channel.campaignId, userId: session.user.id } },
+    });
+    if (mute) {
+      if (mute.expiresAt > new Date()) {
+        const remainingMin = Math.max(1, Math.ceil((mute.expiresAt.getTime() - Date.now()) / 60_000));
+        return NextResponse.json(
+          { error: `You are muted in this community. Try again in ${remainingMin} minute${remainingMin === 1 ? "" : "s"}.` },
+          { status: 403 },
+        );
+      }
+      // Lazy-clean an expired row.
+      await db.communityModerationMute.delete({ where: { id: mute.id } }).catch(() => {});
+    }
+  }
+
   // Optional reply target. Verify it belongs to the same channel (no cross-channel replies).
   let replyToId: string | null = null;
   if (typeof body.replyToId === "string" && body.replyToId.length > 0) {

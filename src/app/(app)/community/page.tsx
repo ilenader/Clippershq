@@ -686,6 +686,7 @@ export default function CommunityPage() {
                     channelId={selectedChannel.id}
                     channelType={selectedChannel.type}
                     channelName={selectedChannel.name}
+                    campaignId={selectedCampaignId}
                     viewerId={viewerId}
                     viewerRole={viewerRole}
                   />

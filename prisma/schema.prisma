@@ -803,6 +803,22 @@ model CommunityMute {
   @@map("community_mutes")
 }
 
+/// Staff-issued mute. Blocks the user from posting in channels (not tickets) until expiresAt.
+/// Separate from CommunityMute (which is a user's own opt-out of announcement emails).
+model CommunityModerationMute {
+  id         String   @id @default(cuid())
+  campaignId String
+  userId     String
+  mutedById  String
+  expiresAt  DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@unique([campaignId, userId])
+  @@index([expiresAt])
+  @@map("community_moderation_mutes")
+}
+
 // Emoji reactions on channel messages. One row per (message, user, emoji).
 model MessageReaction {
   id        String   @id @default(cuid())
