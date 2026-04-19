@@ -206,17 +206,24 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
         },
       };
       setMessages((prev) => {
-        // Drop any optimistic temp message from the same user within the last 10s —
-        // the real server message is arriving now and should take its place.
-        const filtered = prev.filter((m) => {
-          if (!String(m.id).startsWith("temp-")) return true;
-          if (m.userId !== incoming.userId) return true;
+        // If the real message already landed (POST response beat the SSE echo), no-op.
+        if (prev.some((m) => m.id === incoming.id)) return prev;
+        // Find a matching optimistic temp message from the same user within 10s and
+        // replace it IN PLACE. Keeping the array index stable prevents the unmount/remount
+        // flicker you'd get from .filter()+append.
+        const tempIndex = prev.findIndex((m) => {
+          if (!String(m.id).startsWith("temp-")) return false;
+          if (m.userId !== incoming.userId) return false;
+          if (m.content !== incoming.content) return false;
           const age = Date.now() - new Date(m.createdAt).getTime();
-          if (age > 10_000) return true;
-          return false;
+          return age <= 10_000;
         });
-        if (filtered.some((m) => m.id === incoming.id)) return filtered;
-        return [...filtered, incoming];
+        if (tempIndex >= 0) {
+          const next = prev.slice();
+          next[tempIndex] = incoming;
+          return next;
+        }
+        return [...prev, incoming];
       });
       if (nearBottomRef.current || detail.userId === viewerId) {
         setTimeout(() => scrollToBottom(true), 20);
@@ -353,11 +360,19 @@ export function ChannelChat({ channelId, channelType, channelName, viewerId, vie
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to send");
-        // Swap temp → real (or no-op if Ably already replaced it).
+        // Swap temp → real IN PLACE (or no-op if Ably already replaced it).
         setMessages((prev) => {
-          const withoutTemp = prev.filter((m) => m.id !== tempId);
-          if (withoutTemp.some((m) => m.id === data.id)) return withoutTemp;
-          return [...withoutTemp, data];
+          if (prev.some((m) => m.id === data.id)) {
+            // Real already landed via SSE — drop the temp if it's still somehow here.
+            return prev.filter((m) => m.id !== tempId);
+          }
+          const tempIndex = prev.findIndex((m) => m.id === tempId);
+          if (tempIndex >= 0) {
+            const next = prev.slice();
+            next[tempIndex] = data;
+            return next;
+          }
+          return [...prev, data];
         });
         setReplyTo(null);
       } catch (err: any) {
