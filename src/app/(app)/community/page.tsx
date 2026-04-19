@@ -8,6 +8,7 @@ import {
   AlertCircle, ArrowLeft, Loader2, MessageCircle, Phone,
 } from "lucide-react";
 import { ChannelChat } from "@/components/community/ChannelChat";
+import { useVisualViewportHeight } from "@/hooks/useVisualViewport";
 import { Leaderboard } from "@/components/community/Leaderboard";
 import { TicketPanel } from "@/components/community/TicketPanel";
 import { CallScheduler } from "@/components/community/CallScheduler";
@@ -88,6 +89,10 @@ export default function CommunityPage() {
 
   const isAdmin = viewerRole === "OWNER" || viewerRole === "ADMIN";
   const isOwner = viewerRole === "OWNER";
+
+  // Live viewport height that shrinks when the mobile keyboard opens.
+  // Falls back to null on desktop / older browsers — the root div uses dvh in that case.
+  const viewportHeight = useVisualViewportHeight();
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
@@ -547,7 +552,12 @@ export default function CommunityPage() {
   const showingServers = mobileView === "servers";
 
   return (
-    <div className="-m-4 lg:-m-6 flex h-[calc(100dvh-56px)] min-h-0 bg-[var(--bg-primary)]">
+    <div
+      className="-m-4 lg:-m-6 flex min-h-0 bg-[var(--bg-primary)] transition-[height] duration-100"
+      style={{
+        height: viewportHeight != null ? `${viewportHeight - 56}px` : "calc(100dvh - 56px)",
+      }}
+    >
       {/* Desktop: server strip always visible */}
       <div className="hidden lg:flex">
         <ServerStrip
