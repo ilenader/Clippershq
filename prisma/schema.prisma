@@ -264,6 +264,7 @@ model ClipAccount {
   rejectionReason   String?
   verificationCode  String?
   verifiedAt        DateTime?
+  profileImageUrl   String?
   deletedByUser     Boolean          @default(false)
   deletedAt         DateTime?
   createdAt         DateTime         @default(now())

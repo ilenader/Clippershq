@@ -110,7 +110,7 @@ function logHtmlDiagnostics(html: string, code: string, profileLink: string) {
   });
 }
 
-async function checkInstagramBio(profileLink: string, code: string): Promise<{ found: boolean; error?: string; debug?: string }> {
+async function checkInstagramBio(profileLink: string, code: string): Promise<{ found: boolean; error?: string; debug?: string; profileImageUrl?: string }> {
   const username = profileLink.split("/").filter(Boolean).pop() || "";
   console.log(`[VERIFY] ════ INSTAGRAM VERIFY START ════`);
   console.log(`[VERIFY] Profile: ${profileLink}`);
@@ -150,8 +150,9 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
         console.log(`[VERIFY] Code "${code}" found in bio: ${foundInBio}`);
 
         if (foundInBio) {
-          console.log(`[VERIFY] ✓ Code found via Apify`);
-          return { found: true };
+          const profileImageUrl = apifyData?.[0]?.profilePicUrlHD || apifyData?.[0]?.profilePicUrl || undefined;
+          console.log(`[VERIFY] ✓ Code found via Apify${profileImageUrl ? `, profilePic: ${profileImageUrl.substring(0, 80)}…` : ""}`);
+          return { found: true, profileImageUrl };
         }
         console.log(`[VERIFY] ✗ Apify: code not found in bio`);
       } else {
@@ -313,7 +314,7 @@ async function checkInstagramBio(profileLink: string, code: string): Promise<{ f
 
 // ─── TikTok / YouTube / fallback: plain fetch ─────────────
 
-async function checkBioPlainFetch(profileLink: string, code: string, platform: string): Promise<{ found: boolean; error?: string; debug?: string }> {
+async function checkBioPlainFetch(profileLink: string, code: string, platform: string): Promise<{ found: boolean; error?: string; debug?: string; profileImageUrl?: string }> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
@@ -364,7 +365,7 @@ async function checkBioPlainFetch(profileLink: string, code: string, platform: s
 // ─── Router: pick the right method per platform ────────────
 // Uses the STORED platform from the database, NOT auto-detected from URL.
 
-async function checkBioForCode(profileLink: string, code: string, storedPlatform: string): Promise<{ found: boolean; error?: string; debug?: string }> {
+async function checkBioForCode(profileLink: string, code: string, storedPlatform: string): Promise<{ found: boolean; error?: string; debug?: string; profileImageUrl?: string }> {
   const platform = storedPlatform.toLowerCase();
   const urlPlatform = detectPlatform(profileLink);
   console.log(`[VERIFY] ─── START ───`);
@@ -463,7 +464,11 @@ export async function POST(
 
         await db.clipAccount.update({
           where: { id },
-          data: { status: "APPROVED", verifiedAt: new Date() },
+          data: {
+            status: "APPROVED",
+            verifiedAt: new Date(),
+            ...(result.profileImageUrl ? { profileImageUrl: result.profileImageUrl } : {}),
+          },
         });
         console.log(`[VERIFY] ✓ Account ${account.id} approved!`);
         return NextResponse.json({ verified: true, message: "Code found! Account approved." });

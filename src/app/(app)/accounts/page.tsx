@@ -243,8 +243,11 @@ export default function AccountsPage() {
               onClick={() => setSelectedAccountId(account.id)}
               className="relative flex flex-col items-center p-2 sm:p-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-accent/30 hover:bg-[var(--bg-card-hover)] hover:shadow-md hover:shadow-accent/5 transition-all duration-200 cursor-pointer min-h-[90px] sm:min-h-[110px] group"
             >
-              <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center mb-1.5 ring-2 ring-transparent group-hover:ring-accent/30 transition-all duration-200 ${platformBgColor(account.platform)}`}>
+              <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full overflow-hidden flex items-center justify-center mb-1.5 ring-2 ring-transparent group-hover:ring-accent/30 transition-all duration-200 ${platformBgColor(account.platform)} relative`}>
                 <span className="text-sm sm:text-base font-bold text-white">{platformLetter(account.platform)}</span>
+                {account.profileImageUrl && (
+                  <img src={account.profileImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                )}
               </div>
               <p className="text-[10px] sm:text-xs font-medium text-[var(--text-primary)] truncate w-full text-center">
                 {account.username}
