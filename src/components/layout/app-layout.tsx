@@ -127,8 +127,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const onTouchStart = (e: TouchEvent) => {
       if (window.innerWidth >= 1024) return;
+      // Skip when the touch originates inside a horizontally scrollable container
+      // (community ServerStrip, carousels, charts) — those own the horizontal gesture.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.("[data-no-swipe], .overflow-x-auto, .overflow-x-scroll")) return;
       const x = e.touches[0].clientX;
-      if (x < 80 || mobileOpen) {
+      const zone = window.innerWidth * 0.8; // extend swipe-to-open to left 80% of the screen
+      if (x < zone || mobileOpen) {
         swipeRef.current = { startX: x, startY: e.touches[0].clientY, lastX: x, tracking: true, decided: false };
       }
     };
