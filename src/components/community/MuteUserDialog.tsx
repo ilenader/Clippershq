@@ -12,15 +12,19 @@ interface Props {
 }
 
 const DURATIONS: { minutes: number; label: string }[] = [
-  { minutes: 1,    label: "1 min" },
   { minutes: 5,    label: "5 min" },
-  { minutes: 10,   label: "10 min" },
+  { minutes: 15,   label: "15 min" },
+  { minutes: 30,   label: "30 min" },
   { minutes: 60,   label: "1 hour" },
-  { minutes: 1440, label: "1 day" },
+  { minutes: 120,  label: "2 hours" },
+  { minutes: 300,  label: "5 hours" },
+  { minutes: 480,  label: "8 hours" },
+  { minutes: 720,  label: "12 hours" },
+  { minutes: 1440, label: "24 hours" },
 ];
 
 export function MuteUserDialog({ open, onClose, campaignId, target }: Props) {
-  const [duration, setDuration] = useState<number>(10);
+  const [duration, setDuration] = useState<number>(15);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -44,7 +48,7 @@ export function MuteUserDialog({ open, onClose, campaignId, target }: Props) {
       const label = DURATIONS.find((d) => d.minutes === duration)?.label || `${duration} min`;
       toast.success(`Muted ${target.username} for ${label}`);
       setReason("");
-      setDuration(10);
+      setDuration(15);
       onClose();
     } catch (err: any) {
       toast.error(err?.message || "Could not mute user");
@@ -81,7 +85,7 @@ export function MuteUserDialog({ open, onClose, campaignId, target }: Props) {
         </div>
 
         <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] mb-2">Duration</p>
-        <div className="grid grid-cols-5 gap-1.5 mb-4">
+        <div className="grid grid-cols-3 gap-2 mb-4">
           {DURATIONS.map((d) => (
             <button
               key={d.minutes}

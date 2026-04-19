@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const VALID_DURATIONS = new Set([1, 5, 10, 60, 1440]);
+const VALID_DURATIONS = new Set([5, 15, 30, 60, 120, 300, 480, 720, 1440]);
 
 /**
  * Staff-issued moderation mute for channel posting.
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
   if (!campaignId || !userId) return NextResponse.json({ error: "campaignId and userId required" }, { status: 400 });
   if (!VALID_DURATIONS.has(durationMinutes)) {
-    return NextResponse.json({ error: "durationMinutes must be 1, 5, 10, 60, or 1440" }, { status: 400 });
+    return NextResponse.json({ error: "durationMinutes must be one of: 5, 15, 30, 60, 120, 300, 480, 720, 1440" }, { status: 400 });
   }
   if (userId === session.user.id) {
     return NextResponse.json({ error: "Cannot mute yourself" }, { status: 400 });
