@@ -66,21 +66,6 @@ interface ThreadInfo {
   needsHumanSupport?: boolean;
 }
 
-// ─── Quick Suggestions (10 prompts, displayed as a grid) ────
-
-const QUICK_SUGGESTIONS = [
-  "I have a problem with my views",
-  "I don't know what to post",
-  "I'm having trouble hitting the USA market",
-  "How do I post correctly?",
-  "Can you review my posting strategy?",
-  "Why is this video not performing?",
-  "What kind of content should I make for this campaign?",
-  "How do I hit more USA viewers?",
-  "What's the best hook for this campaign?",
-  "Can you help me improve this clip?",
-];
-
 // ─── Helpers ────────────────────────────────────────────────
 
 function formatTime(dateStr: string): string {
@@ -194,9 +179,6 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
   type ChatFilter = "all" | "needs-agent" | "direct" | string; // string = campaignId
   const [chatFilter, setChatFilter] = useState<ChatFilter>("all");
   const [filterOpen, setFilterOpen] = useState(false);
-
-  // Track if user has sent a message in current thread (hides suggestions)
-  const [hasSentInThread, setHasSentInThread] = useState(false);
 
   // New conversation (admin/owner)
   const [messageableUsers, setMessageableUsers] = useState<MessageableUser[]>([]);
@@ -412,7 +394,6 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
       sender: { id: myId, name: null, username: "You", image: null, role },
     };
     setMessages((prev) => [...prev, optimisticMsg]);
-    setHasSentInThread(true);
     setSending(true);
 
     try {
@@ -451,7 +432,6 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
     setThreadInfo(info);
     activeConvoIdRef.current = info.convoId;
     setMessages([]);
-    setHasSentInThread(false);
     setNeedsHumanSupport(info.needsHumanSupport || false);
     setView("thread");
     setLoadingMessages(true);
@@ -886,19 +866,6 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-[var(--text-muted)] mb-4 text-center">
-                        Pick a question below or type your own.
-                      </p>
-                      {/* Quick suggestions as a vertical card list — no horizontal scrolling */}
-                      <div className="space-y-2">
-                        {QUICK_SUGGESTIONS.slice(0, 6).map((suggestion) => (
-                          <button key={suggestion} onClick={() => handleSend(suggestion)}
-                            disabled={!canSend}
-                            className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-4 py-3 text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)] hover:border-accent/30 transition-all cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed">
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center">
@@ -1022,18 +989,6 @@ export function ChatWidget({ userId, role }: ChatWidgetProps) {
                 </>
               )}
             </div>
-
-            {/* Quick suggestion chips — only before first message in conversation */}
-            {isClipperOnly && canSend && messages.length === 0 && !hasSentInThread && (
-              <div className="border-t border-[var(--border-subtle)] px-4 py-2.5 flex flex-wrap gap-2">
-                {QUICK_SUGGESTIONS.slice(0, 4).map((s) => (
-                  <button key={s} onClick={() => handleSend(s)}
-                    className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-accent hover:border-accent/30 transition-all cursor-pointer">
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Return to AI button — owner/admin only, after they've responded */}
             {!isClipper && threadInfo && !threadInfo.needsHumanSupport && messages.length > 0 && (
