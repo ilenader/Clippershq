@@ -200,9 +200,14 @@ export default function CommunityPage() {
   }, [loadCampaigns]);
 
   // --- Channels for the selected campaign ---------------------------
-  const loadChannels = useCallback(async (cid: string) => {
+  // `silent` refreshes (from real-time SSE events) skip the loadingChannels toggle so
+  // the render tree stays on the ChannelChat branch. Toggling to the spinner branch
+  // unmounts ChannelChat — which looked like a full page reload to the user when their
+  // own message triggered the Ably echo and hit this handler.
+  const loadChannels = useCallback(async (cid: string, opts?: { silent?: boolean }) => {
     if (!cid) return;
-    setLoadingChannels(true);
+    const silent = !!opts?.silent;
+    if (!silent) setLoadingChannels(true);
     setError(null);
     try {
       const res = await fetch(`/api/community/channels?campaignId=${encodeURIComponent(cid)}`);
@@ -237,7 +242,7 @@ export default function CommunityPage() {
         return prev;
       });
     }
-    setLoadingChannels(false);
+    if (!silent) setLoadingChannels(false);
   }, []);
 
   useEffect(() => {
@@ -259,7 +264,9 @@ export default function CommunityPage() {
     const handler = async () => {
       if (fetchingRef.current || !selectedCampaignId) return;
       fetchingRef.current = true;
-      try { await loadChannels(selectedCampaignId); } finally { fetchingRef.current = false; }
+      // Silent refresh — don't flip loadingChannels, or the render tree unmounts
+      // ChannelChat and looks like a full page reload to the user.
+      try { await loadChannels(selectedCampaignId, { silent: true }); } finally { fetchingRef.current = false; }
     };
     const deleteHandler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
