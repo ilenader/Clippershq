@@ -403,7 +403,7 @@ async function checkBioForCode(profileLink: string, code: string, storedPlatform
     };
   }
 
-  let result: { found: boolean; error?: string; debug?: string };
+  let result: { found: boolean; error?: string; debug?: string; profileImageUrl?: string };
 
   if (platform === "instagram") {
     result = await checkInstagramBio(profileLink, code);
@@ -411,7 +411,7 @@ async function checkBioForCode(profileLink: string, code: string, storedPlatform
     result = await checkBioPlainFetch(profileLink, code, platform);
   }
 
-  console.log(`[VERIFY] Result: found=${result.found}, error=${result.error || "none"}`);
+  console.log(`[VERIFY] Result: found=${result.found}, profileImageUrl=${result.profileImageUrl || "none"}, error=${result.error || "none"}`);
   console.log(`[VERIFY] ─── END ───`);
   return result;
 }
@@ -481,6 +481,7 @@ export async function POST(
           return NextResponse.json({ verified: false, message: "This account is already verified by another user." }, { status: 400 });
         }
 
+        console.log(`[VERIFY] Saving approval. profileImageUrl from verification: ${result.profileImageUrl || "none"}`);
         await db.clipAccount.update({
           where: { id },
           data: {
@@ -490,6 +491,47 @@ export async function POST(
           },
         });
         console.log(`[VERIFY] ✓ Account ${account.id} approved!`);
+
+        // Fallback: fetch profile pic separately if verification didn't capture one (e.g. Browserless path)
+        if (!result.profileImageUrl && account.platform.toLowerCase() === "instagram") {
+          const apifyToken = process.env.APIFY_API_KEY || process.env.APIFY_TOKEN || "";
+          if (apifyToken) {
+            try {
+              console.log(`[VERIFY] No profile pic from verification — fetching separately via Apify`);
+              const picRes = await fetch(
+                `https://api.apify.com/v2/acts/${APIFY_IG_PROFILE_ACTOR}/run-sync-get-dataset-items?token=${apifyToken}`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ usernames: [account.username], resultsLimit: 1 }),
+                  signal: AbortSignal.timeout(30000),
+                }
+              );
+              if (picRes.ok) {
+                const picData = await picRes.json();
+                const pd = picData?.[0] || {};
+                console.log(`[VERIFY] Fallback Apify pic fields:`, {
+                  profilePicUrl: pd.profilePicUrl, profilePicUrlHD: pd.profilePicUrlHD,
+                  profilePicture: pd.profilePicture, profile_pic_url_hd: pd.profile_pic_url_hd,
+                });
+                const pic = pd.profilePicUrlHD || pd.profilePicUrl || pd.profilePicture ||
+                  pd.profile_pic_url_hd || pd.profile_pic_url ||
+                  pd.avatarUrl || pd.profileImage || null;
+                if (pic) {
+                  await db.clipAccount.update({ where: { id }, data: { profileImageUrl: pic } });
+                  console.log(`[VERIFY] ✓ Profile pic saved via fallback: ${pic.substring(0, 80)}`);
+                } else {
+                  console.log(`[VERIFY] Fallback Apify returned no profile pic URL. Keys: ${Object.keys(pd).join(", ")}`);
+                }
+              } else {
+                console.log(`[VERIFY] Fallback Apify HTTP ${picRes.status}`);
+              }
+            } catch (picErr: any) {
+              console.log(`[VERIFY] Profile pic fallback failed (non-critical): ${picErr?.message}`);
+            }
+          }
+        }
+
         return NextResponse.json({ verified: true, message: "Code found! Account approved." });
       } catch (dbErr: any) {
         console.error(`[VERIFY] DB update failed:`, dbErr?.message);
