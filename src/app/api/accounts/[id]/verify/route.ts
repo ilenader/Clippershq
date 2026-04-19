@@ -16,6 +16,33 @@ import { NextRequest, NextResponse } from "next/server";
 
 const APIFY_IG_PROFILE_ACTOR = process.env.APIFY_IG_PROFILE_ACTOR || "apify~instagram-profile-scraper";
 
+// Instagram/TikTok CDN URLs expire after a few hours — download the image during verification
+// and persist as a base64 data URL so the profile pic never breaks.
+async function downloadAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
+      headers: { "User-Agent": "Mozilla/5.0", "Referer": "https://www.instagram.com/" },
+    });
+    if (!res.ok) {
+      console.log(`[VERIFY] downloadAsDataUrl: HTTP ${res.status} for ${url.substring(0, 80)}`);
+      return null;
+    }
+    const ct = res.headers.get("content-type") || "image/jpeg";
+    const buf = Buffer.from(await res.arrayBuffer());
+    // Skip images larger than 200KB — keep the CDN URL as fallback (may expire, but better than bloating the DB)
+    if (buf.length > 200_000) {
+      console.log(`[VERIFY] downloadAsDataUrl: image too large (${buf.length} bytes), skipping persist`);
+      return null;
+    }
+    console.log(`[VERIFY] downloadAsDataUrl: persisted ${buf.length} bytes as ${ct}`);
+    return `data:${ct};base64,${buf.toString("base64")}`;
+  } catch (err: any) {
+    console.log(`[VERIFY] downloadAsDataUrl failed: ${err?.message}`);
+    return null;
+  }
+}
+
 /**
  * Detect platform from profile URL.
  */
@@ -482,12 +509,20 @@ export async function POST(
         }
 
         console.log(`[VERIFY] Saving approval. profileImageUrl from verification: ${result.profileImageUrl || "none"}`);
+        let persistedPic: string | undefined = undefined;
+        if (result.profileImageUrl && !result.profileImageUrl.startsWith("data:")) {
+          const dataUrl = await downloadAsDataUrl(result.profileImageUrl);
+          persistedPic = dataUrl || result.profileImageUrl;
+        } else if (result.profileImageUrl) {
+          persistedPic = result.profileImageUrl;
+        }
+
         await db.clipAccount.update({
           where: { id },
           data: {
             status: "APPROVED",
             verifiedAt: new Date(),
-            ...(result.profileImageUrl ? { profileImageUrl: result.profileImageUrl } : {}),
+            ...(persistedPic ? { profileImageUrl: persistedPic } : {}),
           },
         });
         console.log(`[VERIFY] ✓ Account ${account.id} approved!`);
@@ -518,8 +553,10 @@ export async function POST(
                   pd.profile_pic_url_hd || pd.profile_pic_url ||
                   pd.avatarUrl || pd.profileImage || null;
                 if (pic) {
-                  await db.clipAccount.update({ where: { id }, data: { profileImageUrl: pic } });
-                  console.log(`[VERIFY] ✓ Profile pic saved via fallback: ${pic.substring(0, 80)}`);
+                  const dataUrl = await downloadAsDataUrl(pic);
+                  const finalPic = dataUrl || pic;
+                  await db.clipAccount.update({ where: { id }, data: { profileImageUrl: finalPic } });
+                  console.log(`[VERIFY] ✓ Profile pic saved via fallback (${dataUrl ? "persisted as data URL" : "CDN URL — may expire"})`);
                 } else {
                   console.log(`[VERIFY] Fallback Apify returned no profile pic URL. Keys: ${Object.keys(pd).join(", ")}`);
                 }
