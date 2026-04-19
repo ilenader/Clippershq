@@ -515,7 +515,7 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
       <div
         ref={scrollRef}
         onScroll={searchActive ? undefined : handleScroll}
-        className="flex-1 overflow-y-auto min-h-0"
+        className="flex-1 overflow-y-auto min-h-0 flex flex-col"
       >
         {loadingMore && (
           <div className="flex items-center justify-center py-3">
@@ -568,7 +568,13 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
             </div>
           </div>
         ) : (
-          <div className="py-2">
+          // mt-auto bottom-aligns the messages list when it's shorter than the scroll
+          // container. Without it, messages cling to the top and a gap appears at the
+          // bottom (most noticeable when the mobile keyboard opens and the document
+          // scrolls to reveal the input). With mt-auto the empty space moves above the
+          // first message — hidden above the visible viewport when scrolled — so the
+          // last message always sits flush against the input.
+          <div className="py-2 mt-auto">
             {messages.map((m, i) => {
               const prev = i > 0 ? messages[i - 1] : null;
               const sameDay = prev && new Date(prev.createdAt).toDateString() === new Date(m.createdAt).toDateString();
