@@ -5,7 +5,7 @@ import { MessageBubble, type Message } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { MuteUserDialog } from "./MuteUserDialog";
 import { toast } from "@/lib/toast";
-import { AlertCircle, ArrowDown, ChevronDown, Loader2, Megaphone, MessageCircle, Pin, Search, Trophy, X } from "lucide-react";
+import { AlertCircle, ArrowDown, Loader2, Megaphone, MessageCircle, Search, Trophy, X } from "lucide-react";
 
 /** Discord-style day divider label. */
 function formatDateSeparator(date: string | Date): string {
@@ -68,7 +68,6 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
   const [searchResults, setSearchResults] = useState<Message[] | null>(null);
   const [typingUsers, setTypingUsers] = useState<Map<string, { username: string; until: number }>>(new Map());
   const [replyTo, setReplyTo] = useState<{ id: string; username: string; content: string } | null>(null);
-  const [pinnedOpen, setPinnedOpen] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Moderation mute state.
@@ -226,11 +225,6 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
         prev.map((m) => (m.id === detail.messageId ? { ...m, isDeleted: true } : m)),
       );
     };
-    const onPinned = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (!detail || detail.channelId !== channelId) return;
-      setMessages((prev) => prev.map((m) => m.id === detail.messageId ? { ...m, isPinned: !!detail.isPinned } : m));
-    };
     const onReaction = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (!detail || detail.channelId !== channelId) return;
@@ -246,12 +240,10 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
 
     window.addEventListener("sse:channel_message", onMessage);
     window.addEventListener("sse:channel_message_deleted", onDeleted);
-    window.addEventListener("sse:channel_message_pinned", onPinned);
     window.addEventListener("sse:channel_reaction", onReaction);
     return () => {
       window.removeEventListener("sse:channel_message", onMessage);
       window.removeEventListener("sse:channel_message_deleted", onDeleted);
-      window.removeEventListener("sse:channel_message_pinned", onPinned);
       window.removeEventListener("sse:channel_reaction", onReaction);
     };
   }, [channelId, viewerId, scrollToBottom]);
@@ -401,21 +393,6 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
     setReplyTo(m);
   }, []);
 
-  const handlePin = useCallback(async (id: string, nextPinned: boolean) => {
-    try {
-      const res = await fetch(`/api/community/channels/${channelId}/messages`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageId: id, isPinned: nextPinned }),
-      });
-      if (!res.ok) throw new Error();
-      // Optimistic — Ably echo will confirm.
-      setMessages((prev) => prev.map((m) => m.id === id ? { ...m, isPinned: nextPinned } : m));
-    } catch {
-      toast.error("Could not update pin");
-    }
-  }, [channelId]);
-
   const handleReact = useCallback(async (messageId: string, emoji: string) => {
     // Snapshot the target message's reactions so we can restore on API failure.
     let snapshot: Message["reactions"] | undefined;
@@ -482,7 +459,6 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
 
   const displayMessages = searchActive && searchResults ? searchResults : messages;
   const typingList = Array.from(typingUsers.values()).map((t) => t.username);
-  const pinnedMessages = messages.filter((m) => m.isPinned && !m.isDeleted);
   const HeaderIcon = channelHeaderIcon(channelType);
 
   if (error) {
@@ -536,31 +512,6 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
           )}
         </div>
       )}
-      {pinnedMessages.length > 0 && !searchActive && (
-        <div className="border-b border-[var(--border-color)] bg-accent/5 px-3 sm:px-4 py-2 mb-2">
-          <button
-            onClick={() => setPinnedOpen((o) => !o)}
-            className="flex items-center gap-1.5 text-xs font-medium text-accent hover:opacity-80 transition-opacity"
-          >
-            <Pin className="h-3 w-3" />
-            {pinnedMessages.length} pinned message{pinnedMessages.length === 1 ? "" : "s"}
-            <ChevronDown className={`h-3 w-3 transition-transform ${pinnedOpen ? "" : "-rotate-90"}`} />
-          </button>
-          {pinnedOpen && (
-            <div className="mt-2 space-y-1">
-              {pinnedMessages.slice(0, 5).map((m) => (
-                <p key={m.id} className="text-xs text-[var(--text-secondary)] truncate">
-                  <span className="font-semibold text-accent">{m.user?.username || "user"}: </span>
-                  {m.content}
-                </p>
-              ))}
-              {pinnedMessages.length > 5 && (
-                <p className="text-[10px] text-[var(--text-muted)]">+{pinnedMessages.length - 5} more pinned</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
       <div
         ref={scrollRef}
         onScroll={searchActive ? undefined : handleScroll}
@@ -590,7 +541,6 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
                   channelType={channelType}
                   onDelete={handleDelete}
                   onReply={handleReply}
-                  onPin={handlePin}
                   onReact={handleReact}
                   onMute={isAdminOrOwner ? setMuteDialog : undefined}
                   showAvatar={true}
@@ -641,8 +591,7 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
                     channelType={channelType}
                     onDelete={handleDelete}
                     onReply={handleReply}
-                    onPin={handlePin}
-                    onReact={handleReact}
+                      onReact={handleReact}
                     onMute={isAdminOrOwner ? setMuteDialog : undefined}
                     showAvatar={shouldShowAvatar(i)}
                   />

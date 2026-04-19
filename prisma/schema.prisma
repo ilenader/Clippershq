@@ -713,7 +713,6 @@ model ChannelMessage {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   content   String   @db.Text
-  isPinned  Boolean  @default(false)
   isDeleted Boolean  @default(false)
   deletedBy String?
   replyToId String?

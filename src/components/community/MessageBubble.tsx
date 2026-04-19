@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useRef, useState, useEffect } from "react";
-import { Pin, Reply, SmilePlus, Trash2, VolumeX } from "lucide-react";
+import { Reply, SmilePlus, Trash2, VolumeX } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 /** Discord-style message timestamp: time for today, "Yesterday at …" for yesterday,
@@ -28,7 +28,6 @@ export interface Message {
    *  server on the real message so the sender can match real→temp and keep the React key. */
   clientId?: string | null;
   content: string;
-  isPinned?: boolean;
   isDeleted?: boolean;
   deletedBy?: string | null;
   createdAt: string | Date;
@@ -59,7 +58,6 @@ interface Props {
   channelType?: string;
   onDelete?: (id: string) => void;
   onReply?: (m: { id: string; username: string; content: string }) => void;
-  onPin?: (id: string, nextPinned: boolean) => void;
   onReact?: (messageId: string, emoji: string) => void;
   /** Staff-only: opens the mute dialog targeted at this message's author. */
   onMute?: (target: { userId: string; username: string }) => void;
@@ -99,7 +97,7 @@ export const REACTION_GLYPHS: Record<string, string> = {
 function MessageBubbleInner({
   message, viewerRole, viewerId,
   channelType,
-  onDelete, onReply, onPin, onReact, onMute,
+  onDelete, onReply, onReact, onMute,
   showAvatar = true,
   searchQuery,
 }: Props) {
@@ -192,11 +190,6 @@ function MessageBubbleInner({
             <span className="text-[11px] lg:text-xs text-[var(--text-muted)] tabular-nums">
               {formatMessageTime(message.createdAt)}
             </span>
-            {message.isPinned && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-accent font-medium">
-                <Pin className="h-3 w-3" /> Pinned
-              </span>
-            )}
           </div>
         )}
 
@@ -303,16 +296,6 @@ function MessageBubbleInner({
               aria-label="Reply to message"
             >
               <Reply className="h-3.5 w-3.5 text-accent" />
-            </button>
-          )}
-          {canModerate && onPin && (
-            <button
-              onClick={() => onPin(message.id, !message.isPinned)}
-              className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 rounded-lg flex items-center justify-center hover:bg-accent/10"
-              title={message.isPinned ? "Unpin" : "Pin"}
-              aria-label={message.isPinned ? "Unpin message" : "Pin message"}
-            >
-              <Pin className={`h-3.5 w-3.5 ${message.isPinned ? "text-accent" : "text-[var(--text-muted)]"}`} />
             </button>
           )}
           {canModerate && onMute && message.userId !== viewerId && role !== "OWNER" && (
