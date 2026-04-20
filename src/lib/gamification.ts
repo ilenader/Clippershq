@@ -205,8 +205,12 @@ export async function updateStreak(userId: string): Promise<void> {
     evalStart = addDays(today, -14);
   }
 
-  // If eval start is after the latest evaluable day, nothing to do
-  if (evalStart > latestEvaluable) return;
+  // Only bail out when even today is already accounted for (lastActiveDate is today
+  // or later). When lastActiveDate is yesterday, evalStart==today and the loop below
+  // is a no-op — but we must still fall through to the today-branch so a freshly-posted
+  // clip gets credited. Returning on `evalStart > latestEvaluable` here is what caused
+  // submits on day N+1 after a day-N today-branch credit to never advance the streak.
+  if (evalStart > today) return;
 
   // Freeze check: does user have any actively-posting campaigns?
   // "Actively posting" = campaign is ACTIVE and user has at least 1 clip in it
@@ -308,6 +312,11 @@ export async function updateStreak(userId: string): Promise<void> {
       lastActiveDate: lastPassedDate || user.lastActiveDate,
     },
   });
+
+  // Bust the in-memory gamification cache so the next dashboard read reflects the
+  // write (not the 30s-stale value). Without this, clip submits from clips POST
+  // would update the DB but the dashboard would keep showing the old streak.
+  gamificationCache.delete(userId);
 
   // If streak changed, recalculate unpaid earnings with new bonus
   if (streakChanged) {
