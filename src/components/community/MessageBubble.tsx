@@ -41,6 +41,9 @@ export interface Message {
   } | null;
   replyTo?: {
     id: string;
+    /** Author of the original message being replied to — used to detect
+     *  "someone replied to me" and render the Discord-style accent highlight. */
+    userId?: string | null;
     content: string;
     isDeleted?: boolean;
     user?: { username?: string | null } | null;
@@ -152,8 +155,28 @@ function MessageBubbleInner({
   }
   const hasReactions = Object.keys(groupedReactions).length > 0;
 
+  // Discord-style "someone replied to you" highlight: this message is a reply,
+  // the original was authored by the viewer, and the replier isn't the viewer.
+  const isReplyToMe =
+    !!message.replyTo &&
+    !!message.replyTo.userId &&
+    message.replyTo.userId === viewerId &&
+    message.userId !== viewerId;
+
   return (
-    <div className={`group flex gap-3 px-3 sm:px-4 ${showAvatar ? "py-1.5 mt-1" : "py-0.5"} hover:bg-[var(--bg-card-hover)] transition-colors`}>
+    <div
+      className={`group relative flex gap-3 px-3 sm:px-4 ${showAvatar ? "py-1.5 mt-1" : "py-0.5"} transition-colors ${
+        isReplyToMe
+          ? "bg-accent/10 hover:bg-accent/[0.14]"
+          : "hover:bg-[var(--bg-card-hover)]"
+      }`}
+    >
+      {isReplyToMe && (
+        <div
+          aria-hidden
+          className="absolute left-0 top-0 bottom-0 w-1 sm:w-0.5 bg-accent"
+        />
+      )}
       <div className="flex-shrink-0 w-8">
         {showAvatar && (
           message.user?.image ? (

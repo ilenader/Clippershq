@@ -210,6 +210,15 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
           role: detail.role || "CLIPPER",
           image: detail.image || null,
         },
+        replyTo: detail.replyTo
+          ? {
+              id: detail.replyTo.id,
+              userId: detail.replyTo.userId ?? null,
+              content: detail.replyTo.content,
+              isDeleted: !!detail.replyTo.isDeleted,
+              user: { username: detail.replyTo.user?.username ?? null },
+            }
+          : null,
       };
       // No optimistic temp — the POST response already appended the sender's own message,
       // so we just dedupe by id and append incoming messages from other users.

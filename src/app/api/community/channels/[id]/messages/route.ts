@@ -64,7 +64,7 @@ export async function GET(
       where: { channelId, ...(searchClause || {}) },
       include: {
         user: { select: { id: true, username: true, name: true, role: true, image: true } },
-        replyTo: { select: { id: true, content: true, user: { select: { username: true, name: true } }, isDeleted: true } },
+        replyTo: { select: { id: true, content: true, userId: true, user: { select: { username: true, name: true } }, isDeleted: true } },
         reactions: { select: { emoji: true, userId: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -199,7 +199,7 @@ export async function POST(
       data: { channelId, userId: session.user.id, content, replyToId: replyToId || undefined },
       include: {
         user: { select: { id: true, username: true, name: true, role: true, image: true } },
-        replyTo: { select: { id: true, content: true, user: { select: { username: true, name: true } }, isDeleted: true } },
+        replyTo: { select: { id: true, content: true, userId: true, user: { select: { username: true, name: true } }, isDeleted: true } },
         reactions: { select: { emoji: true, userId: true } },
       },
     });
@@ -218,6 +218,15 @@ export async function POST(
       image: (message.user as any)?.image || null,
       content: message.content,
       createdAt: message.createdAt,
+      replyTo: (message as any).replyTo
+        ? {
+            id: (message as any).replyTo.id,
+            userId: (message as any).replyTo.userId,
+            content: (message as any).replyTo.content,
+            isDeleted: (message as any).replyTo.isDeleted,
+            user: { username: (message as any).replyTo.user?.username || null },
+          }
+        : null,
     }).catch(() => {});
 
     // Announcement: in-app notification + email to every subscriber who isn't muted.
