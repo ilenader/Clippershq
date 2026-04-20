@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
       },
     },
     orderBy: { createdAt: "desc" },
+    take: 500,
   });
 
   const jobSummary = allJobs.map((j: any) => ({

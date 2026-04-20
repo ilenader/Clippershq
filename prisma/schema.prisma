@@ -93,6 +93,12 @@ model User {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
+  // AI chatbot daily quota — replaces the old in-memory Map in src/lib/chatbot.ts
+  // which reset on every container restart, silently granting users new quotas
+  // after every redeploy. Persisted so limits survive deploys.
+  aiMessageCount Int       @default(0)
+  aiQuotaResetAt DateTime?
+
   // Relations
   referredBy       User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals        User[]    @relation("Referrals")

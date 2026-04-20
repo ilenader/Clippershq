@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { fetchClipStats, detectPlatform } from "@/lib/apify";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,12 @@ export async function POST(req: NextRequest) {
   if (role !== "ADMIN" && role !== "OWNER") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  // Each call hits Apify. Cap at 30/min per admin so a runaway loop (or a
+  // compromised admin token) can't drain credits. 30 is plenty for legitimate
+  // manual stat lookups; automation should go through the cron path.
+  const rl = checkRateLimit(`fetch-stats:${session.user.id}`, 30, 60_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   let body: any;
   try {

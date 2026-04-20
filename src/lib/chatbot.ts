@@ -65,6 +65,7 @@ interface ChatMessage {
 }
 
 interface UserData {
+  id: string;
   username: string;
   role: string;
   level: number;
@@ -72,29 +73,50 @@ interface UserData {
   streak: number;
 }
 
-// Rate limit: 20 AI messages per user per day
-const dailyLimits = new Map<string, { count: number; resetAt: number }>();
+/** Daily AI message cap per user. Each paid Anthropic call goes through
+ *  generateChatbotResponse and this check gates it. */
+const AI_DAILY_LIMIT = 20;
 
-function checkAIRateLimit(userId: string): boolean {
-  const now = Date.now();
-  const entry = dailyLimits.get(userId);
-  if (!entry || entry.resetAt <= now) {
-    dailyLimits.set(userId, { count: 1, resetAt: now + 24 * 60 * 60 * 1000 });
-    return true;
-  }
-  if (entry.count >= 20) return false;
-  entry.count++;
-  return true;
-}
+/**
+ * DB-backed daily AI quota. Replaces a previous in-memory Map that reset on
+ * every container restart — which silently handed users a fresh quota after
+ * each Railway redeploy. Persisted counters survive deploys.
+ *
+ * Stored on the User row (aiMessageCount + aiQuotaResetAt). Reset fires
+ * lazily on first check after aiQuotaResetAt; no background job needed.
+ */
+async function checkAIRateLimit(userId: string): Promise<boolean> {
+  if (!db || !userId) return true; // Fail open if DB missing — better than blocking all chats.
+  try {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { aiMessageCount: true, aiQuotaResetAt: true },
+    });
+    if (!user) return true;
 
-// Clean expired entries every hour
-if (typeof setInterval !== "undefined") {
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of dailyLimits) {
-      if (entry.resetAt <= now) dailyLimits.delete(key);
+    const now = new Date();
+    const needsReset = !user.aiQuotaResetAt || user.aiQuotaResetAt < now;
+    if (needsReset) {
+      // Reset window to next local midnight UTC — one full day from now.
+      const next = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      await db.user.update({
+        where: { id: userId },
+        data: { aiMessageCount: 1, aiQuotaResetAt: next },
+      });
+      return true;
     }
-  }, 3_600_000);
+
+    if (user.aiMessageCount >= AI_DAILY_LIMIT) return false;
+
+    await db.user.update({
+      where: { id: userId },
+      data: { aiMessageCount: { increment: 1 } },
+    });
+    return true;
+  } catch (err: any) {
+    console.error("[AI] Quota check failed, allowing message:", err?.message);
+    return true; // Fail open on DB error.
+  }
 }
 
 /**
@@ -139,8 +161,9 @@ export async function generateChatbotResponse(
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null; // Fall back to pattern-based auto-replies
 
-  // Check rate limit
-  if (!checkAIRateLimit(userData.username)) {
+  // Check rate limit — DB-backed, persists across redeploys.
+  const allowed = await checkAIRateLimit(userData.id);
+  if (!allowed) {
     return "You've reached the daily message limit. Please connect with our support team for further help.";
   }
 

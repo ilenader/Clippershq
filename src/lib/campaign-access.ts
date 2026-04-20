@@ -22,11 +22,13 @@ export async function getUserCampaignIds(userId: string, role: string): Promise<
       db.campaign.findMany({
         where: { createdById: userId },
         select: { id: true },
+        take: 1000,
       }),
       // Campaigns where user is assigned owner
       db.campaign.findMany({
         where: { ownerUserId: userId },
         select: { id: true },
+        take: 1000,
       }),
       // Team-based access: find user's teams, then find team campaigns
       db.teamMember.findMany({

@@ -311,6 +311,7 @@ export async function POST(
               }));
 
               replyContent = await generateChatbotResponse(content, chatHistory, {
+                id: userId,
                 username: userData?.username || "Clipper",
                 role: "CLIPPER",
                 level: userData?.level || 0,

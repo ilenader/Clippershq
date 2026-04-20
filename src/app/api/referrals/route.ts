@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
       const referredUsers = await db.user.findMany({
         where: { referredById: { not: null } },
         select: { id: true, username: true, name: true, referredById: true, totalEarnings: true, totalViews: true, createdAt: true },
+        take: 1000,
       });
 
       // Count clips per referred user
@@ -98,6 +99,7 @@ export async function GET(req: NextRequest) {
       const referred = await db.user.findMany({
         where: { referredById: { not: null } },
         select: { referredById: true, totalEarnings: true },
+        take: 1000,
       });
       const inviterMap = new Map<string, { count: number; earnings: number }>();
       const pct = DEFAULT_REFERRAL_PERCENT / 100;

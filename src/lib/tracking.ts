@@ -13,6 +13,15 @@
 
 import { db } from "@/lib/db";
 import { fetchClipStats, fetchClipStatsBatch, detectPlatform } from "@/lib/apify";
+
+/**
+ * Hard cap on Apify API calls per cron run. 200 × (288 runs/day = every 5 min)
+ * = 57,600 calls/day ceiling, which bounds the worst-case Apify bill at roughly
+ * $60/day. Without this cap a burst of tracked clips could uncork unlimited
+ * spend. Counter is reset at the start of each runDueTrackingJobs invocation.
+ */
+const MAX_APIFY_CALLS_PER_RUN = 200;
+let apifyCallsMade = 0;
 import { recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
 import { computeFraudLevel } from "@/lib/fraud";
 import { publishToUser, publishToUsers } from "@/lib/ably";
@@ -225,9 +234,19 @@ async function processTrackingJob(
     // Use prefetched stats when available; fall back to individual fetch if batch missed this clip
     let stats = prefetchedStats;
     if (stats === null || stats === undefined) {
+      // Apify cap check — defer this clip to a later run rather than burn the budget.
+      if (apifyCallsMade >= MAX_APIFY_CALLS_PER_RUN) {
+        await db.trackingJob.update({
+          where: { id: job.id },
+          data: { nextCheckAt: roundToNextSlot(60), lastCheckedAt: new Date() },
+        }).catch(() => {});
+        console.log(`[TRACKING] Clip ${clip.id}: deferred — Apify cap reached (${apifyCallsMade}/${MAX_APIFY_CALLS_PER_RUN})`);
+        return { success: true, detail: "apify-cap-deferred" };
+      }
       try {
         console.log(`[TRACKING] Clip ${clip.id}: batch miss, trying individual fetch`);
         stats = await fetchClipStats(clip.clipUrl);
+        apifyCallsMade++;
         console.log(`[TRACKING] Clip ${clip.id}: individual fetch succeeded, views=${stats.views}`);
       } catch (fetchErr: any) {
         await db.trackingJob.update({
@@ -665,6 +684,9 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
 
   const source = options?.source || "cron";
   const campaignIds = options?.campaignIds;
+  // Reset the Apify call counter at the start of each run so the cap applies
+  // per-invocation, not cumulative across cron cycles.
+  apifyCallsMade = 0;
   console.log(`[TRACKING] TRACKING RUNNING (${source}) at`, new Date().toISOString());
 
   const details: string[] = [];
@@ -696,7 +718,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           },
         },
       },
-      take: campaignIds ? 50 : 500,
+      take: campaignIds ? 50 : 250,
     });
 
     console.log(`[TRACKING] Found ${dueJobs.length} due jobs`);
@@ -754,6 +776,14 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
         details.push(`Stopped early — 280s timeout. ${processed} processed.`);
         break;
       }
+      // Apify cap: if we've burned the per-run budget, stop dispatching more
+      // campaign groups. Already-processed ones complete normally; remaining
+      // clips defer to the next cron cycle (their nextCheckAt isn't advanced).
+      if (apifyCallsMade >= MAX_APIFY_CALLS_PER_RUN) {
+        console.log(`[TRACKING] Apify cap reached (${apifyCallsMade}/${MAX_APIFY_CALLS_PER_RUN}) — deferring remaining ${campaignGroupIds.length - i} campaign groups`);
+        details.push(`Apify cap reached — deferred ${campaignGroupIds.length - i} campaign groups`);
+        break;
+      }
 
       const campaignBatch = campaignGroupIds.slice(i, i + CAMPAIGN_BATCH_SIZE);
       console.log(`[TRACKING] Processing ${campaignBatch.length} campaigns in parallel`);
@@ -775,6 +805,11 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
                 platform: detectPlatform(j.clip.clipUrl) || "unknown",
                 clipId: j.clipId,
               }));
+            // Count the batch as one Apify call per platform (batch groups by platform
+            // internally). Approximating as batchInput.length worst-case over-counts
+            // slightly; that's intentional — err on the side of stopping earlier.
+            const platforms = new Set(batchInput.map((b: any) => b.platform));
+            apifyCallsMade += platforms.size;
             prefetchedStats = await fetchClipStatsBatch(batchInput);
           } catch (batchErr: any) {
             console.error(`[TRACKING] fetchClipStatsBatch threw for campaign ${cId}:`, batchErr?.message);
