@@ -109,6 +109,45 @@ export function dayBoundsForTz(d: Date, timezone: string): { start: Date; end: D
   return dayBounds(d, timezone);
 }
 
+/**
+ * Canonical day-bounds primitive: take a YYYY-MM-DD date string + tz and return
+ * the exact UTC window for that user-local day. Safer than dayBounds(Date, tz)
+ * which misbehaves when the input Date was constructed as a UTC-anchored pseudo
+ * representation of a user-local date (the old convention used here) — in
+ * negative-offset timezones that pseudo-Date re-interpreted in tz gives the
+ * PREVIOUS day, and the clip query ends up looking at the wrong bounds.
+ */
+function dayBoundsFromStr(dateStr: string, tz?: string | null): { start: Date; end: Date } {
+  if (tz) {
+    try {
+      const utcMidnight = new Date(`${dateStr}T00:00:00Z`);
+      const fmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "shortOffset" });
+      const offsetStr = fmt.formatToParts(utcMidnight).find((p) => p.type === "timeZoneName")?.value || "GMT";
+      let offsetMinutes = 0;
+      const match = offsetStr.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+      if (match) {
+        const sign = match[1] === "+" ? 1 : -1;
+        offsetMinutes = sign * (parseInt(match[2]) * 60 + parseInt(match[3] || "0"));
+      }
+      const start = new Date(utcMidnight.getTime() - offsetMinutes * 60_000);
+      const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+      return { start, end };
+    } catch {
+      /* fall through to UTC */
+    }
+  }
+  const start = new Date(`${dateStr}T00:00:00Z`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+  return { start, end };
+}
+
+/** Shift a YYYY-MM-DD string by N days. Always produces a valid YYYY-MM-DD. */
+function shiftDateStr(dateStr: string, deltaDays: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Helper: add N days to a date */
 function addDays(d: Date, n: number): Date {
   const r = new Date(d);
@@ -140,7 +179,18 @@ type DayStatus = "passed" | "failed" | "pending";
 async function evaluateDay(userId: string, date: Date, timezone?: string | null): Promise<DayStatus> {
   if (!db) return "failed";
   const { start, end } = dayBounds(date, timezone);
+  return evaluateDayByBounds(userId, start, end);
+}
 
+/** String-based variant — the canonical path used by updateStreak. */
+async function evaluateDayByStr(userId: string, dateStr: string, timezone?: string | null): Promise<DayStatus> {
+  if (!db) return "failed";
+  const { start, end } = dayBoundsFromStr(dateStr, timezone);
+  return evaluateDayByBounds(userId, start, end);
+}
+
+async function evaluateDayByBounds(userId: string, start: Date, end: Date): Promise<DayStatus> {
+  if (!db) return "failed";
   const clips = await db.clip.findMany({
     where: {
       userId,
@@ -151,22 +201,28 @@ async function evaluateDay(userId: string, date: Date, timezone?: string | null)
   });
 
   if (clips.length === 0) return "failed";
-  // If any clip has streakDayLocked, this day is permanently "passed"
   if (clips.some((c: any) => c.streakDayLocked)) return "passed";
   if (clips.some((c: any) => c.status === "APPROVED")) return "passed";
   if (clips.every((c: any) => c.status === "REJECTED")) return "failed";
-  // Some clips still PENDING or FLAGGED
   return "pending";
 }
 
 /**
  * Evaluate and update a user's streak.
  *
- * Rules:
- * - Evaluate ALL days from lastActiveDate+1 to yesterday (today is never evaluated)
- * - No grace period — days are evaluated as soon as they end
- * - "pending" days stop evaluation (wait for review, don't break streak)
- * - Streak freezes when user has no actively-posting campaigns
+ * Idempotent: always computes the streak from clip history backwards starting
+ * at yesterday in the user's tz. Walks by YYYY-MM-DD date string (not by Date
+ * objects) to avoid the negative-offset timezone trap where a UTC-anchored
+ * pseudo-date, when re-interpreted via Intl.DateTimeFormat in the user's tz,
+ * shifts onto the previous calendar day and silently queries the wrong bounds.
+ *
+ * Rules preserved from prior implementation:
+ * - "passed" day = has an APPROVED clip OR a clip with streakDayLocked
+ * - "failed" day = has clips, all REJECTED, or no clips at all — breaks streak
+ * - "pending" day = has PENDING/FLAGGED clips — pauses walk (don't break yet)
+ * - Today provisionally counts if the user has an APPROVED/PENDING/locked clip today
+ * - 36h grace period after manual streakRestoredAt skips evaluation
+ * - Freeze if user has no actively-posting campaigns
  */
 export async function updateStreak(userId: string): Promise<void> {
   if (!db) return;
@@ -177,7 +233,6 @@ export async function updateStreak(userId: string): Promise<void> {
   });
   if (!user) return;
 
-  // If streak was recently restored, skip evaluation to give clipper time to post
   if (user.streakRestoredAt) {
     const hoursAgo = (Date.now() - new Date(user.streakRestoredAt).getTime()) / 3_600_000;
     if (hoursAgo < 36) {
@@ -186,34 +241,9 @@ export async function updateStreak(userId: string): Promise<void> {
     }
   }
 
-  const tz = user.timezone || null;
-  // Use user's timezone for "today" to avoid UTC/local mismatch
-  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: tz || "UTC" });
-  const today = new Date(todayStr + "T00:00:00Z");
+  const tz = user.timezone || "UTC";
 
-  // Latest evaluable day = yesterday (today isn't over yet)
-  const latestEvaluable = addDays(today, -1);
-
-  // Where to start evaluating from
-  let evalStart: Date;
-  if (user.lastActiveDate) {
-    const lastStr = new Date(user.lastActiveDate).toLocaleDateString("en-CA", { timeZone: tz || "UTC" });
-    const last = new Date(lastStr + "T00:00:00Z");
-    evalStart = addDays(last, 1); // day after last confirmed
-  } else {
-    // No streak history — start from 14 days ago max
-    evalStart = addDays(today, -14);
-  }
-
-  // Only bail out when even today is already accounted for (lastActiveDate is today
-  // or later). When lastActiveDate is yesterday, evalStart==today and the loop below
-  // is a no-op — but we must still fall through to the today-branch so a freshly-posted
-  // clip gets credited. Returning on `evalStart > latestEvaluable` here is what caused
-  // submits on day N+1 after a day-N today-branch credit to never advance the streak.
-  if (evalStart > today) return;
-
-  // Freeze check: does user have any actively-posting campaigns?
-  // "Actively posting" = campaign is ACTIVE and user has at least 1 clip in it
+  // Freeze check: no actively-posting campaigns → keep current state, don't evaluate.
   try {
     const memberships = await db.campaignAccount.findMany({
       where: { clipAccount: { userId } },
@@ -224,101 +254,103 @@ export async function updateStreak(userId: string): Promise<void> {
       const activeCampaignIds = memberships
         .filter((m: any) => m.campaign.status === "ACTIVE")
         .map((m: any) => m.campaign.id);
-      if (activeCampaignIds.length === 0) {
-        // No active campaigns — freeze streak
-        return;
-      }
-      // Check if user has posted any clips in active campaigns
+      if (activeCampaignIds.length === 0) return;
       const clipInActive = await db.clip.findFirst({
         where: { userId, campaignId: { in: activeCampaignIds } },
         select: { id: true },
       });
-      if (!clipInActive) {
-        // Has active campaigns but hasn't posted in any — freeze streak
-        return;
-      }
+      if (!clipInActive) return;
     }
   } catch (err: any) {
     console.error(`[STREAK] Freeze check failed for user ${userId}:`, err?.message);
-    return; // Safe default: keep streak frozen on error
+    return;
   }
 
-  let currentStreak = user.currentStreak;
-  let lastPassedDate = user.lastActiveDate ? new Date(user.lastActiveDate) : null;
-  let streakBroken = false;
+  // Today, in the user's tz, as a canonical date string. This is the anchor.
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: tz });
 
-  // Walk each day from evalStart to yesterday
-  const cursor = new Date(evalStart);
+  // Walk backwards from yesterday. Count consecutive "passed" days. Stop on
+  // "pending" (pause, don't break) or "failed" (break — save previousStreak).
+  let streak = 0;
+  let lastPassedStr: string | null = null;
+  let brokeAtStr: string | null = null;
+  let cursorStr = shiftDateStr(todayStr, -1);
 
-  while (cursor <= latestEvaluable) {
-    const status = await evaluateDay(userId, cursor, tz);
-
+  // Hard lookback cap. 400 days exceeds every documented streak tier.
+  for (let i = 0; i < 400; i++) {
+    const status = await evaluateDayByStr(userId, cursorStr, tz);
     if (status === "passed") {
-      if (streakBroken) {
-        // Restart streak from this day
-        currentStreak = 1;
-        streakBroken = false;
-      } else {
-        currentStreak++;
-      }
-      lastPassedDate = new Date(cursor);
-    } else if (status === "failed") {
-      streakBroken = true;
-      // Save the streak before resetting
-      if (currentStreak > 0) {
-        try { await db.user.update({ where: { id: userId }, data: { previousStreak: currentStreak } }); } catch {}
-      }
-      currentStreak = 0;
-    } else {
-      // "pending" — stop evaluating, wait for reviews (don't break streak)
+      streak++;
+      if (!lastPassedStr) lastPassedStr = cursorStr;
+      cursorStr = shiftDateStr(cursorStr, -1);
+      continue;
+    }
+    if (status === "pending") {
+      // Pending day — stop counting but don't consider the streak broken.
       break;
     }
-
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    // failed
+    brokeAtStr = cursorStr;
+    break;
   }
 
-  // Check if user posted today (today can't be fully evaluated but count it provisionally)
-  if (!streakBroken) {
-    const { start: todayStart, end: todayEnd } = dayBounds(today, tz);
-    const todayClips = await db.clip.findMany({
-      where: {
-        userId,
-        isDeleted: false,
-        OR: [{ status: "APPROVED" }, { status: "PENDING" }, { streakDayLocked: true }],
-        createdAt: { gte: todayStart, lt: todayEnd },
-      },
-      select: { id: true },
-      take: 1,
-    });
-    if (todayClips.length > 0) {
-      // User posted today — check if lastPassedDate is yesterday (continuous streak)
-      const lastDateStr = lastPassedDate ? lastPassedDate.toLocaleDateString("en-CA", { timeZone: "UTC" }) : null;
-      const yesterdayStr = addDays(today, -1).toISOString().slice(0, 10);
-      if (lastDateStr === yesterdayStr || (currentStreak === 0 && !streakBroken)) {
-        currentStreak++;
-        lastPassedDate = today;
-      }
+  // Today credit: user has an APPROVED/PENDING/locked clip today.
+  const { start: todayStart, end: todayEnd } = dayBoundsFromStr(todayStr, tz);
+  const todayActivity = await db.clip.findFirst({
+    where: {
+      userId,
+      isDeleted: false,
+      OR: [{ status: "APPROVED" }, { status: "PENDING" }, { streakDayLocked: true }],
+      createdAt: { gte: todayStart, lte: todayEnd },
+    },
+    select: { id: true },
+  });
+
+  if (todayActivity) {
+    if (streak > 0 || !brokeAtStr) {
+      // Either the walk found consecutive passed days ending yesterday, or it
+      // stopped on pending/lookback — today extends or starts a streak.
+      streak += 1;
+      lastPassedStr = todayStr;
+    } else {
+      // Streak broke somewhere in the past, today restarts at 1.
+      streak = 1;
+      lastPassedStr = todayStr;
     }
   }
 
-  const newLongest = Math.max(currentStreak, user.longestStreak);
-  const streakChanged = currentStreak !== user.currentStreak;
+  // Save previousStreak if the streak just broke.
+  if (streak === 0 && user.currentStreak > 0) {
+    try {
+      await db.user.update({ where: { id: userId }, data: { previousStreak: user.currentStreak } });
+    } catch {}
+  }
+
+  const lastActiveDate = lastPassedStr
+    ? new Date(`${lastPassedStr}T00:00:00Z`)
+    : user.lastActiveDate;
+  const newLongest = Math.max(streak, user.longestStreak);
+  const streakChanged = streak !== user.currentStreak;
+
+  console.log(
+    `[STREAK-AUDIT] user=${userId} old=${user.currentStreak} new=${streak} tz=${tz} ` +
+      `today=${todayStr} lastPassed=${lastPassedStr ?? "none"} brokeAt=${brokeAtStr ?? "none"} ` +
+      `todayActivity=${!!todayActivity}`,
+  );
 
   await db.user.update({
     where: { id: userId },
     data: {
-      currentStreak,
+      currentStreak: streak,
       longestStreak: newLongest,
-      lastActiveDate: lastPassedDate || user.lastActiveDate,
+      lastActiveDate,
     },
   });
 
-  // Bust the in-memory gamification cache so the next dashboard read reflects the
-  // write (not the 30s-stale value). Without this, clip submits from clips POST
-  // would update the DB but the dashboard would keep showing the old streak.
+  // Bust the in-memory gamification cache so the next dashboard read reflects
+  // the write rather than a 30s-stale value.
   gamificationCache.delete(userId);
 
-  // If streak changed, recalculate unpaid earnings with new bonus
   if (streakChanged) {
     try {
       await recalculateUnpaidEarnings(userId);
@@ -336,43 +368,50 @@ export async function updateStreak(userId: string): Promise<void> {
 export async function getStreakDayStatuses(userId: string, days: number = 60): Promise<string[]> {
   if (!db) return Array(days).fill("empty");
 
-  // Fetch user timezone
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { timezone: true },
   });
-  const tz = user?.timezone || null;
+  const tz = user?.timezone || "UTC";
 
-  // Use user's timezone for "today"
-  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: tz || "UTC" });
-  const today = new Date(todayStr + "T00:00:00Z");
+  // Today's canonical date string in the user's tz.
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+  const oldestStr = shiftDateStr(todayStr, -(days - 1));
+  const { start: oldestStart } = dayBoundsFromStr(oldestStr, tz);
+  const { end: todayEnd } = dayBoundsFromStr(todayStr, tz);
 
-  // Fetch all clips from the last N days in one query
-  const cutoff = addDays(today, -(days - 1));
   const clips = await db.clip.findMany({
     where: {
       userId,
-      createdAt: { gte: cutoff },
+      createdAt: { gte: oldestStart, lte: todayEnd },
       isDeleted: false,
     },
     select: { createdAt: true, status: true, streakDayLocked: true },
   });
 
+  // Bucket each clip into its user-local YYYY-MM-DD once, up-front.
+  const byDate: Map<string, { status: string; streakDayLocked: boolean }[]> = new Map();
+  for (const c of clips as any[]) {
+    const ds = new Date(c.createdAt).toLocaleDateString("en-CA", { timeZone: tz });
+    let bucket = byDate.get(ds);
+    if (!bucket) { bucket = []; byDate.set(ds, bucket); }
+    bucket.push({ status: c.status, streakDayLocked: !!c.streakDayLocked });
+  }
+
   const result: string[] = [];
   for (let i = 0; i < days; i++) {
-    const d = addDays(today, -i);
-    const dayClips = clips.filter((c: any) => sameDay(new Date(c.createdAt), d, tz));
-
+    const dayStr = shiftDateStr(todayStr, -i);
+    const dayClips = byDate.get(dayStr) || [];
     if (dayClips.length === 0) {
       result.push("empty");
-    } else if (dayClips.some((c: any) => c.streakDayLocked)) {
-      result.push("confirmed"); // permanently locked
-    } else if (dayClips.some((c: any) => c.status === "APPROVED")) {
+    } else if (dayClips.some((c) => c.streakDayLocked)) {
       result.push("confirmed");
-    } else if (dayClips.every((c: any) => c.status === "REJECTED")) {
-      result.push("empty"); // all rejected = missed day
+    } else if (dayClips.some((c) => c.status === "APPROVED")) {
+      result.push("confirmed");
+    } else if (dayClips.every((c) => c.status === "REJECTED")) {
+      result.push("empty");
     } else {
-      result.push("pending"); // has unreviewed clips
+      result.push("pending");
     }
   }
 
