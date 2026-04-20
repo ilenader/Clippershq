@@ -219,10 +219,16 @@ export async function POST(req: NextRequest) {
     const maxAllowed = role === "OWNER" ? 20 : 10;
     createData.maxClipsPerUserPerDay = Math.max(1, Math.min(maxAllowed, isNaN(maxClips) ? 3 : maxClips));
 
+    // Per-campaign announcement toggle. Defaults to false so test/draft campaigns
+    // don't spam every active clipper via Discord DM + email. Owners flip this on
+    // in the create form only for campaigns they actually want announced.
+    createData.announceOnDiscord = data.announceOnDiscord === true;
+
     const campaign = await db.campaign.create({ data: createData });
 
-    // Send campaign alerts to all active clippers (fire-and-forget)
-    if (campaign.status === 'ACTIVE') {
+    // Send campaign alerts to all active clippers (fire-and-forget). Gated on
+    // the per-campaign toggle — no more auto-spam on every ACTIVE create.
+    if (campaign.status === 'ACTIVE' && (campaign as any).announceOnDiscord) {
       broadcastCampaignAlert(campaign.name, campaign.description || 'A new campaign is live! Start clipping now.').catch(() => {});
     }
 

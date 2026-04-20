@@ -45,6 +45,7 @@ const defaultForm = {
   targetCountriesInput: "",
   accountCountriesInput: "",
   ownerUserId: "",
+  announceOnDiscord: false,
 };
 
 export default function AdminCampaignsPage() {
@@ -155,6 +156,7 @@ export default function AdminCampaignsPage() {
       targetCountriesInput: (() => { try { return JSON.parse(c.targetCountries || "[]").join(", "); } catch { return ""; } })(),
       accountCountriesInput: (() => { try { const obj = JSON.parse(c.accountCountries || "{}"); return Object.entries(obj).map(([k, v]) => `${k}: ${v}%`).join("\n"); } catch { return ""; } })(),
       ownerUserId: c.ownerUserId || "",
+      announceOnDiscord: !!c.announceOnDiscord,
     });
     setShowModal(true);
   };
@@ -208,6 +210,7 @@ export default function AdminCampaignsPage() {
             )
           : null,
         ownerUserId: form.ownerUserId || null,
+        announceOnDiscord: !!form.announceOnDiscord,
       };
 
       if (editingId) {
@@ -658,6 +661,20 @@ export default function AdminCampaignsPage() {
               <p className="mt-1 text-xs text-[var(--text-muted)]">Max {isOwner ? 20 : 10} per user per day</p>
             </div>
           </div>
+          {!editingId && isOwner && (
+            <label className="flex items-start gap-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-3 cursor-pointer hover:border-accent/40 transition-colors">
+              <input
+                type="checkbox"
+                checked={!!form.announceOnDiscord}
+                onChange={(e) => setForm({ ...form, announceOnDiscord: e.target.checked })}
+                className="mt-0.5 h-4 w-4 accent-accent"
+              />
+              <span className="flex-1">
+                <span className="block text-sm font-medium text-[var(--text-primary)]">Announce on Discord + email</span>
+                <span className="block text-xs text-[var(--text-muted)] mt-0.5">DMs every active clipper via the Discord bot and sends a Resend email. Leave off for test campaigns.</span>
+              </span>
+            </label>
+          )}
           <ImageUpload label="Campaign image" value={form.imageUrl} onChange={(url) => updateField("imageUrl", url)} />
           <Input id="imageUrl" label="Or paste an image URL" placeholder="https://example.com/image.jpg" value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} />
           <Textarea id="examples" label="Examples (links or descriptions)" placeholder="https://tiktok.com/..." value={form.examples} onChange={(e) => updateField("examples", e.target.value)} />

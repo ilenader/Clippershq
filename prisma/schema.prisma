@@ -190,6 +190,11 @@ model Campaign {
   minViews        Int?
   maxPayoutPerClip Float?
   maxClipsPerUserPerDay Int     @default(3)
+  // When true, creating the campaign fires broadcastCampaignAlert — DMs every
+  // active clipper via Discord bot AND sends a Resend email. Defaults to false
+  // so test/draft campaigns don't spam the user base; owners flip this per
+  // campaign when they actually want to announce it.
+  announceOnDiscord Boolean @default(false)
   description     String?        @db.Text
   requirements    String?        @db.Text
   examples        String?        @db.Text
