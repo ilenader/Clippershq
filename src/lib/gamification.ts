@@ -110,14 +110,12 @@ export function dayBoundsForTz(d: Date, timezone: string): { start: Date; end: D
 }
 
 /**
- * Canonical day-bounds primitive: take a YYYY-MM-DD date string + tz and return
- * the exact UTC window for that user-local day. Safer than dayBounds(Date, tz)
- * which misbehaves when the input Date was constructed as a UTC-anchored pseudo
- * representation of a user-local date (the old convention used here) — in
- * negative-offset timezones that pseudo-Date re-interpreted in tz gives the
- * PREVIOUS day, and the clip query ends up looking at the wrong bounds.
+ * Resolve the UTC instant of local midnight for a YYYY-MM-DD string in the
+ * given tz. Uses Intl.DateTimeFormat shortOffset which returns the correct
+ * offset FOR THAT SPECIFIC INSTANT (so it naturally handles DST-aware offsets
+ * and fractional offsets like India +5:30, Nepal +5:45, Chatham +12:45).
  */
-function dayBoundsFromStr(dateStr: string, tz?: string | null): { start: Date; end: Date } {
+function startOfUserLocalDay(dateStr: string, tz?: string | null): Date {
   if (tz) {
     try {
       const utcMidnight = new Date(`${dateStr}T00:00:00Z`);
@@ -129,16 +127,29 @@ function dayBoundsFromStr(dateStr: string, tz?: string | null): { start: Date; e
         const sign = match[1] === "+" ? 1 : -1;
         offsetMinutes = sign * (parseInt(match[2]) * 60 + parseInt(match[3] || "0"));
       }
-      const start = new Date(utcMidnight.getTime() - offsetMinutes * 60_000);
-      const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
-      return { start, end };
+      return new Date(utcMidnight.getTime() - offsetMinutes * 60_000);
     } catch {
       /* fall through to UTC */
     }
   }
-  const start = new Date(`${dateStr}T00:00:00Z`);
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
-  return { start, end };
+  return new Date(`${dateStr}T00:00:00Z`);
+}
+
+/**
+ * Canonical day-bounds primitive: take a YYYY-MM-DD date string + tz and return
+ * the exact UTC window for that user-local day.
+ *
+ * DST-safe: `end` is computed as (next day's local midnight) − 1ms rather than
+ * (today's start + 24h). On DST transition days the local day is 23h or 25h
+ * long; a blind +24h under- or over-counts that last/extra hour and causes
+ * clips submitted near midnight local to be attributed to the wrong day.
+ * Querying the actual next-day boundary lets the Intl offset lookup resolve
+ * the correct post-transition offset, so each day's window is its true length.
+ */
+function dayBoundsFromStr(dateStr: string, tz?: string | null): { start: Date; end: Date } {
+  const start = startOfUserLocalDay(dateStr, tz);
+  const nextStart = startOfUserLocalDay(shiftDateStr(dateStr, 1), tz);
+  return { start, end: new Date(nextStart.getTime() - 1) };
 }
 
 /** Shift a YYYY-MM-DD string by N days. Always produces a valid YYYY-MM-DD. */
