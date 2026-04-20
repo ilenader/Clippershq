@@ -229,6 +229,34 @@ export async function POST(
         : null,
     }).catch(() => {});
 
+    // "Someone replied to you" — targeted notification. Fires only when this
+    // message is a reply AND the original author is someone other than the replier.
+    const repliedToUserId =
+      replyToId && (message as any).replyTo?.userId ? (message as any).replyTo.userId : null;
+    if (repliedToUserId && repliedToUserId !== session.user.id) {
+      const replierName =
+        (message.user as any)?.username || (message.user as any)?.name || "user";
+      const preview = content.length > 100 ? content.slice(0, 100) : content;
+      // Live toast payload — ephemeral; only reaches users with an open tab.
+      publishToUsers([repliedToUserId], "replied_to_you", {
+        channelId,
+        channelName: channel.name,
+        campaignId: channel.campaignId,
+        messageId: message.id,
+        replierUsername: replierName,
+        preview,
+      }).catch(() => {});
+      // Persistent bell notification — createNotification also pushes `notif_refresh`
+      // so the navbar badge updates without a page reload.
+      await createNotification(
+        repliedToUserId,
+        "COMMUNITY_REPLY",
+        `${replierName} replied to you`,
+        content.length > 200 ? content.slice(0, 197) + "…" : content,
+        { channelId, campaignId: channel.campaignId, messageId: message.id },
+      ).catch(() => {});
+    }
+
     // Announcement: in-app notification + email to every subscriber who isn't muted.
     if (channel.type === "announcement") {
       const muted = await db.communityMute.findMany({

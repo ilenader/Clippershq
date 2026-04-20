@@ -8,7 +8,8 @@ export type NotificationType =
   | "CAMPAIGN_APPROVED" | "CAMPAIGN_REJECTED"
   | "STREAK_WARNING" | "STREAK_MILESTONE" | "STREAK_LOST"
   | "LEVEL_UP" | "REFERRAL_SIGNUP"
-  | "PAYOUT_APPROVED" | "PAYOUT_REJECTED" | "PAYOUT_PAID";
+  | "PAYOUT_APPROVED" | "PAYOUT_REJECTED" | "PAYOUT_PAID"
+  | "COMMUNITY_REPLY";
 
 export async function createNotification(
   userId: string,

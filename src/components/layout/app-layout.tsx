@@ -15,6 +15,7 @@ import { PWAInstallPopup } from "@/components/pwa-install-popup";
 import { useIsPWA } from "@/hooks/use-pwa";
 import { useAbly } from "@/hooks/use-ably";
 import { DmToast } from "@/components/community/DmToast";
+import { toast } from "@/lib/toast";
 import { CallBanner } from "@/components/community/CallBanner";
 import dynamic from "next/dynamic";
 
@@ -116,6 +117,39 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     window.addEventListener("sse:voice_call_status", handler);
     return () => window.removeEventListener("sse:voice_call_status", handler);
   }, [activeVoiceCall]);
+
+  // "Someone replied to you" toast. Bell badge is handled by the navbar's own
+  // `sse:notif_refresh` listener (createNotification on the server pushes that too),
+  // so we only own the transient toast here.
+  useEffect(() => {
+    const onReplied = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail) return;
+      const channelName = detail.channelName ? `#${detail.channelName}` : "a channel";
+      const replier = detail.replierUsername || "Someone";
+      const body = detail.preview
+        ? `${replier} replied in ${channelName}: ${detail.preview}`
+        : `${replier} replied to you in ${channelName}`;
+      toast.info(body, {
+        action: detail.campaignId
+          ? {
+              label: "View",
+              onClick: () => {
+                try {
+                  sessionStorage.setItem(
+                    "community_nav_target",
+                    JSON.stringify({ campaignId: detail.campaignId }),
+                  );
+                } catch {}
+                router.push("/community");
+              },
+            }
+          : undefined,
+      });
+    };
+    window.addEventListener("sse:replied_to_you", onReplied);
+    return () => window.removeEventListener("sse:replied_to_you", onReplied);
+  }, [router]);
 
   // Progressive swipe-to-open sidebar on mobile
   const sidebarPanelRef = useRef<HTMLDivElement>(null);
