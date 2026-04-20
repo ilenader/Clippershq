@@ -73,6 +73,11 @@ export interface ClipperEarningsInput {
   manualBonusOverride?: number | null;
   isReferred?: boolean;
   isPWAUser?: boolean;
+  /** When provided (non-null), skips the streak-tier lookup and uses this %
+   *  as the streak bonus portion. Used to lock the streak % at approval time
+   *  so later streak changes don't retroactively adjust the clip's bonus.
+   *  Level/PWA/budget recalc still runs normally. */
+  streakBonusPercentOverride?: number | null;
 }
 
 export interface EarningsBreakdown {
@@ -114,6 +119,7 @@ export function calculateClipperEarnings(input: ClipperEarningsInput): EarningsB
     manualBonusOverride = null,
     isReferred = false,
     isPWAUser = false,
+    streakBonusPercentOverride = null,
   } = input;
 
   const baseFee = isReferred ? DEFAULT_REFERRED_FEE : platformFeePercent;
@@ -133,10 +139,16 @@ export function calculateClipperEarnings(input: ClipperEarningsInput): EarningsB
   // Calculate level bonus %
   const levelBonus = levelBonuses[clipperLevel] || 0;
 
-  // Calculate streak bonus %
+  // Calculate streak bonus %. When a locked override is provided (a clip's
+  // snapshot at approval time), use it verbatim; otherwise look up the current
+  // tier from the user's live streak days.
   let streakBonus = 0;
-  for (const tier of [...streakBonuses].sort((a, b) => b.days - a.days)) {
-    if (clipperStreak >= tier.days) { streakBonus = tier.bonusPercent; break; }
+  if (streakBonusPercentOverride != null) {
+    streakBonus = Math.max(0, streakBonusPercentOverride);
+  } else {
+    for (const tier of [...streakBonuses].sort((a, b) => b.days - a.days)) {
+      if (clipperStreak >= tier.days) { streakBonus = tier.bonusPercent; break; }
+    }
   }
 
   // PWA bonus (additive, stacks with level + streak)
@@ -275,6 +287,10 @@ export function recalculateClipEarningsBreakdown(clip: {
   };
   user?: { level?: number; currentStreak?: number; referredById?: string | null; isPWAUser?: boolean };
   bonusOverride?: number;
+  /** Locked streak bonus % captured at approval time. Forwarded to
+   *  calculateClipperEarnings as streakBonusPercentOverride so level/PWA/budget
+   *  recalc can still run without disturbing the streak portion. */
+  streakBonusPercentAtApproval?: number | null;
 }): EarningsBreakdown {
   const latestStat = clip.stats[0];
   const empty: EarningsBreakdown = { clipperEarnings: 0, platformFee: 0, bonusPercent: 0, bonusAmount: 0, baseEarnings: 0, effectiveFeePercent: 9, grossClipperEarnings: 0 };
@@ -291,7 +307,23 @@ export function recalculateClipEarningsBreakdown(clip: {
     isReferred: !!clip.user?.referredById,
     isPWAUser: clip.user?.isPWAUser ?? false,
     manualBonusOverride: clip.bonusOverride ?? null,
+    streakBonusPercentOverride: clip.streakBonusPercentAtApproval ?? null,
   });
+}
+
+/**
+ * Resolve the streak bonus % a user currently qualifies for based on streak days.
+ * Mirrors the lookup inside calculateClipperEarnings — exported so the approval
+ * path can snapshot this value onto a clip as streakBonusPercentAtApproval.
+ */
+export function getStreakBonusPercent(
+  streakDays: number,
+  streakBonuses: { days: number; bonusPercent: number }[] = DEFAULT_STREAK_BONUSES,
+): number {
+  for (const tier of [...streakBonuses].sort((a, b) => b.days - a.days)) {
+    if (streakDays >= tier.days) return tier.bonusPercent;
+  }
+  return 0;
 }
 
 /** Compute which level a user should be based on total earnings */

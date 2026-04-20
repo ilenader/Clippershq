@@ -324,6 +324,12 @@ model Clip {
   fraudCheckedAt  DateTime?
   isOwnerOverride      Boolean    @default(false)
   feePercentAtApproval Float?
+  // Streak bonus % snapshot taken at the moment of APPROVAL. Once set, this value
+  // is NEVER recomputed — future streak changes don't cascade to this clip. Null
+  // for legacy clips approved before this column existed; recalc paths lazily
+  // snapshot the current streak % on first touch. Level/PWA/budget recalc still
+  // runs — only the streak portion is frozen.
+  streakBonusPercentAtApproval Float?
   streakDayLocked      Boolean    @default(false)
   streakDayLockedAt    DateTime?
   videoUnavailable     Boolean    @default(false)

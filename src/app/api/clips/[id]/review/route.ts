@@ -2,11 +2,11 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { getUserCampaignIds } from "@/lib/campaign-access";
 import { logAudit } from "@/lib/audit";
-import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
+import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwnerEarnings, getStreakBonusPercent } from "@/lib/earnings-calc";
 import { getCampaignBudgetStatus } from "@/lib/balance";
 import { createNotification } from "@/lib/notifications";
 import { sendClipApproved, sendClipRejected, sendStreakRejectionWarning, sendConsecutiveRejectionWarning } from "@/lib/email";
-import { updateUserLevel } from "@/lib/gamification";
+import { updateUserLevel, loadConfig } from "@/lib/gamification";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
 import { publishToUser } from "@/lib/ably";
@@ -87,6 +87,9 @@ export async function POST(
     if (action === "APPROVED") {
       // Fetch clip stats + campaign data BEFORE changing status
       // This ensures the budget check sees accurate "spent" (this clip is still PENDING/etc)
+      // include (without a top-level select) returns all Clip scalars by default —
+      // that includes the existing streakBonusPercentAtApproval snapshot, which the
+      // re-approval branch reads below to avoid re-snapshotting.
       const clipWithData = await db.clip.findUnique({
         where: { id },
         include: {
@@ -100,10 +103,26 @@ export async function POST(
       let finalOwnerAmt = 0;
 
       if (clipWithData?.campaign && clipWithData.stats.length > 0) {
+        // Snapshot the streak bonus % at approval. On re-approval of an already-
+        // locked clip, preserve the prior snapshot — we only freeze on first
+        // approval so re-approvals don't move the streak portion.
+        const priorLocked = (clipWithData as any).streakBonusPercentAtApproval;
+        let lockedStreakPct: number;
+        if (priorLocked != null) {
+          lockedStreakPct = priorLocked;
+        } else {
+          const cfg = await loadConfig();
+          lockedStreakPct = getStreakBonusPercent(
+            clipWithData.user?.currentStreak ?? 0,
+            cfg.streakBonuses,
+          );
+        }
+
         const breakdown = recalculateClipEarningsBreakdown({
           stats: clipWithData.stats,
           campaign: clipWithData.campaign,
           user: clipWithData.user || undefined,
+          streakBonusPercentAtApproval: lockedStreakPct,
         });
 
         finalClipperEarnings = breakdown.clipperEarnings;
@@ -190,6 +209,7 @@ export async function POST(
                 bonusPercent: breakdown.bonusPercent,
                 bonusAmount: breakdown.bonusAmount,
                 feePercentAtApproval: isReferred ? 4 : 9,
+                streakBonusPercentAtApproval: lockedStreakPct,
                 streakDayLocked: true,
                 streakDayLockedAt: new Date(),
               },
@@ -217,7 +237,22 @@ export async function POST(
           return NextResponse.json({ error: "Failed to save approval" }, { status: 500 });
         }
       } else {
-        // No stats — just set status
+        // No stats — set status, and still snapshot the streak bonus % so that
+        // once tracking starts producing views, the first earnings calc uses the
+        // approval-time streak rather than whatever the user's streak is then.
+        let lockedStreakPctNoStats: number | null = null;
+        if (action === "APPROVED") {
+          const priorLocked = (clipWithData as any)?.streakBonusPercentAtApproval;
+          if (priorLocked != null) {
+            lockedStreakPctNoStats = priorLocked;
+          } else {
+            const cfg = await loadConfig();
+            lockedStreakPctNoStats = getStreakBonusPercent(
+              clipWithData?.user?.currentStreak ?? 0,
+              cfg.streakBonuses,
+            );
+          }
+        }
         await db.clip.update({
           where: { id },
           data: {
@@ -225,7 +260,13 @@ export async function POST(
             rejectionReason: null,
             reviewedById: session.user.id,
             reviewedAt: new Date(),
-            ...(action === "APPROVED" ? { streakDayLocked: true, streakDayLockedAt: new Date() } : {}),
+            ...(action === "APPROVED"
+              ? {
+                  streakDayLocked: true,
+                  streakDayLockedAt: new Date(),
+                  streakBonusPercentAtApproval: lockedStreakPctNoStats,
+                }
+              : {}),
           },
         });
       }

@@ -665,6 +665,20 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
         continue;
       }
 
+      // Streak portion is locked per-clip at approval; lazy-backfill legacy
+      // clips from the user's current streak so they stop shifting.
+      let lockedStreakPct = (clip as any).streakBonusPercentAtApproval as number | null | undefined;
+      if (lockedStreakPct == null) {
+        const { getStreakBonusPercent } = await import("@/lib/earnings-calc");
+        lockedStreakPct = getStreakBonusPercent(user.currentStreak, config.streakBonuses);
+        await db.clip.update({
+          where: { id: clip.id },
+          data: { streakBonusPercentAtApproval: lockedStreakPct },
+        }).catch((bfErr: any) => {
+          console.error(`[RECALC] Lazy backfill of streak lock failed for ${clip.id}:`, bfErr?.message);
+        });
+      }
+
       const cpm = clip.campaign.clipperCpm ?? clip.campaign.cpmRate ?? null;
       const result = calculateClipperEarnings({
         views: stat.views,
@@ -673,6 +687,7 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
         campaignMaxPayoutPerClip: clip.campaign.maxPayoutPerClip,
         clipperLevel: user.level,
         clipperStreak: user.currentStreak,
+        streakBonusPercentOverride: lockedStreakPct ?? 0,
         levelBonuses: config.levelBonuses,
         streakBonuses: config.streakBonuses,
         isReferred: !!user.referredById,

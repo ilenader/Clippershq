@@ -39,10 +39,14 @@ export async function POST() {
   for (const clip of clips) {
     oldTotal += clip.earnings || 0;
 
+    // Honor the per-clip streak lock. Null (legacy) falls through as 0 rather
+    // than retroactively applying the user's current streak — matches the new
+    // locked-at-approval semantics. True backfill happens via the tracking path.
     const breakdown = recalculateClipEarningsBreakdown({
       stats: clip.stats,
       campaign: clip.campaign,
       user: clip.user || undefined,
+      streakBonusPercentAtApproval: (clip as any).streakBonusPercentAtApproval ?? 0,
     });
 
     if (breakdown.clipperEarnings !== clip.earnings ||

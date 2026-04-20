@@ -346,25 +346,38 @@ async function processTrackingJob(
         // Still update stats below, but skip earnings recalculation
       } else {
       // Normal earnings calculation.
-      // Fetch current gamification state so the clip is recomputed with TODAY's bonus,
-      // not whatever was stored on the User row at the last write. getGamificationState
-      // is 30s-cached per instance and internally triggers streak eval — so if the streak
-      // just broke, recalculateUnpaidEarnings already fired for ALL unpaid clips before
-      // we reach here. Fall back to stored level/streak/PWA on any failure.
-      let currentBonusOverride: number | undefined;
-      try {
-        const { getGamificationState } = await import("@/lib/gamification");
-        const gamState = await getGamificationState(clip.userId);
-        if (gamState) currentBonusOverride = gamState.bonusPercent;
-      } catch (gamErr: any) {
-        console.error(`[TRACKING] getGamificationState failed for clip ${clip.id}:`, gamErr?.message);
+      // Streak bonus % is locked at approval time — stored on the clip. Level,
+      // PWA and budget caps still recalc dynamically off the live user/campaign.
+      // For legacy clips approved before the lock column existed, lazy-backfill
+      // the snapshot from the user's current streak on first touch so they move
+      // to the locked model from this point forward.
+      let lockedStreakPct = (clip as any).streakBonusPercentAtApproval as number | null | undefined;
+      if (lockedStreakPct == null) {
+        try {
+          const { loadConfig } = await import("@/lib/gamification");
+          const { getStreakBonusPercent } = await import("@/lib/earnings-calc");
+          const cfg = await loadConfig();
+          lockedStreakPct = getStreakBonusPercent(
+            (clip as any).user?.currentStreak ?? 0,
+            cfg.streakBonuses,
+          );
+          await db.clip.update({
+            where: { id: clip.id },
+            data: { streakBonusPercentAtApproval: lockedStreakPct },
+          }).catch((bfErr: any) => {
+            console.error(`[TRACKING] Lazy backfill of streak lock failed for ${clip.id}:`, bfErr?.message);
+          });
+        } catch (cfgErr: any) {
+          console.error(`[TRACKING] Streak lock backfill config load failed for ${clip.id}:`, cfgErr?.message);
+          lockedStreakPct = 0;
+        }
       }
 
       const breakdown = recalculateClipEarningsBreakdown({
         stats: [{ views: stats.views }],
         campaign: clip.campaign,
         user: clip.user,
-        bonusOverride: currentBonusOverride,
+        streakBonusPercentAtApproval: lockedStreakPct ?? 0,
       });
       let newEarnings = breakdown.clipperEarnings;
 
@@ -677,6 +690,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           select: {
             id: true, userId: true, clipUrl: true, status: true, earnings: true,
             campaignId: true, createdAt: true, isOwnerOverride: true, videoUnavailable: true, savedEarnings: true,
+            streakBonusPercentAtApproval: true,
             campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true } },
             user: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true, status: true } },
           },
