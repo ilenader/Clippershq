@@ -651,10 +651,11 @@ export default function AdminCampaignsPage() {
                 onChange={(e) => updateField("maxClipsPerUserPerDay", e.target.value)}
                 className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-accent"
               >
-                {[1, 2, 3, 4, 5, 6].map((n) => (
+                {Array.from({ length: isOwner ? 20 : 10 }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>{n} clip{n > 1 ? "s" : ""} per day</option>
                 ))}
               </select>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">Max {isOwner ? 20 : 10} per user per day</p>
             </div>
           </div>
           <ImageUpload label="Campaign image" value={form.imageUrl} onChange={(url) => updateField("imageUrl", url)} />

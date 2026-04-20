@@ -216,7 +216,8 @@ export async function POST(req: NextRequest) {
     if (data.ownerUserId) createData.ownerUserId = data.ownerUserId;
     // Max clips per user per day (validated 1-6, default 3)
     const maxClips = data.maxClipsPerUserPerDay ? parseInt(data.maxClipsPerUserPerDay) : 3;
-    createData.maxClipsPerUserPerDay = Math.max(1, Math.min(6, isNaN(maxClips) ? 3 : maxClips));
+    const maxAllowed = role === "OWNER" ? 20 : 10;
+    createData.maxClipsPerUserPerDay = Math.max(1, Math.min(maxAllowed, isNaN(maxClips) ? 3 : maxClips));
 
     const campaign = await db.campaign.create({ data: createData });
 

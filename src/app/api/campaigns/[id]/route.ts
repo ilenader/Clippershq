@@ -131,6 +131,14 @@ export async function PATCH(
         return NextResponse.json({ error: "You do not have access to edit this campaign" }, { status: 403 });
       }
 
+      // Clamp ADMIN-submitted maxClipsPerUserPerDay to 10 before recording the change.
+      // Admin can only request values in [1, 10] — anything higher is silently clamped
+      // so the owner never sees an out-of-policy value in the pending edit diff.
+      if (raw.maxClipsPerUserPerDay !== undefined && raw.maxClipsPerUserPerDay !== null && raw.maxClipsPerUserPerDay !== "") {
+        const v = parseInt(String(raw.maxClipsPerUserPerDay));
+        raw.maxClipsPerUserPerDay = Math.max(1, Math.min(10, isNaN(v) ? 3 : v));
+      }
+
       // Build changes object with old/new values for diff display
       const changes: Record<string, { old: any; new: any }> = {};
       for (const key of CAMPAIGN_FIELDS) {
@@ -177,7 +185,8 @@ export async function PATCH(
     if ("minViews" in data) data.minViews = (data.minViews !== "" && data.minViews != null) ? parseInt(data.minViews) : null;
     if (data.maxClipsPerUserPerDay !== undefined && data.maxClipsPerUserPerDay !== null && data.maxClipsPerUserPerDay !== "") {
       const v = parseInt(data.maxClipsPerUserPerDay);
-      data.maxClipsPerUserPerDay = Math.max(1, Math.min(6, isNaN(v) ? 3 : v));
+      // OWNER branch — they can go up to 20 per user per day.
+      data.maxClipsPerUserPerDay = Math.max(1, Math.min(20, isNaN(v) ? 3 : v));
     }
 
     if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
