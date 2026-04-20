@@ -213,10 +213,13 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
         replyTo: detail.replyTo
           ? {
               id: detail.replyTo.id,
-              userId: detail.replyTo.userId ?? null,
+              userId: detail.replyTo.userId ?? detail.replyTo.user?.id ?? null,
               content: detail.replyTo.content,
               isDeleted: !!detail.replyTo.isDeleted,
-              user: { username: detail.replyTo.user?.username ?? null },
+              user: {
+                id: detail.replyTo.user?.id ?? detail.replyTo.userId ?? null,
+                username: detail.replyTo.user?.username ?? null,
+              },
             }
           : null,
       };

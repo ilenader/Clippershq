@@ -64,7 +64,7 @@ export async function GET(
       where: { channelId, ...(searchClause || {}) },
       include: {
         user: { select: { id: true, username: true, name: true, role: true, image: true } },
-        replyTo: { select: { id: true, content: true, userId: true, user: { select: { username: true, name: true } }, isDeleted: true } },
+        replyTo: { select: { id: true, content: true, userId: true, user: { select: { id: true, username: true, name: true } }, isDeleted: true } },
         reactions: { select: { emoji: true, userId: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -199,7 +199,7 @@ export async function POST(
       data: { channelId, userId: session.user.id, content, replyToId: replyToId || undefined },
       include: {
         user: { select: { id: true, username: true, name: true, role: true, image: true } },
-        replyTo: { select: { id: true, content: true, userId: true, user: { select: { username: true, name: true } }, isDeleted: true } },
+        replyTo: { select: { id: true, content: true, userId: true, user: { select: { id: true, username: true, name: true } }, isDeleted: true } },
         reactions: { select: { emoji: true, userId: true } },
       },
     });
@@ -221,10 +221,16 @@ export async function POST(
       replyTo: (message as any).replyTo
         ? {
             id: (message as any).replyTo.id,
+            // Both `userId` (scalar foreign key) and `user.id` (relation) carry the
+            // original author's id. We send both so the client check has a fallback
+            // path if one gets stripped anywhere in serialization.
             userId: (message as any).replyTo.userId,
             content: (message as any).replyTo.content,
             isDeleted: (message as any).replyTo.isDeleted,
-            user: { username: (message as any).replyTo.user?.username || null },
+            user: {
+              id: (message as any).replyTo.user?.id || (message as any).replyTo.userId || null,
+              username: (message as any).replyTo.user?.username || null,
+            },
           }
         : null,
     }).catch(() => {});

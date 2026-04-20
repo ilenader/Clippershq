@@ -42,11 +42,13 @@ export interface Message {
   replyTo?: {
     id: string;
     /** Author of the original message being replied to — used to detect
-     *  "someone replied to me" and render the Discord-style accent highlight. */
+     *  "someone replied to me" and render the Discord-style accent highlight.
+     *  Both `userId` (scalar) and `user.id` (relation) are populated server-side;
+     *  the client check falls back between them. */
     userId?: string | null;
     content: string;
     isDeleted?: boolean;
-    user?: { username?: string | null } | null;
+    user?: { id?: string | null; username?: string | null } | null;
   } | null;
   reactions?: Reaction[];
   _deleted?: boolean;
@@ -157,10 +159,16 @@ function MessageBubbleInner({
 
   // Discord-style "someone replied to you" highlight: this message is a reply,
   // the original was authored by the viewer, and the replier isn't the viewer.
+  // Resolve the replied-to author id from either `replyTo.userId` (scalar FK) or
+  // `replyTo.user.id` (nested relation) — role-agnostic; applies to clipper, admin
+  // and owner viewers identically. The fallback guards against any path where one
+  // of the two fields is dropped in serialization.
+  const repliedToAuthorId = message.replyTo?.userId || message.replyTo?.user?.id || null;
   const isReplyToMe =
     !!message.replyTo &&
-    !!message.replyTo.userId &&
-    message.replyTo.userId === viewerId &&
+    !!repliedToAuthorId &&
+    !!viewerId &&
+    repliedToAuthorId === viewerId &&
     message.userId !== viewerId;
 
   return (
