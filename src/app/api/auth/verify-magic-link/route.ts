@@ -1,10 +1,21 @@
 import { db } from "@/lib/db";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    // Brute-force defense: cap verification attempts per source IP. If tokens were
+    // ever shortened or if an attacker harvested multiple magic links, this prevents
+    // enumeration. request.ip isn't set on Next server runtime; derive from headers.
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "unknown";
+    const rl = checkRateLimit(`magic-verify:${ip}`, 10, 60_000);
+    if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
     if (!db) return NextResponse.redirect(new URL("/login?error=unavailable", req.url));
 
     const token = req.nextUrl.searchParams.get("token");

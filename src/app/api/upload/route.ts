@@ -24,6 +24,17 @@ export async function POST(req: NextRequest) {
   const rl = checkRateLimit(`upload:${session.user.id}`, 20, 3_600_000);
   if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
+  // Pre-parse size guard: reject oversize requests via Content-Length BEFORE
+  // formData parses the whole body into memory. The existing post-parse check
+  // (file.size > 5MB) still stands as belt-and-suspenders, but this short-circuit
+  // stops an attacker from streaming a huge body and burning bandwidth + RAM
+  // just to hit the eventual 400.
+  const contentLength = parseInt(req.headers.get("content-length") || "0", 10);
+  const MAX_UPLOAD_SIZE = 5 * 1024 * 1024; // 5 MB
+  if (contentLength > MAX_UPLOAD_SIZE) {
+    return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 413 });
+  }
+
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;

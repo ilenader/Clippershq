@@ -7,6 +7,19 @@ import { NextRequest } from "next/server";
 export const dynamic = "force-dynamic";
 
 /**
+ * Per-user cap on concurrent SSE sockets. An authenticated user opening many
+ * tabs (or a malicious script spinning up sockets) would otherwise multiply
+ * the 5s DB poll by their connection count. 3 is enough for normal multi-tab
+ * use while keeping the DB-query blast radius per user bounded.
+ *
+ * Single-container semantics: lives in module memory. Fine for Railway's
+ * single-instance deploy. If we scale horizontally this becomes per-instance
+ * (so 3 × N_instances total) — acceptable for a soft cap.
+ */
+const activeSSEConnections = new Map<string, number>();
+const MAX_SSE_CONNECTIONS_PER_USER = 3;
+
+/**
  * GET /api/chat/sse
  *
  * Server-Sent Events endpoint for real-time chat notifications.
@@ -24,6 +37,19 @@ export async function GET(req: NextRequest) {
   if (banCheck) return banCheck;
 
   const userId = session.user.id;
+
+  // Per-user connection cap — reject before opening the stream.
+  const openCount = activeSSEConnections.get(userId) || 0;
+  if (openCount >= MAX_SSE_CONNECTIONS_PER_USER) {
+    return new Response("Too many connections", { status: 429 });
+  }
+  activeSSEConnections.set(userId, openCount + 1);
+
+  const releaseConnection = () => {
+    const after = (activeSSEConnections.get(userId) || 1) - 1;
+    if (after <= 0) activeSSEConnections.delete(userId);
+    else activeSSEConnections.set(userId, after);
+  };
 
   const encoder = new TextEncoder();
   let closed = false;
@@ -86,12 +112,20 @@ export async function GET(req: NextRequest) {
 
       // Handle client disconnect via abort signal
       req.signal.addEventListener("abort", () => {
+        if (closed) return;
         closed = true;
         clearInterval(interval);
         clearInterval(heartbeat);
         unregisterSSEClient(userId, controller);
+        releaseConnection();
         try { controller.close(); } catch {}
       });
+    },
+    cancel() {
+      // ReadableStream cancel — fires on client detach when abort didn't.
+      if (closed) return;
+      closed = true;
+      releaseConnection();
     },
   });
 
