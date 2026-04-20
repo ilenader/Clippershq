@@ -2,7 +2,8 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
 import { detectPlatform, fetchClipStats } from "@/lib/apify";
-import { recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
+import { recalculateClipEarningsBreakdown, calculateOwnerEarnings, getStreakBonusPercent } from "@/lib/earnings-calc";
+import { loadConfig, updateStreak } from "@/lib/gamification";
 import { roundToNextSlot } from "@/lib/tracking";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -109,6 +110,27 @@ export async function POST(req: NextRequest) {
       console.log(`[OWNER-SUBMIT] Could not fetch stats for ${clipUrl}: ${err?.message} — starting with 0`);
     }
 
+    // Snapshot the target user's streak bonus % NOW — this clip is auto-APPROVED,
+    // so "approval time" is right here. Force a fresh streak evaluation first so
+    // we don't lock a stale value. If updateStreak errors we fall through to
+    // whatever's on the user row.
+    try { await updateStreak(targetUserId); } catch (usErr: any) {
+      console.error("[OWNER-SUBMIT] updateStreak failed — locking from stale user row:", usErr?.message);
+    }
+    const targetUser = await db.user.findUnique({
+      where: { id: targetUserId },
+      select: { currentStreak: true, level: true, referredById: true, isPWAUser: true, lastPWAOpenAt: true },
+    });
+    const cfg = await loadConfig();
+    const lockedStreakPct = getStreakBonusPercent(
+      targetUser?.currentStreak ?? 0,
+      cfg.streakBonuses,
+    );
+    const pwaFresh =
+      !!targetUser?.isPWAUser &&
+      !!targetUser?.lastPWAOpenAt &&
+      (Date.now() - new Date(targetUser.lastPWAOpenAt).getTime()) / 86_400_000 <= 2;
+
     // Create clip as APPROVED + initial stat with real views + tracking job (immediate)
     const clip = await db.$transaction(async (tx: any) => {
       const newClip = await tx.clip.create({
@@ -121,6 +143,9 @@ export async function POST(req: NextRequest) {
           note: note || "Owner override submission",
           isOwnerOverride: true,
           earnings: 0,
+          streakBonusPercentAtApproval: lockedStreakPct,
+          streakDayLocked: true,
+          streakDayLockedAt: new Date(),
         },
       });
 
@@ -149,6 +174,13 @@ export async function POST(req: NextRequest) {
           const breakdown = recalculateClipEarningsBreakdown({
             stats: [{ views: fetchedStats.views }],
             campaign: fullCampaign,
+            user: {
+              level: targetUser?.level ?? 0,
+              currentStreak: targetUser?.currentStreak ?? 0,
+              referredById: targetUser?.referredById ?? null,
+              isPWAUser: pwaFresh,
+            },
+            streakBonusPercentAtApproval: lockedStreakPct,
           });
           await db.clip.update({
             where: { id: clip.id },

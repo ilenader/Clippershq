@@ -6,7 +6,7 @@ import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwn
 import { getCampaignBudgetStatus } from "@/lib/balance";
 import { createNotification } from "@/lib/notifications";
 import { sendClipApproved, sendClipRejected, sendStreakRejectionWarning, sendConsecutiveRejectionWarning } from "@/lib/email";
-import { updateUserLevel, loadConfig } from "@/lib/gamification";
+import { updateUserLevel, loadConfig, updateStreak } from "@/lib/gamification";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { checkBanStatus } from "@/lib/check-ban";
 import { publishToUser } from "@/lib/ably";
@@ -85,11 +85,23 @@ export async function POST(
 
     // ── Calculate and update earnings based on new status ──
     if (action === "APPROVED") {
-      // Fetch clip stats + campaign data BEFORE changing status
-      // This ensures the budget check sees accurate "spent" (this clip is still PENDING/etc)
-      // include (without a top-level select) returns all Clip scalars by default —
-      // that includes the existing streakBonusPercentAtApproval snapshot, which the
-      // re-approval branch reads below to avoid re-snapshotting.
+      // Force-refresh the clipper's streak BEFORE snapshotting so we never
+      // lock a stale/cached value. Any transient "day 4 → day 3" window in
+      // updateStreak that might exist around midnight or during concurrent
+      // writes is resolved here by an explicit rebuild-from-clip-history pass.
+      // Errors are swallowed — we fall back to whatever's on the user row.
+      try {
+        await updateStreak(clip.userId);
+      } catch (usErr: any) {
+        console.error(`[REVIEW] updateStreak pre-lock failed for user ${clip.userId}:`, usErr?.message);
+      }
+
+      // Fetch clip stats + campaign data AFTER the streak refresh so user.currentStreak
+      // reflects the rebuild. This ensures the budget check sees accurate "spent"
+      // (this clip is still PENDING/etc). include (without a top-level select) returns
+      // all Clip scalars by default — that includes the existing
+      // streakBonusPercentAtApproval snapshot, which the re-approval branch reads
+      // below to avoid re-snapshotting.
       const clipWithData = await db.clip.findUnique({
         where: { id },
         include: {
@@ -513,10 +525,7 @@ export async function POST(
     // Re-evaluate streak on approval/rejection (48h grace system)
     // Skip for OWNER users and owner override clips
     if ((action === "APPROVED" || action === "REJECTED") && userRole_ !== "OWNER" && userRole_ !== "ADMIN" && !clip.isOwnerOverride) {
-      try {
-        const { updateStreak } = await import("@/lib/gamification");
-        await updateStreak(clip.userId);
-      } catch {}
+      try { await updateStreak(clip.userId); } catch {}
     }
 
     // Audit log
