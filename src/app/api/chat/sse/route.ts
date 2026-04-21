@@ -16,7 +16,9 @@ export const dynamic = "force-dynamic";
  * single-instance deploy. If we scale horizontally this becomes per-instance
  * (so 3 × N_instances total) — acceptable for a soft cap.
  */
-const activeSSEConnections = new Map<string, number>();
+// Exported so the /admin/command-center dashboard can read the current live-
+// connections count without poking at internal state. Read-only from outside.
+export const activeSSEConnections = new Map<string, number>();
 const MAX_SSE_CONNECTIONS_PER_USER = 3;
 
 /**
