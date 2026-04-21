@@ -573,8 +573,8 @@ function StatCard({
       <p
         className={`mt-2 font-bold tracking-tight tabular-nums ${
           big
-            ? "text-4xl md:text-5xl lg:text-6xl"
-            : "text-3xl md:text-4xl lg:text-5xl"
+            ? "text-3xl md:text-4xl"
+            : "text-2xl md:text-3xl"
         } ${toneClass}`}
       >
         {value}
