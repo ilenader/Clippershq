@@ -252,14 +252,38 @@ export default function CommandCenterPage() {
 
       {/* Money section */}
       <SectionTitle icon={<DollarSign className="h-4 w-4 text-accent" />} title="Money" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+
+      {/* The big-picture money row: where money came from, where it went,
+          what you kept, what's still available. */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <StatCard
-          title="Platform revenue"
-          value={formatCurrency(data.money.platformRevenue ?? 0)}
-          sub="Your cut for the selected period"
-          big
-          tooltip="Sum of AgencyEarning (CPM_SPLIT campaigns) plus fee% of clipper earnings (AGENCY_FEE campaigns). This is what Clippers HQ kept from campaigns reviewed in this range."
+          title="Total campaign value"
+          value={formatCurrency(data.money.totalCampaignValue ?? 0)}
+          sub="Budgets of campaigns created in range"
+          tooltip="Total money brands put into campaigns created on the platform within this date range. Open-ended (no-budget) campaigns are excluded. This is the gross merchandise value (GMV) flowing through in the period."
         />
+        <StatCard
+          title="Paid to clippers"
+          value={formatCurrency(data.money.totalPaidToClippers ?? 0)}
+          sub="Clipper earnings on approved clips"
+          tooltip="Sum of clip.earnings across all APPROVED clips reviewed in the date range. This is the total clipper-side gross earnings the platform has committed (before clipper payout requests / fees)."
+        />
+        <StatCard
+          title="Your profit (9–10% fee)"
+          value={formatCurrency(data.money.platformRevenue ?? 0)}
+          sub="Platform fees + CPM splits"
+          tooltip="Your cut: AgencyEarning.amount for CPM_SPLIT campaigns + clip.earnings × feePercentAtApproval/100 for AGENCY_FEE campaigns. Reviewed-in-range only."
+        />
+        <StatCard
+          title="Unspent campaign budget"
+          value={formatCurrency(data.money.totalUnspentBudget ?? 0)}
+          sub="Available across active campaigns"
+          tooltip="Point-in-time snapshot: sum of (budget − spent) for every ACTIVE campaign right now. Not filtered by the date picker — 'money still available to be earned today'. Spent includes both clipper and owner/agency earnings."
+        />
+      </div>
+
+      {/* Secondary money metrics — same Money section, lower priority. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <StatCard
           title="Avg earnings per clipper"
           value={formatCurrency(data.money.avgPayoutPerClipper)}

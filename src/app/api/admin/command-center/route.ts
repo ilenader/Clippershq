@@ -235,6 +235,72 @@ export async function GET(req: NextRequest) {
     platformRevenue = Math.round((cpmSplitRevenue + agencyFeeRevenue) * 100) / 100;
   } catch {}
 
+  // Total GMV — money brands put into campaigns CREATED in the date range.
+  // Null budgets (open-ended campaigns) excluded.
+  let totalCampaignValue = 0;
+  try {
+    const agg = await db.campaign.aggregate({
+      where: { createdAt: { gte: from, lte: to }, budget: { not: null, gt: 0 } },
+      _sum: { budget: true },
+    });
+    totalCampaignValue = Math.round((agg._sum.budget ?? 0) * 100) / 100;
+  } catch {}
+
+  // Paid to clippers — total clipper gross earnings on clips approved in range.
+  let totalPaidToClippers = 0;
+  try {
+    const agg = await db.clip.aggregate({
+      where: {
+        status: "APPROVED",
+        isDeleted: false,
+        videoUnavailable: false,
+        reviewedAt: { gte: from, lte: to },
+      },
+      _sum: { earnings: true },
+    });
+    totalPaidToClippers = Math.round((agg._sum.earnings ?? 0) * 100) / 100;
+  } catch {}
+
+  // Unspent campaign budget — POINT-IN-TIME snapshot across all ACTIVE campaigns.
+  // Not filtered by date range: this is "money still available to be earned
+  // right now" and extrapolating it over a past window would be meaningless.
+  let totalUnspentBudget = 0;
+  try {
+    const activeAll = await db.campaign.findMany({
+      where: { status: "ACTIVE", budget: { not: null, gt: 0 } },
+      select: { id: true, budget: true },
+      take: 1000,
+    });
+    const ids = activeAll.map((c: any) => c.id);
+    if (ids.length > 0) {
+      const [clipperSp, agencySp] = await Promise.all([
+        db.clip.groupBy({
+          by: ["campaignId"],
+          where: {
+            campaignId: { in: ids },
+            status: "APPROVED",
+            isDeleted: false,
+            videoUnavailable: false,
+          },
+          _sum: { earnings: true },
+        }),
+        db.agencyEarning.groupBy({
+          by: ["campaignId"],
+          where: { campaignId: { in: ids } },
+          _sum: { amount: true },
+        }),
+      ]);
+      const spent = new Map<string, number>();
+      for (const s of clipperSp as any[]) spent.set(s.campaignId, (spent.get(s.campaignId) || 0) + (s._sum.earnings ?? 0));
+      for (const s of agencySp as any[]) spent.set(s.campaignId, (spent.get(s.campaignId) || 0) + (s._sum.amount ?? 0));
+      let remaining = 0;
+      for (const c of activeAll as any[]) {
+        remaining += Math.max(0, (c.budget || 0) - (spent.get(c.id) || 0));
+      }
+      totalUnspentBudget = Math.round(remaining * 100) / 100;
+    }
+  } catch {}
+
   let top10EarningClippers: any[] = [];
   try {
     const grouped = await db.clip.groupBy({
@@ -529,6 +595,9 @@ export async function GET(req: NextRequest) {
     },
     money: {
       platformRevenue,
+      totalCampaignValue,
+      totalPaidToClippers,
+      totalUnspentBudget,
       top10EarningClippers,
       avgPayoutPerClipper,
     },
