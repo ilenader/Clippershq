@@ -163,7 +163,7 @@ export default function CommandCenterPage() {
   const rt = realtime || data.realtime;
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+    <div className="w-full px-4 sm:px-6 py-6 2xl:max-w-[1800px] 2xl:mx-auto">
       <div className="flex items-center gap-3 mb-1">
         <Gauge className="h-5 w-5 text-accent" />
         <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">Command Center</h1>
@@ -174,7 +174,7 @@ export default function CommandCenterPage() {
 
       {/* Date range picker */}
       <div className="sticky top-0 z-10 mb-6 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           {PRESETS.map((p) => (
             <button
               key={p.key}
@@ -255,26 +255,30 @@ export default function CommandCenterPage() {
 
       {/* The big-picture money row: where money came from, where it went,
           what you kept, what's still available. */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <StatCard
+          big
           title="Total campaign value"
           value={formatCurrency(data.money.totalCampaignValue ?? 0)}
           sub="Budgets of campaigns created in range"
           tooltip="Total money brands put into campaigns created on the platform within this date range. Open-ended (no-budget) campaigns are excluded. This is the gross merchandise value (GMV) flowing through in the period."
         />
         <StatCard
+          big
           title="Paid to clippers"
           value={formatCurrency(data.money.totalPaidToClippers ?? 0)}
           sub="Clipper earnings on approved clips"
           tooltip="Sum of clip.earnings across all APPROVED clips reviewed in the date range. This is the total clipper-side gross earnings the platform has committed (before clipper payout requests / fees)."
         />
         <StatCard
+          big
           title="Your profit (9–10% fee)"
           value={formatCurrency(data.money.platformRevenue ?? 0)}
           sub="Platform fees + CPM splits"
           tooltip="Your cut: AgencyEarning.amount for CPM_SPLIT campaigns + clip.earnings × feePercentAtApproval/100 for AGENCY_FEE campaigns. Reviewed-in-range only."
         />
         <StatCard
+          big
           title="Unspent campaign budget"
           value={formatCurrency(data.money.totalUnspentBudget ?? 0)}
           sub="Available across active campaigns"
@@ -305,7 +309,7 @@ export default function CommandCenterPage() {
             <TrendingUp className="h-4 w-4 text-accent" />
             <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Revenue per day</h3>
           </div>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={data.charts.revenuePerDay}>
               <defs>
                 <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
@@ -380,7 +384,7 @@ export default function CommandCenterPage() {
           <Film className="h-4 w-4 text-accent" />
           <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Clips submitted per day</h3>
         </div>
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data.charts.clipsPerDay}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1e1e24" />
             <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#888" }} tickFormatter={(d) => d.slice(5)} />
@@ -420,7 +424,7 @@ export default function CommandCenterPage() {
           <Users className="h-4 w-4 text-accent" />
           <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Daily signups — last 30 days</h3>
         </div>
-        <ResponsiveContainer width="100%" height={180}>
+        <ResponsiveContainer width="100%" height={300}>
           <LineChart data={data.growth.newClippersStats.dailyLast30}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1e1e24" />
             <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#888" }} tickFormatter={(d) => d.slice(5)} />
@@ -561,13 +565,21 @@ function StatCard({
   const toneClass =
     tone === "red" ? "text-red-400" : tone === "amber" ? "text-amber-400" : "text-[var(--text-primary)]";
   return (
-    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3 hover:bg-[var(--bg-card-hover)] transition-colors">
+    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-4 hover:bg-[var(--bg-card-hover)] transition-colors">
       <div className="flex items-center gap-1.5">
-        <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">{title}</p>
+        <p className="text-xs uppercase tracking-widest text-[var(--text-muted)]">{title}</p>
         {tooltip && <TooltipIcon text={tooltip} />}
       </div>
-      <p className={`mt-1 ${big ? "text-3xl" : "text-xl"} font-bold tabular-nums ${toneClass}`}>{value}</p>
-      {sub && <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{sub}</p>}
+      <p
+        className={`mt-2 font-bold tracking-tight tabular-nums ${
+          big
+            ? "text-4xl md:text-5xl lg:text-6xl"
+            : "text-3xl md:text-4xl lg:text-5xl"
+        } ${toneClass}`}
+      >
+        {value}
+      </p>
+      {sub && <p className="mt-1.5 text-sm text-[var(--text-muted)]">{sub}</p>}
     </div>
   );
 }
