@@ -8,7 +8,6 @@ import {
   AlertCircle, ArrowLeft, Loader2, MessageCircle, Phone,
 } from "lucide-react";
 import { ChannelChat } from "@/components/community/ChannelChat";
-import { useVisualViewportHeight } from "@/hooks/useVisualViewport";
 import { Leaderboard } from "@/components/community/Leaderboard";
 import { TicketPanel } from "@/components/community/TicketPanel";
 import { CallScheduler } from "@/components/community/CallScheduler";
@@ -87,52 +86,15 @@ export default function CommunityPage() {
     };
   }, []);
 
-  // iOS fires the focus event and its native "scroll the input into view"
-  // animation BEFORE `visualViewport` has resized for the keyboard. During that
-  // window (~300 ms) the document is scrolled up while our container is still
-  // at full pre-keyboard height, so the input shoots above the visible area and
-  // only falls back once typing starts and the resize lands. Fix: pin
-  // window.scrollY to 0 for 500 ms after any input/textarea focus, mobile only.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.innerWidth >= 1024) return; // desktop unaffected
-
-    let lockInterval: ReturnType<typeof setInterval> | null = null;
-    let lockTimeout: ReturnType<typeof setTimeout> | null = null;
-
-    const startLock = () => {
-      window.scrollTo(0, 0);
-      document.body.scrollTop = 0;
-      if (lockInterval) clearInterval(lockInterval);
-      if (lockTimeout) clearTimeout(lockTimeout);
-      lockInterval = setInterval(() => {
-        if (window.scrollY !== 0) window.scrollTo(0, 0);
-        if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
-      }, 10);
-      lockTimeout = setTimeout(() => {
-        if (lockInterval) { clearInterval(lockInterval); lockInterval = null; }
-      }, 500);
-    };
-
-    const onFocusIn = (e: FocusEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT")) startLock();
-    };
-
-    document.addEventListener("focusin", onFocusIn);
-    return () => {
-      document.removeEventListener("focusin", onFocusIn);
-      if (lockInterval) clearInterval(lockInterval);
-      if (lockTimeout) clearTimeout(lockTimeout);
-    };
-  }, []);
+  // (removed) The 500 ms scrollY-pinning loop that ran on every input focus
+  // was a workaround for a misguided visualViewport-driven height approach.
+  // It fought iOS's native keyboard animation every 10 ms and still let the
+  // input shift off-screen during textarea auto-grow. Replaced by
+  // position: fixed + h-[100dvh] on the mobile container below — the same
+  // pattern ChatWidget uses, which works natively without JS intervention.
 
   const isAdmin = viewerRole === "OWNER" || viewerRole === "ADMIN";
   const isOwner = viewerRole === "OWNER";
-
-  // Live viewport height that shrinks when the mobile keyboard opens.
-  // Falls back to null on desktop / older browsers — the root div uses dvh in that case.
-  const viewportHeight = useVisualViewportHeight();
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
@@ -593,10 +555,11 @@ export default function CommunityPage() {
 
   return (
     <div
-      className="-m-4 lg:-m-6 flex min-h-0 bg-[var(--bg-primary)] transition-[height] duration-100"
-      style={{
-        height: viewportHeight != null ? `${viewportHeight - 56}px` : "calc(100dvh - 56px)",
-      }}
+      className="
+        -m-4 lg:-m-6 flex min-h-0 bg-[var(--bg-primary)]
+        max-lg:fixed max-lg:inset-x-0 max-lg:top-14 max-lg:bottom-0 max-lg:m-0 max-lg:z-30
+        lg:h-[calc(100dvh-56px)]
+      "
     >
       {/* Desktop: server strip always visible */}
       <div className="hidden lg:flex">
