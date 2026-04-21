@@ -5,8 +5,8 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import type { SessionUser } from "@/lib/auth-types";
 import {
-  Activity, AlertTriangle, Bot, Clock, Database, DollarSign, Film, Flag,
-  Gauge, Mail, Megaphone, Target, TrendingUp, Users, Zap,
+  Activity, AlertTriangle, Clock, DollarSign, Film, Flag,
+  Gauge, HelpCircle, Megaphone, Target, TrendingUp, Users, Zap,
 } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, AreaChart, Area,
@@ -51,6 +51,39 @@ const PRESETS: { key: PresetKey; label: string }[] = [
   { key: "all", label: "All time" },
   { key: "custom", label: "Custom" },
 ];
+
+// ─── Formatters ────────────────────────────────────────────
+
+/** Human-readable duration. 45s / 12 min / 2h 15min / 1d 6h. */
+function formatDuration(minutes: number | null | undefined): string {
+  if (minutes == null || !Number.isFinite(minutes)) return "—";
+  if (minutes < 1) return `${Math.max(0, Math.round(minutes * 60))}s`;
+  if (minutes < 60) return `${Math.round(minutes)} min`;
+  if (minutes < 1440) {
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
+    return m > 0 ? `${h}h ${m}min` : `${h}h`;
+  }
+  const d = Math.floor(minutes / 1440);
+  const h = Math.floor((minutes % 1440) / 60);
+  return h > 0 ? `${d}d ${h}h` : `${d}d`;
+}
+
+/** $12.34 under $100, $1,234 over — two decimals for the small numbers where
+ *  the cents actually move, whole dollars for the bigger aggregates. */
+function formatCurrency(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  if (Math.abs(value) < 100) {
+    return `$${value.toFixed(2)}`;
+  }
+  return `$${Math.round(value).toLocaleString()}`;
+}
+
+/** 1,234,567 grouping on any integer stat. */
+function formatNumber(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return Math.round(value).toLocaleString();
+}
 
 // ─── Page ──────────────────────────────────────────────────
 
@@ -183,41 +216,62 @@ export default function CommandCenterPage() {
       {/* Real-time row */}
       <SectionTitle icon={<Zap className="h-4 w-4 text-accent" />} title="Real-time" />
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-        <StatCard title="Live sockets" value={String(rt?.liveUsersOnline ?? 0)} sub="open SSE now" />
-        <StatCard title="Active 15 min" value={String(rt?.activeSessionsLast15Min ?? 0)} sub="distinct users" />
         <StatCard
-          title="Active this hour"
-          value={String(rt?.peakActiveThisHour ?? 0)}
-          sub="proxy for peak"
+          title="Users online right now"
+          value={formatNumber(rt?.liveUsersOnline ?? 0)}
+          sub="Connected through live chat this second"
+          tooltip="Clippers actively connected to the SSE chat system right this moment. Drops the instant they close the tab."
         />
         <StatCard
-          title="DB size"
+          title="Active in last 15 min"
+          value={formatNumber(rt?.activeSessionsLast15Min ?? 0)}
+          sub="Unique clippers who posted a clip recently"
+          tooltip="Distinct user IDs that submitted a clip within the last 15 minutes. Proxy for recent session activity."
+        />
+        <StatCard
+          title="Peak users this hour"
+          value={formatNumber(rt?.peakActiveThisHour ?? 0)}
+          sub="Distinct clippers in the last 60 min"
+          tooltip="Most users active within the last 60 minutes (proxy). True peak-concurrent would need a time-series table."
+        />
+        <StatCard
+          title="Database usage"
           value={data.system.databaseSize.pretty || "—"}
-          sub={data.system.databaseSize.percentOfFree != null ? `${data.system.databaseSize.percentOfFree}% of 500 MB` : "free tier"}
+          sub={data.system.databaseSize.percentOfFree != null ? `${data.system.databaseSize.percentOfFree}% of 500 MB free tier` : "Free tier"}
           tone={data.system.databaseSize.percentOfFree != null && data.system.databaseSize.percentOfFree > 80 ? "amber" : undefined}
+          tooltip="Total Postgres data stored in Supabase. Free tier caps at 500 MB; upgrade before you hit 100%."
         />
         <StatCard
-          title="Last tracking"
-          value={data.system.cronStatus.minutesAgo != null ? `${data.system.cronStatus.minutesAgo}m ago` : "—"}
-          sub="TrackingJob.lastCheckedAt (proxy)"
+          title="Last tracking update"
+          value={formatDuration(data.system.cronStatus.minutesAgo)}
+          sub="Since last view-count refresh"
           tone={data.system.cronStatus.minutesAgo != null && data.system.cronStatus.minutesAgo > 15 ? "red" : undefined}
+          tooltip="When the tracking cron last fetched view counts from TikTok/IG/YT. Over 15 min ago = cron may be stalled. (Proxy — derived from TrackingJob.lastCheckedAt, not a real cron-run audit log.)"
         />
       </div>
 
       {/* Money section */}
       <SectionTitle icon={<DollarSign className="h-4 w-4 text-accent" />} title="Money" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Platform revenue" value={`$${(data.money.platformRevenue ?? 0).toFixed(2)}`} sub="agency earnings in range" big />
         <StatCard
-          title="Avg payout / clipper"
-          value={data.money.avgPayoutPerClipper != null ? `$${data.money.avgPayoutPerClipper.toFixed(2)}` : "—"}
-          sub="approved clip earnings / active clippers"
+          title="Platform revenue"
+          value={formatCurrency(data.money.platformRevenue ?? 0)}
+          sub="Your cut for the selected period"
+          big
+          tooltip="Sum of AgencyEarning (CPM_SPLIT campaigns) plus fee% of clipper earnings (AGENCY_FEE campaigns). This is what Clippers HQ kept from campaigns reviewed in this range."
+        />
+        <StatCard
+          title="Avg earnings per clipper"
+          value={formatCurrency(data.money.avgPayoutPerClipper)}
+          sub="Among clippers who posted in range"
+          tooltip="Total approved clip earnings divided by the count of distinct clippers who had at least one clip in the range. Clippers with no clips in the range aren't counted in the denominator."
         />
         <StatCard
           title="Approval rate"
           value={data.health.approvalRate != null ? `${data.health.approvalRate}%` : "—"}
-          sub="approved / reviewed in range"
+          sub="Approved out of all reviewed clips"
           tone={data.health.approvalRate != null && data.health.approvalRate < 50 ? "red" : undefined}
+          tooltip="Approved clips as a percent of (approved + rejected) clips reviewed in the range. Pending clips aren't counted — they haven't been decided yet."
         />
       </div>
 
@@ -247,7 +301,8 @@ export default function CommandCenterPage() {
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
           <div className="flex items-center gap-2 mb-3">
             <Users className="h-4 w-4 text-accent" />
-            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Top 10 earners</h3>
+            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Top 10 clippers</h3>
+            <TooltipIcon text="The 10 clippers who earned the most from approved clips in this date range. Excludes flagged and unavailable videos." />
           </div>
           {data.money.top10EarningClippers.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)]">No earnings in this period.</p>
@@ -257,7 +312,8 @@ export default function CommandCenterPage() {
                 <li key={c.userId} className="flex items-center gap-2 text-sm">
                   <span className="w-5 text-[var(--text-muted)] tabular-nums">{i + 1}.</span>
                   <span className="flex-1 truncate text-[var(--text-primary)]">{c.username}</span>
-                  <span className="tabular-nums text-accent font-semibold">${c.totalEarnings.toFixed(2)}</span>
+                  <span className="text-xs text-[var(--text-muted)] tabular-nums">{c.clipCount} clips</span>
+                  <span className="tabular-nums text-accent font-semibold">{formatCurrency(c.totalEarnings)}</span>
                 </li>
               ))}
             </ol>
@@ -268,10 +324,31 @@ export default function CommandCenterPage() {
       {/* Health section */}
       <SectionTitle icon={<Activity className="h-4 w-4 text-accent" />} title="Platform health" />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <StatCard title="Pending review" value={String(data.health.clipsPendingReview)} sub="in range" tone={data.health.clipsPendingReview > 50 ? "amber" : undefined} />
-        <StatCard title="Admin review time" value={data.health.avgReviewTimeAdminMin != null ? `${data.health.avgReviewTimeAdminMin}m` : "—"} sub="avg from submit → review" />
-        <StatCard title="Owner review time" value={data.health.avgReviewTimeOwnerMin != null ? `${data.health.avgReviewTimeOwnerMin}m` : "—"} sub="avg from submit → review" />
-        <StatCard title="Total views" value={(data.health.totalViewsThisRange ?? 0).toLocaleString()} sub="in range" />
+        <StatCard
+          title="Clips waiting for review"
+          value={formatNumber(data.health.clipsPendingReview)}
+          sub="Pending clips submitted in range"
+          tone={data.health.clipsPendingReview > 50 ? "amber" : undefined}
+          tooltip="Count of PENDING clips created in the date range. These are clips clippers have submitted but you haven't approved or rejected yet."
+        />
+        <StatCard
+          title="Admin avg review time"
+          value={formatDuration(data.health.avgReviewTimeAdminMin)}
+          sub="From clip submit to admin decision"
+          tooltip="Average time between clip creation and the review action (approve/reject) WHEN the reviewer is an ADMIN. Owner reviews don't affect this number."
+        />
+        <StatCard
+          title="Owner avg review time"
+          value={formatDuration(data.health.avgReviewTimeOwnerMin)}
+          sub="From clip submit to owner decision"
+          tooltip="Average time between clip creation and review action WHEN the reviewer is an OWNER. Admin reviews don't affect this number."
+        />
+        <StatCard
+          title="Total views in period"
+          value={formatNumber(data.health.totalViewsThisRange)}
+          sub="Across all tracked clips"
+          tooltip="Sum of the maximum view count recorded per clip within the date range. Using MAX per clip avoids double-counting clips that got multiple tracking updates."
+        />
       </div>
 
       <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 mb-6">
@@ -293,13 +370,24 @@ export default function CommandCenterPage() {
       {/* Growth section */}
       <SectionTitle icon={<TrendingUp className="h-4 w-4 text-accent" />} title="Growth" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        <StatCard title="New clippers today" value={String(data.growth.newClippersStats.today ?? 0)} sub={`${data.growth.newClippersStats.week ?? 0} this week · ${data.growth.newClippersStats.month ?? 0} this month`} />
-        <StatCard title="Bot" value={String(rt?.recentClipSubmissions?.length ?? 0)} sub="clips in last 10 min" />
         <StatCard
-          title="Owner response"
-          value={data.support.ownerResponseTimeMin != null ? `${data.support.ownerResponseTimeMin}m` : "—"}
-          sub="avg reply time to tickets"
+          title="New clipper signups"
+          value={formatNumber(data.growth.newClippersStats.today)}
+          sub={`today · ${formatNumber(data.growth.newClippersStats.week)} this week · ${formatNumber(data.growth.newClippersStats.month)} this month`}
+          tooltip="New accounts with role CLIPPER — excludes OWNER, ADMIN, and CLIENT signups. Window is rolling today / 7 days / calendar month."
+        />
+        <StatCard
+          title="Recent clip submissions"
+          value={formatNumber(rt?.recentClipSubmissions?.length ?? 0)}
+          sub="Clips submitted in the last 10 minutes"
+          tooltip="Count of clips created in the last 10 minutes. The live feed below shows who submitted them."
+        />
+        <StatCard
+          title="Your response time"
+          value={formatDuration(data.support.ownerResponseTimeMin)}
+          sub="Avg time from clipper ticket to owner reply"
           tone={data.support.ownerResponseTimeMin != null && data.support.ownerResponseTimeMin > 120 ? "amber" : undefined}
+          tooltip="Average time between a clipper's ticket message and the NEXT owner reply in that thread. Only counts user→owner gaps; owner-to-owner or user-to-user messages don't affect this."
         />
       </div>
 
@@ -324,16 +412,17 @@ export default function CommandCenterPage() {
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
           <div className="flex items-center gap-2 mb-3">
             <Target className="h-4 w-4 text-accent" />
-            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Campaigns under budget (&lt;20% left)</h3>
+            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Campaigns running low</h3>
+            <TooltipIcon text="Active campaigns with less than 20% of budget remaining. Spent includes clipper earnings AND owner/agency earnings on CPM_SPLIT campaigns — both consume the same budget." />
           </div>
           {data.campaigns.underBudget.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">No campaigns under 20%.</p>
+            <p className="text-sm text-[var(--text-muted)]">All active campaigns have more than 20% of their budget remaining.</p>
           ) : (
             <ul className="space-y-2">
               {data.campaigns.underBudget.map((c: any) => (
                 <li key={c.id} className="flex items-center justify-between gap-2 text-sm border-l-2 border-amber-400/40 pl-3">
                   <span className="truncate text-[var(--text-primary)]">{c.name}</span>
-                  <span className="tabular-nums text-amber-400 font-semibold flex-shrink-0">{c.percentRemaining}% · ${c.spent.toFixed(2)} / ${c.budget.toFixed(2)}</span>
+                  <span className="tabular-nums text-amber-400 font-semibold flex-shrink-0">{c.percentRemaining}% · {formatCurrency(c.spent)} / {formatCurrency(c.budget)}</span>
                 </li>
               ))}
             </ul>
@@ -343,16 +432,17 @@ export default function CommandCenterPage() {
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
           <div className="flex items-center gap-2 mb-3">
             <Megaphone className="h-4 w-4 text-accent" />
-            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Dead campaigns (no clips in 7d)</h3>
+            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Inactive campaigns</h3>
+            <TooltipIcon text="Active campaigns that received zero clip submissions in the last 7 days. Paused and archived campaigns are excluded — these are 'live' campaigns nobody is clipping for." />
           </div>
           {data.campaigns.dead.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">No dead ACTIVE campaigns.</p>
+            <p className="text-sm text-[var(--text-muted)]">Every active campaign had submissions in the last 7 days.</p>
           ) : (
             <ul className="space-y-2">
               {data.campaigns.dead.map((c: any) => (
                 <li key={c.id} className="flex items-center justify-between gap-2 text-sm border-l-2 border-red-400/40 pl-3">
                   <span className="truncate text-[var(--text-primary)]">{c.name}</span>
-                  <span className="text-xs text-[var(--text-muted)] flex-shrink-0">{c.ownerName} · {c.daysInactive}d+</span>
+                  <span className="text-xs text-[var(--text-muted)] flex-shrink-0">{c.ownerName} · {c.daysInactive}d+ idle</span>
                 </li>
               ))}
             </ul>
@@ -365,10 +455,11 @@ export default function CommandCenterPage() {
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
           <div className="flex items-center gap-2 mb-3">
             <Activity className="h-4 w-4 text-accent" />
-            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Live activity (10 min)</h3>
+            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Recent clip submissions</h3>
+            <TooltipIcon text="Every clip submitted in the last 10 minutes, newest first. Refreshes every 15 seconds." />
           </div>
           {!rt?.recentClipSubmissions?.length ? (
-            <p className="text-sm text-[var(--text-muted)]">No submissions in the last 10 minutes.</p>
+            <p className="text-sm text-[var(--text-muted)]">No activity in this period. Check back in a few minutes.</p>
           ) : (
             <ul className="space-y-2">
               {rt.recentClipSubmissions.map((c: any) => (
@@ -389,13 +480,11 @@ export default function CommandCenterPage() {
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
           <div className="flex items-center gap-2 mb-3">
             <Flag className="h-4 w-4 text-accent" />
-            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Duplicate clip URLs</h3>
+            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">Duplicate clip alerts</h3>
+            <TooltipIcon text="Same clip URL submitted by more than one user in the date range. A single match may be a mistake; multiple users on the same URL is usually clip stealing. Manual review recommended." />
           </div>
-          <p className="text-xs text-[var(--text-muted)] mb-2">
-            Same clipUrl submitted by multiple users in range — likely stealing. {data.fraud.note.split(".")[0]}.
-          </p>
           {!data.fraud.suspiciousClipUrls.length ? (
-            <p className="text-sm text-[var(--text-muted)]">No duplicates detected.</p>
+            <p className="text-sm text-[var(--text-muted)]">No duplicate submissions detected in this period.</p>
           ) : (
             <ul className="space-y-2">
               {data.fraud.suspiciousClipUrls.map((s: any, i: number) => (
@@ -403,7 +492,7 @@ export default function CommandCenterPage() {
                   <AlertTriangle className="h-3 w-3 text-red-400 mt-1 flex-shrink-0" />
                   <span className="flex-1 min-w-0 break-all">
                     <span className="text-[var(--text-primary)] text-xs">{s.clipUrl}</span>
-                    <span className="block text-xs text-red-400">{s.distinctUsers} users</span>
+                    <span className="block text-xs text-red-400">{s.distinctUsers} users submitted this URL</span>
                   </span>
                 </li>
               ))}
@@ -412,9 +501,14 @@ export default function CommandCenterPage() {
         </div>
       </div>
 
-      <p className="text-xs text-[var(--text-muted)] mt-2">
-        All $ figures are estimates reconciled against provider billing. "Last tracking" and "Active this hour" are proxies (marked in source) — no persisted time-series exists without a schema change.
-      </p>
+      <div className="mt-2 space-y-1 text-xs text-[var(--text-muted)]">
+        <p>
+          Metrics refresh every 15 seconds (real-time) or 60 seconds (analytics). Dollar figures are estimates — reconcile against provider billing (Supabase, Anthropic, Apify) for the authoritative numbers.
+        </p>
+        <p>
+          "Peak users this hour" and "Last tracking update" are proxies derived from recent activity — a persisted time-series would give exact values but needs a schema change.
+        </p>
+      </div>
     </div>
   );
 }
@@ -431,21 +525,42 @@ function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string })
 }
 
 function StatCard({
-  title, value, sub, tone, big,
+  title, value, sub, tone, big, tooltip,
 }: {
   title: string;
   value: string;
   sub?: string;
   tone?: "amber" | "red";
   big?: boolean;
+  tooltip?: string;
 }) {
   const toneClass =
     tone === "red" ? "text-red-400" : tone === "amber" ? "text-amber-400" : "text-[var(--text-primary)]";
   return (
     <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3 hover:bg-[var(--bg-card-hover)] transition-colors">
-      <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">{title}</p>
+      <div className="flex items-center gap-1.5">
+        <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">{title}</p>
+        {tooltip && <TooltipIcon text={tooltip} />}
+      </div>
       <p className={`mt-1 ${big ? "text-3xl" : "text-xl"} font-bold tabular-nums ${toneClass}`}>{value}</p>
       {sub && <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{sub}</p>}
     </div>
+  );
+}
+
+/**
+ * Lightweight info icon with a native tooltip. The `title` attribute works on
+ * desktop hover and on mobile long-press without pulling in a floating-ui /
+ * popover dependency. For heavier tooltip UX later, swap this one helper.
+ */
+function TooltipIcon({ text }: { text: string }) {
+  return (
+    <span
+      title={text}
+      aria-label={text}
+      className="inline-flex cursor-help text-[var(--text-muted)] hover:text-accent transition-colors"
+    >
+      <HelpCircle className="h-3 w-3" />
+    </span>
   );
 }

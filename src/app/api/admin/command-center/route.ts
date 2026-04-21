@@ -199,13 +199,40 @@ export async function GET(req: NextRequest) {
   } catch {}
 
   // ── MONEY & BUSINESS ───────────────────────────────────────
+  // Platform revenue = (a) AgencyEarning.amount for CPM_SPLIT campaigns +
+  //                    (b) clip.earnings × feePercentAtApproval / 100 for
+  //                        AGENCY_FEE campaigns (clipper-side fee cut).
+  // Prior version only counted (a), silently undercounting revenue from every
+  // AGENCY_FEE campaign.
   let platformRevenue = 0;
   try {
-    const agg = await db.agencyEarning.aggregate({
+    const agencyAgg = await db.agencyEarning.aggregate({
       where: { createdAt: { gte: from, lte: to } },
       _sum: { amount: true },
     });
-    platformRevenue = Math.round((agg._sum.amount ?? 0) * 100) / 100;
+    const cpmSplitRevenue = agencyAgg._sum.amount ?? 0;
+
+    const feeClips = await db.clip.findMany({
+      where: {
+        status: "APPROVED",
+        isDeleted: false,
+        videoUnavailable: false,
+        reviewedAt: { gte: from, lte: to },
+        feePercentAtApproval: { not: null },
+      },
+      select: { earnings: true, feePercentAtApproval: true, campaign: { select: { pricingModel: true } } },
+      take: 10000,
+    });
+    let agencyFeeRevenue = 0;
+    for (const c of feeClips as any[]) {
+      // Only AGENCY_FEE campaigns use the fee% model; CPM_SPLIT revenue is
+      // already accounted for via AgencyEarning above.
+      if (c.campaign?.pricingModel !== "CPM_SPLIT") {
+        agencyFeeRevenue += (c.earnings || 0) * ((c.feePercentAtApproval || 0) / 100);
+      }
+    }
+
+    platformRevenue = Math.round((cpmSplitRevenue + agencyFeeRevenue) * 100) / 100;
   } catch {}
 
   let top10EarningClippers: any[] = [];
@@ -251,17 +278,31 @@ export async function GET(req: NextRequest) {
       select: { id: true, name: true, budget: true, ownerUserId: true },
       take: 500,
     });
-    const spendsByCampaign = await db.clip.groupBy({
-      by: ["campaignId"],
-      where: {
-        campaignId: { in: active.map((c: any) => c.id) },
-        status: "APPROVED",
-        isDeleted: false,
-        videoUnavailable: false,
-      },
-      _sum: { earnings: true },
-    });
-    const spendMap = new Map(spendsByCampaign.map((s: any) => [s.campaignId, s._sum.earnings ?? 0]));
+    const campaignIds = active.map((c: any) => c.id);
+    // Spent = clipper earnings + owner/agency earnings. The latter was missing
+    // previously; on CPM_SPLIT campaigns owner earnings consume the same
+    // budget, so omitting them understated spend and hid near-budget campaigns.
+    const [clipperSpends, agencySpends] = await Promise.all([
+      db.clip.groupBy({
+        by: ["campaignId"],
+        where: {
+          campaignId: { in: campaignIds },
+          status: "APPROVED",
+          isDeleted: false,
+          videoUnavailable: false,
+        },
+        _sum: { earnings: true },
+      }),
+      db.agencyEarning.groupBy({
+        by: ["campaignId"],
+        where: { campaignId: { in: campaignIds } },
+        _sum: { amount: true },
+      }),
+    ]);
+    const spendMap = new Map<string, number>();
+    for (const s of clipperSpends as any[]) spendMap.set(s.campaignId, (spendMap.get(s.campaignId) || 0) + (s._sum.earnings ?? 0));
+    for (const s of agencySpends as any[]) spendMap.set(s.campaignId, (spendMap.get(s.campaignId) || 0) + (s._sum.amount ?? 0));
+
     campaignsUnderBudget = active
       .map((c: any) => {
         const spent = Number(spendMap.get(c.id) ?? 0);
