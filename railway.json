@@ -1,0 +1,10 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "services": [
+    {
+      "name": "web",
+      "build": { "builder": "NIXPACKS" },
+      "deploy": { "startCommand": "npm start" }
+    }
+  ]
+}

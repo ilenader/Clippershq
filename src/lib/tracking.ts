@@ -21,14 +21,13 @@ import { fetchClipStats, fetchClipStatsBatch, detectPlatform } from "@/lib/apify
  * spend. Counter is reset at the start of each runDueTrackingJobs invocation.
  */
 /**
- * cron-job.org (free tier) cuts HTTP connections at 30 s. Keeping a hard ceiling
- * of 50 Apify fetches per run + 75 dueJobs fetched up front means the cron
- * invocation finishes well inside that limit; anything we don't get to is
- * picked up on the next 5-minute tick (its nextCheckAt isn't advanced).
- * Manual checks aren't affected by the 30 s ceiling — trackingDeadlineAt
- * below carves out a longer budget for source === "manual".
+ * Run on Railway's native cron service (no 30 s HTTP timeout). The old
+ * 50-calls-per-run / 75-job take was a band-aid for cron-job.org's free
+ * tier. Railway has no ceiling, so we're back to aggressive batch sizes.
+ * trackingDeadlineAt below still imposes an 8 min wall-clock budget as a
+ * backstop against hung Apify calls.
  */
-const MAX_APIFY_CALLS_PER_RUN = 50;
+const MAX_APIFY_CALLS_PER_RUN = 200;
 let apifyCallsMade = 0;
 
 /**
@@ -701,18 +700,79 @@ async function processTrackingJob(
  * @param options.campaignIds - If provided, only check clips from these campaigns (ignores nextCheckAt)
  * @param options.source - "cron" or "manual" — manual checks don't change the next scheduled cron time
  */
+/**
+ * Row-based cron lock. Postgres advisory locks are session-scoped and don't
+ * work reliably through Prisma's pg.Pool adapter (each query checks out a
+ * random connection; lock and unlock land on different sessions). Instead
+ * we use an atomic INSERT ... ON CONFLICT DO UPDATE on an existing k/v row
+ * in gamification_config with a staleness window — the update only "wins"
+ * if the prior lock is older than STALE_MS, which means a crashed/killed
+ * run self-heals after that window. 10 min matches the script's KILL_TIMEOUT
+ * and is 2× the tracking DEADLINE_MS so a legitimate long run won't lose
+ * its lock mid-execution.
+ */
+const TRACKING_LOCK_KEY = "tracking_cron_lock";
+const TRACKING_LOCK_STALE_MS = 10 * 60 * 1000;
+
+async function acquireTrackingLock(): Promise<boolean> {
+  if (!db) return false;
+  const now = Date.now();
+  const staleBefore = now - TRACKING_LOCK_STALE_MS;
+  try {
+    const rows = await db.$queryRaw<{ key: string }[]>`
+      INSERT INTO "gamification_config" ("key", "value")
+      VALUES (${TRACKING_LOCK_KEY}, ${String(now)})
+      ON CONFLICT ("key") DO UPDATE
+        SET "value" = EXCLUDED."value"
+      WHERE "gamification_config"."value" ~ '^[0-9]+$'
+        AND ("gamification_config"."value")::bigint < ${staleBefore}
+      RETURNING "key"
+    `;
+    return rows.length > 0;
+  } catch (err: any) {
+    console.error(`[TRACKING-LOCK] acquire failed: ${err?.message}`);
+    // Fail closed: if we can't check the lock, don't run (better to skip a
+    // cycle than double-process).
+    return false;
+  }
+}
+
+async function releaseTrackingLock(): Promise<void> {
+  if (!db) return;
+  try {
+    await db.$executeRaw`DELETE FROM "gamification_config" WHERE "key" = ${TRACKING_LOCK_KEY}`;
+  } catch (err: any) {
+    console.error(`[TRACKING-LOCK] release failed (will self-heal after staleness): ${err?.message}`);
+  }
+}
+
 export async function runDueTrackingJobs(options?: { campaignIds?: string[]; source?: "cron" | "manual"; includeInactive?: boolean }): Promise<{ processed: number; errors: number; details: string[] }> {
   if (!db) return { processed: 0, errors: 0, details: ["DB unavailable"] };
 
   const source = options?.source || "cron";
   const campaignIds = options?.campaignIds;
+
+  // Overlap prevention: if the previous run is still holding the lock (and
+  // it's not stale), skip this invocation entirely. Two concurrent runs
+  // against the same Apify actor would burn 2× the budget AND race on
+  // budget-cap Serializable transactions. Skipping is safer than fighting.
+  // Manual triggers share the same lock so an owner hitting the manual
+  // button while the cron is running just noops, same as any other overlap.
+  const gotLock = await acquireTrackingLock();
+  if (!gotLock) {
+    console.log(`[TRACKING] Skipped (${source}) — another run holds the lock`);
+    return { processed: 0, errors: 0, details: ["Skipped: another run in progress"] };
+  }
+
+  try {
   // Reset the Apify call counter at the start of each run so the cap applies
   // per-invocation, not cumulative across cron cycles.
   apifyCallsMade = 0;
-  // Wall-clock deadline: 25 s for cron-triggered runs (cron-job.org cuts at
-  // 30 s on its free tier — leave 5 s safety margin for response flush),
-  // 280 s for manual checks where the owner is watching progress.
-  const DEADLINE_MS = source === "cron" ? 25_000 : 280_000;
+  // Wall-clock deadline: 8 min for both cron and manual now that Railway's
+  // native cron has no HTTP timeout. Still a hard ceiling against hung Apify
+  // calls or runaway DB operations. Unprocessed jobs roll to the next tick
+  // because their nextCheckAt isn't advanced.
+  const DEADLINE_MS = 480_000;
   trackingDeadlineAt = Date.now() + DEADLINE_MS;
   console.log(`[TRACKING] TRACKING RUNNING (${source}) at`, new Date().toISOString());
 
@@ -745,7 +805,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           },
         },
       },
-      take: campaignIds ? 50 : 75,
+      take: campaignIds ? 50 : 500,
     });
 
     console.log(`[TRACKING] Found ${dueJobs.length} due jobs`);
@@ -919,4 +979,8 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     console.log(`[TRACKING] Manual check summary: ${processed}/${due} processed, ${errors} errors, elapsed=${Math.round((Date.now() - startTime) / 1000)}s`);
   }
   return { processed, errors, details };
+  } finally {
+    // Always release so the next run can acquire even if this one threw.
+    await releaseTrackingLock();
+  }
 }
