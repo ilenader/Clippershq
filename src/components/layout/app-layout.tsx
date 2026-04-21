@@ -330,18 +330,26 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="flex flex-1 flex-col lg:ml-60 min-w-0 overflow-x-hidden">
-        {/* Mobile header: hamburger + logo + bell/theme/avatar all on ONE line */}
-        <div className="lg:hidden flex items-center justify-between h-14 px-3 border-b border-[var(--border-color)] bg-[var(--bg-glass)] backdrop-blur-xl">
-          <div className="flex items-center gap-2 flex-shrink-0 whitespace-nowrap">
-            <button onClick={() => setMobileOpen(true)} className="rounded-lg p-1.5 text-[var(--text-primary)] hover:bg-[var(--bg-input)] cursor-pointer">
-              <Menu className="h-5 w-5" />
-            </button>
-            <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">CLIPPERS HQ</span>
+        {/* Mobile header: hamburger + logo + bell/theme/avatar all on ONE line.
+            Hidden on /community — the community UI renders its own channel
+            header and sits as a full-viewport overlay (matches ChatWidget's
+            mobile pattern). Showing the app topbar there stacks two headers
+            and, because the app topbar doesn't handle safe-area-inset-top,
+            leaves a dead black strip between the status bar and the channel
+            header. Swipe-from-left still opens the sidebar. */}
+        {!pathname?.startsWith("/community") && (
+          <div className="lg:hidden flex items-center justify-between h-14 px-3 border-b border-[var(--border-color)] bg-[var(--bg-glass)] backdrop-blur-xl">
+            <div className="flex items-center gap-2 flex-shrink-0 whitespace-nowrap">
+              <button onClick={() => setMobileOpen(true)} className="rounded-lg p-1.5 text-[var(--text-primary)] hover:bg-[var(--bg-input)] cursor-pointer">
+                <Menu className="h-5 w-5" />
+              </button>
+              <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">CLIPPERS HQ</span>
+            </div>
+            <div className="flex items-center flex-shrink-0">
+              <Navbar />
+            </div>
           </div>
-          <div className="flex items-center flex-shrink-0">
-            <Navbar />
-          </div>
-        </div>
+        )}
         <div className="hidden lg:block">
           <Navbar />
         </div>

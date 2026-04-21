@@ -557,7 +557,8 @@ export default function CommunityPage() {
     <div
       className="
         -m-4 lg:-m-6 flex min-h-0 bg-[var(--bg-primary)]
-        max-lg:fixed max-lg:inset-x-0 max-lg:top-14 max-lg:bottom-0 max-lg:m-0 max-lg:z-30
+        max-lg:fixed max-lg:top-0 max-lg:left-0 max-lg:right-0 max-lg:h-[100dvh] max-lg:m-0 max-lg:z-30
+        max-lg:pt-[env(safe-area-inset-top)]
         lg:h-[calc(100dvh-56px)]
       "
     >
