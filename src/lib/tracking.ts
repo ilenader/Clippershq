@@ -20,8 +20,24 @@ import { fetchClipStats, fetchClipStatsBatch, detectPlatform } from "@/lib/apify
  * $60/day. Without this cap a burst of tracked clips could uncork unlimited
  * spend. Counter is reset at the start of each runDueTrackingJobs invocation.
  */
-const MAX_APIFY_CALLS_PER_RUN = 200;
+/**
+ * cron-job.org (free tier) cuts HTTP connections at 30 s. Keeping a hard ceiling
+ * of 50 Apify fetches per run + 75 dueJobs fetched up front means the cron
+ * invocation finishes well inside that limit; anything we don't get to is
+ * picked up on the next 5-minute tick (its nextCheckAt isn't advanced).
+ * Manual checks aren't affected by the 30 s ceiling — trackingDeadlineAt
+ * below carves out a longer budget for source === "manual".
+ */
+const MAX_APIFY_CALLS_PER_RUN = 50;
 let apifyCallsMade = 0;
+
+/**
+ * Wall-clock deadline set at the start of every runDueTrackingJobs call.
+ * processTrackingJob reads it via the module scope (same pattern as
+ * apifyCallsMade) and returns early if we've blown through the budget,
+ * so a slow Apify response can't cause a cascading timeout.
+ */
+let trackingDeadlineAt = 0;
 import { recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
 import { computeFraudLevel } from "@/lib/fraud";
 import { publishToUser, publishToUsers } from "@/lib/ably";
@@ -212,6 +228,12 @@ async function processTrackingJob(
   details: string[],
   prefetchedStats?: { views: number; likes: number; comments: number; shares: number } | null,
 ): Promise<{ success: boolean; detail?: string; error?: string }> {
+  // Per-job deadline gate. If the wall-clock budget for this run is already
+  // exhausted, skip without touching the DB — the job's nextCheckAt isn't
+  // advanced, so it'll be picked up on the next cron tick 5 min later.
+  if (trackingDeadlineAt && Date.now() >= trackingDeadlineAt) {
+    return { success: true, detail: "deadline-deferred" };
+  }
   const clip = job.clip;
   try {
     if (!clip) {
@@ -687,6 +709,11 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
   // Reset the Apify call counter at the start of each run so the cap applies
   // per-invocation, not cumulative across cron cycles.
   apifyCallsMade = 0;
+  // Wall-clock deadline: 25 s for cron-triggered runs (cron-job.org cuts at
+  // 30 s on its free tier — leave 5 s safety margin for response flush),
+  // 280 s for manual checks where the owner is watching progress.
+  const DEADLINE_MS = source === "cron" ? 25_000 : 280_000;
+  trackingDeadlineAt = Date.now() + DEADLINE_MS;
   console.log(`[TRACKING] TRACKING RUNNING (${source}) at`, new Date().toISOString());
 
   const details: string[] = [];
@@ -718,7 +745,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           },
         },
       },
-      take: campaignIds ? 50 : 250,
+      take: campaignIds ? 50 : 75,
     });
 
     console.log(`[TRACKING] Found ${dueJobs.length} due jobs`);
@@ -772,8 +799,10 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     console.log(`[TRACKING] ${dueJobs.length} jobs across ${campaignGroupIds.length} campaigns (${source}, campaignBatch=${CAMPAIGN_BATCH_SIZE})`);
 
     for (let i = 0; i < campaignGroupIds.length; i += CAMPAIGN_BATCH_SIZE) {
-      if (Date.now() - startTime > 280_000) {
-        details.push(`Stopped early — 280s timeout. ${processed} processed.`);
+      if (Date.now() >= trackingDeadlineAt) {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        console.log(`[TRACKING] ${source} deadline hit (${elapsed}s) — deferring remaining ${campaignGroupIds.length - i} campaign groups to next run`);
+        details.push(`Deadline hit at ${elapsed}s — ${processed} processed, ${campaignGroupIds.length - i} groups deferred`);
         break;
       }
       // Apify cap: if we've burned the per-run budget, stop dispatching more
@@ -819,7 +848,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
           // Parallel batches for both cron and manual
           // Budget is protected by Serializable transactions that retry on conflict
           for (let b = 0; b < jobs.length; b += CLIP_BATCH_SIZE) {
-            if (Date.now() - startTime > 280_000) break;
+            if (Date.now() >= trackingDeadlineAt) break;
             const batch = jobs.slice(b, b + CLIP_BATCH_SIZE);
             const batchResults = await Promise.allSettled(
               batch.map((job: any) => {
