@@ -40,14 +40,18 @@ export function ServerStrip({ campaigns, selectedId, onSelect, compact }: Props)
                 active ? "rounded-xl" : "rounded-2xl group-hover:rounded-xl"
               }`}
             >
-              {c.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={c.imageUrl} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-110" />
-              ) : (
-                <div className="h-full w-full bg-[var(--bg-card)] flex items-center justify-center text-accent font-bold text-lg transition-transform duration-200 group-hover:scale-110">
-                  {c.name?.[0]?.toUpperCase() || "?"}
-                </div>
-              )}
+              {(() => {
+                // Prefer communityAvatarUrl (256x256 slot), fall back to legacy imageUrl.
+                const avatarSrc = (c as any).communityAvatarUrl || c.imageUrl || null;
+                return avatarSrc ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarSrc} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-110" />
+                ) : (
+                  <div className="h-full w-full bg-[var(--bg-card)] flex items-center justify-center text-accent font-bold text-lg transition-transform duration-200 group-hover:scale-110">
+                    {c.name?.[0]?.toUpperCase() || "?"}
+                  </div>
+                );
+              })()}
             </div>
 
             {!active && unread > 0 && (

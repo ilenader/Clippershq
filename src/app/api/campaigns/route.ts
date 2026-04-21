@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
     name: 200, clientName: 200, platform: 100, payoutRule: 500,
     description: 5000, requirements: 5000, examples: 5000,
     soundLink: 2000, assetLink: 2000, imageUrl: 2000,
+    cardImageUrl: 2000, bannerImageUrl: 2000, communityAvatarUrl: 2000,
     bannedContent: 5000, captionRules: 5000, hashtagRules: 5000,
     aiKnowledge: 20000, reviewTiming: 500,
   };
@@ -143,6 +144,9 @@ export async function POST(req: NextRequest) {
     soundLink: data.soundLink || null,
     assetLink: data.assetLink || null,
     imageUrl: data.imageUrl || null,
+    cardImageUrl: data.cardImageUrl || null,
+    bannerImageUrl: data.bannerImageUrl || null,
+    communityAvatarUrl: data.communityAvatarUrl || null,
     bannedContent: data.bannedContent || null,
     captionRules: data.captionRules || null,
     hashtagRules: data.hashtagRules || null,
@@ -198,6 +202,9 @@ export async function POST(req: NextRequest) {
     if (campaignData.soundLink) createData.soundLink = campaignData.soundLink;
     if (campaignData.assetLink) createData.assetLink = campaignData.assetLink;
     if (campaignData.imageUrl) createData.imageUrl = campaignData.imageUrl;
+    if (campaignData.cardImageUrl) createData.cardImageUrl = campaignData.cardImageUrl;
+    if (campaignData.bannerImageUrl) createData.bannerImageUrl = campaignData.bannerImageUrl;
+    if (campaignData.communityAvatarUrl) createData.communityAvatarUrl = campaignData.communityAvatarUrl;
     if (campaignData.bannedContent) createData.bannedContent = campaignData.bannedContent;
     if (campaignData.captionRules) createData.captionRules = campaignData.captionRules;
     if (campaignData.hashtagRules) createData.hashtagRules = campaignData.hashtagRules;

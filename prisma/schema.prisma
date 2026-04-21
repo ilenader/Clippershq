@@ -207,6 +207,12 @@ model Campaign {
   soundLink       String?
   assetLink       String?
   imageUrl        String?
+  // Three-slot image model. Legacy imageUrl stays for backward compat so
+  // old campaigns keep rendering; the display sites fall back in the
+  // order [specific slot → imageUrl → default].
+  cardImageUrl       String?   // 800x800, used on /campaigns list tiles
+  bannerImageUrl     String?   // 1920x600, hero on /campaigns/[id]
+  communityAvatarUrl String?   // 256x256 circle, community sidebar
   bannedContent   String?        @db.Text
   captionRules    String?        @db.Text
   hashtagRules    String?        @db.Text

@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { CampaignImageSlots } from "@/components/ui/CampaignImageSlots";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
 import { CampaignImage } from "@/components/ui/campaign-image";
 import { Plus, Megaphone, Mail, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit, ChevronDown, Download } from "lucide-react";
@@ -38,6 +39,7 @@ const defaultForm = {
   maxClipsPerUserPerDay: "3",
   requirementsList: [""] as string[],
   examples: "", soundLink: "", assetLink: "", imageUrl: "",
+  cardImageUrl: "", bannerImageUrl: "", communityAvatarUrl: "",
   captionRules: "", hashtagRules: "",
   aiKnowledge: "",
   startDate: "",
@@ -149,7 +151,11 @@ export default function AdminCampaignsPage() {
       maxClipsPerUserPerDay: c.maxClipsPerUserPerDay?.toString() || "3",
       requirementsList: reqs.length > 0 ? reqs : [""],
       examples: c.examples || "", soundLink: c.soundLink || "", assetLink: c.assetLink || "",
-      imageUrl: c.imageUrl || "", captionRules: c.captionRules || "", hashtagRules: c.hashtagRules || "",
+      imageUrl: c.imageUrl || "",
+      cardImageUrl: c.cardImageUrl || "",
+      bannerImageUrl: c.bannerImageUrl || "",
+      communityAvatarUrl: c.communityAvatarUrl || "",
+      captionRules: c.captionRules || "", hashtagRules: c.hashtagRules || "",
       aiKnowledge: c.aiKnowledge || "",
       startDate: c.startDate ? new Date(c.startDate).toISOString().split("T")[0] : "",
       targetAudience: c.targetAudience || "",
@@ -190,7 +196,11 @@ export default function AdminCampaignsPage() {
         minViews: form.minViews, maxPayoutPerClip: form.maxPayoutPerClip,
         maxClipsPerUserPerDay: form.maxClipsPerUserPerDay, requirements,
         examples: form.examples, soundLink: form.soundLink, assetLink: form.assetLink,
-        imageUrl: form.imageUrl, captionRules: form.captionRules, hashtagRules: form.hashtagRules,
+        imageUrl: form.imageUrl,
+        cardImageUrl: form.cardImageUrl || null,
+        bannerImageUrl: form.bannerImageUrl || null,
+        communityAvatarUrl: form.communityAvatarUrl || null,
+        captionRules: form.captionRules, hashtagRules: form.hashtagRules,
         aiKnowledge: form.aiKnowledge,
         startDate: editingId ? form.startDate : new Date().toISOString().split("T")[0],
         targetAudience: form.targetAudience || null,
@@ -675,8 +685,21 @@ export default function AdminCampaignsPage() {
               </span>
             </label>
           )}
-          <ImageUpload label="Campaign image" value={form.imageUrl} onChange={(url) => updateField("imageUrl", url)} />
-          <Input id="imageUrl" label="Or paste an image URL" placeholder="https://example.com/image.jpg" value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} />
+          <CampaignImageSlots
+            value={{
+              cardImageUrl: form.cardImageUrl || null,
+              bannerImageUrl: form.bannerImageUrl || null,
+              communityAvatarUrl: form.communityAvatarUrl || null,
+            }}
+            onChange={(next) =>
+              setForm({
+                ...form,
+                cardImageUrl: next.cardImageUrl || "",
+                bannerImageUrl: next.bannerImageUrl || "",
+                communityAvatarUrl: next.communityAvatarUrl || "",
+              })
+            }
+          />
           <Textarea id="examples" label="Examples (links or descriptions)" placeholder="https://tiktok.com/..." value={form.examples} onChange={(e) => updateField("examples", e.target.value)} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Textarea id="captionRules" label="Caption rules" value={form.captionRules} onChange={(e) => updateField("captionRules", e.target.value)} />

@@ -234,14 +234,18 @@ export default function CampaignDetailPage() {
         Back to campaigns
       </button>
 
-      {/* ── 1. HEADER — image background ─────────────────────── */}
-      <div className="relative w-full h-48 lg:h-64 rounded-xl overflow-hidden border border-[var(--border-color)]">
-        {campaign.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={campaign.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-accent/5" />
-        )}
+      {/* ── 1. HEADER — banner image ─────────────────────── */}
+      {/* Prefer bannerImageUrl (new 1920x600 slot), then legacy imageUrl, else gradient. */}
+      <div className="relative w-full aspect-[16/5] rounded-xl overflow-hidden border border-[var(--border-color)]">
+        {(() => {
+          const bannerSrc = (campaign as any).bannerImageUrl || campaign.imageUrl || null;
+          return bannerSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={bannerSrc} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-accent/5" />
+          );
+        })()}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/50" />
         <div className="absolute bottom-0 inset-x-0 p-6">
           <div className="flex items-end justify-between gap-3">

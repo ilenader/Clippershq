@@ -81,22 +81,28 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
         className="relative w-full rounded-xl overflow-hidden border border-white/20 transition-all duration-300 ease-out group-hover:border-white/40 group-hover:shadow-lg group-hover:shadow-accent/5 opacity-0 animate-[fadeUp_0.5s_cubic-bezier(0.16,1,0.3,1)_forwards]"
         style={index != null ? { animationDelay: `${index * 80}ms` } : undefined}
       >
-        {/* Image section */}
-        <div className="relative aspect-[16/10] overflow-hidden">
-          {campaign.imageUrl && !imgError ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={campaign.imageUrl}
-              alt=""
-              loading="lazy"
-              onError={() => setImgError(true)}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
-            />
-          ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center">
-              <span className="text-4xl font-bold text-accent/30">{campaign.name?.[0]?.toUpperCase() || "?"}</span>
-            </div>
-          )}
+        {/* Image section — prefer cardImageUrl (800x800 square slot), fall back to legacy imageUrl. */}
+        <div className="relative aspect-square overflow-hidden">
+          {(() => {
+            const cardSrc = (campaign as any).cardImageUrl || campaign.imageUrl || null;
+            if (cardSrc && !imgError) {
+              return (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={cardSrc}
+                  alt=""
+                  loading="lazy"
+                  onError={() => setImgError(true)}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                />
+              );
+            }
+            return (
+              <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center">
+                <span className="text-4xl font-bold text-accent/30">{campaign.name?.[0]?.toUpperCase() || "?"}</span>
+              </div>
+            );
+          })()}
 
           {/* Top gradient ONLY */}
           <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-black/90 via-black/60 to-transparent" />
