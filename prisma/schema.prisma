@@ -628,6 +628,21 @@ model ChatKnowledge {
   @@map("chat_knowledge")
 }
 
+// ─── Cron coordination ──────────────────────────────────────
+
+/// Lightweight single-key lock table used to prevent overlapping tracking-cron
+/// runs. Row-based rather than Postgres advisory locks because
+/// @prisma/adapter-pg uses pg.Pool — advisory locks are session-scoped to the
+/// connection they were acquired on, which breaks across pool checkouts.
+/// See src/lib/tracking.ts acquireTrackingLock for the atomic INSERT ... ON
+/// CONFLICT pattern with a staleness window for self-healing.
+model CronLock {
+  key        String   @id
+  acquiredAt DateTime @default(now())
+
+  @@map("cron_locks")
+}
+
 // ─── Notifications ──────────────────────────────────────────
 
 model Notification {

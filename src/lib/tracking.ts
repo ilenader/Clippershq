@@ -701,38 +701,49 @@ async function processTrackingJob(
  * @param options.source - "cron" or "manual" — manual checks don't change the next scheduled cron time
  */
 /**
- * Row-based cron lock. Postgres advisory locks are session-scoped and don't
- * work reliably through Prisma's pg.Pool adapter (each query checks out a
- * random connection; lock and unlock land on different sessions). Instead
- * we use an atomic INSERT ... ON CONFLICT DO UPDATE on an existing k/v row
- * in gamification_config with a staleness window — the update only "wins"
- * if the prior lock is older than STALE_MS, which means a crashed/killed
- * run self-heals after that window. 10 min matches the script's KILL_TIMEOUT
- * and is 2× the tracking DEADLINE_MS so a legitimate long run won't lose
- * its lock mid-execution.
+ * Row-based cron lock via the dedicated cron_locks table.
+ *
+ * Why not Postgres advisory locks: they're session-scoped (tied to the TCP
+ * connection they were acquired on) and @prisma/adapter-pg checks out a
+ * random pool connection per query, so acquire + release land on different
+ * sessions and the lock silently no-ops.
+ *
+ * Why not gamification_config (the previous attempt): that table has an
+ * NOT NULL id column with a cuid default; our INSERT didn't supply id and
+ * violated the constraint on every run — acquireTrackingLock returned
+ * false and every cron cycle skipped with "Skipped: another run in
+ * progress". Dedicated table avoids the schema mismatch entirely.
+ *
+ * Staleness window: 10 min matches the cron script's KILL_TIMEOUT and is
+ * 2× the tracking DEADLINE_MS, so a legitimate long run never loses its
+ * lock mid-execution AND a SIGKILL'd run self-heals after 10 min.
+ *
+ * Atomic semantics: INSERT ... ON CONFLICT ... WHERE acquiredAt < stale
+ * cutoff RETURNING. If no row exists the INSERT wins. If a stale row
+ * exists the UPDATE wins. If a fresh row exists the WHERE blocks the
+ * update and RETURNING returns zero rows. The empty RETURNING set is
+ * what we check for "lock held by someone else".
  */
 const TRACKING_LOCK_KEY = "tracking_cron_lock";
 const TRACKING_LOCK_STALE_MS = 10 * 60 * 1000;
 
 async function acquireTrackingLock(): Promise<boolean> {
   if (!db) return false;
-  const now = Date.now();
-  const staleBefore = now - TRACKING_LOCK_STALE_MS;
+  const staleBefore = new Date(Date.now() - TRACKING_LOCK_STALE_MS);
   try {
     const rows = await db.$queryRaw<{ key: string }[]>`
-      INSERT INTO "gamification_config" ("key", "value")
-      VALUES (${TRACKING_LOCK_KEY}, ${String(now)})
+      INSERT INTO "cron_locks" ("key", "acquiredAt")
+      VALUES (${TRACKING_LOCK_KEY}, NOW())
       ON CONFLICT ("key") DO UPDATE
-        SET "value" = EXCLUDED."value"
-      WHERE "gamification_config"."value" ~ '^[0-9]+$'
-        AND ("gamification_config"."value")::bigint < ${staleBefore}
+        SET "acquiredAt" = NOW()
+        WHERE "cron_locks"."acquiredAt" < ${staleBefore}
       RETURNING "key"
     `;
     return rows.length > 0;
   } catch (err: any) {
     console.error(`[TRACKING-LOCK] acquire failed: ${err?.message}`);
-    // Fail closed: if we can't check the lock, don't run (better to skip a
-    // cycle than double-process).
+    // Fail closed: if we can't check the lock, don't run. Better to skip a
+    // cycle than to double-process and burn 2× Apify credits.
     return false;
   }
 }
@@ -740,7 +751,7 @@ async function acquireTrackingLock(): Promise<boolean> {
 async function releaseTrackingLock(): Promise<void> {
   if (!db) return;
   try {
-    await db.$executeRaw`DELETE FROM "gamification_config" WHERE "key" = ${TRACKING_LOCK_KEY}`;
+    await db.$executeRaw`DELETE FROM "cron_locks" WHERE "key" = ${TRACKING_LOCK_KEY}`;
   } catch (err: any) {
     console.error(`[TRACKING-LOCK] release failed (will self-heal after staleness): ${err?.message}`);
   }
