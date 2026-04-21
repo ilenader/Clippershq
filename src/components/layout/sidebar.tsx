@@ -25,6 +25,7 @@ import {
   Phone,
   Smartphone,
   BookOpen,
+  Gauge,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useInstallPrompt } from "@/hooks/use-pwa";
@@ -106,6 +107,7 @@ const ownerExtraNav: NavSection = {
     { label: "Archive", href: "/admin/archive", icon: <Archive className="h-[18px] w-[18px]" /> },
     { label: "Team", href: "/admin/team", icon: <Shield className="h-[18px] w-[18px]" /> },
     { label: "Agency Earnings", href: "/admin/agency-earnings", icon: <DollarSign className="h-[18px] w-[18px]" /> },
+    { label: "Costs", href: "/admin/costs", icon: <Gauge className="h-[18px] w-[18px]" /> },
     { label: "AI Knowledge", href: "/admin/knowledge", icon: <BookOpen className="h-[18px] w-[18px]" /> },
     { label: "Gamification", href: "/admin/settings", icon: <Settings className="h-[18px] w-[18px]" /> },
   ],
