@@ -46,12 +46,19 @@ export async function POST(
     const existing = await db.payoutRequest.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "Payout not found" }, { status: 404 });
 
-    // State machine: PAID and REJECTED are terminal
+    // State machine: REJECTED is terminal. PAID is terminal EXCEPT for OWNER
+    // force-void (used to clear test data pre-launch — voiding removes the
+    // record only, it does NOT refund money, so the UI must warn the owner.)
+    // This route is already gated to role === "OWNER" above, so ADMIN and
+    // CLIPPER never reach this check. Keeping the OWNER gate inline anyway
+    // as defense in depth if the outer guard is ever changed.
     const validTransitions: Record<string, string[]> = {
       REQUESTED: ["UNDER_REVIEW", "APPROVED", "REJECTED"],
       UNDER_REVIEW: ["APPROVED", "REJECTED"],
       APPROVED: ["PAID", "REJECTED"],
+      PAID: role === "OWNER" ? ["VOIDED"] : [],
     };
+    const isForceVoidOfPaid = existing.status === "PAID" && action === "VOIDED";
     if (!validTransitions[existing.status]?.includes(action)) {
       return NextResponse.json(
         { error: `Cannot change payout from ${existing.status} to ${action}` },
@@ -108,7 +115,10 @@ export async function POST(
 
     await logAudit({
       userId: session.user.id,
-      action: `${action}_PAYOUT`,
+      // Force-voiding a PAID payout is distinct from a normal void of a
+      // REJECTED/APPROVED row — the money already left the building. Tag the
+      // action so an audit review can grep for FORCE_VOID_PAID_PAYOUT alone.
+      action: isForceVoidOfPaid ? "FORCE_VOID_PAID_PAYOUT" : `${action}_PAYOUT`,
       targetType: "payout",
       targetId: id,
       details: {
@@ -117,6 +127,7 @@ export async function POST(
         amount: existing.amount,
         userId: existing.userId,
         campaignId: existing.campaignId,
+        ...(isForceVoidOfPaid ? { note: "OWNER force-voided PAID payout — record cleared, money NOT refunded" } : {}),
       },
     });
 

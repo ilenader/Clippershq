@@ -149,13 +149,21 @@ export default function AdminPayoutsPage() {
     calls.find((c: any) => c.payoutId === payoutId && c.status !== "CANCELLED");
 
   const handleVoid = async (id: string) => {
-    if (!confirm("Void this payout? It will no longer count toward the clipper's balance.")) return;
+    // Find the payout so we can tailor the warning when it's already PAID.
+    // Voiding a PAID payout removes the DB record but does NOT refund the
+    // money — make that explicit so nobody accidentally wipes a real payout.
+    const target = payouts.find((p: any) => p.id === id);
+    const wasPaid = target?.status === "PAID";
+    const msg = wasPaid
+      ? "This payout was already PAID. Voiding only removes the record — it does NOT refund the money. Continue?"
+      : "Void this payout? It will no longer count toward the clipper's balance.";
+    if (!confirm(msg)) return;
     setActing(true);
     try {
       const res = await fetch(`/api/payouts/${id}/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "VOIDED", rejectionReason: "Voided by owner" }),
+        body: JSON.stringify({ action: "VOIDED", rejectionReason: wasPaid ? "Force-voided by owner (already PAID)" : "Voided by owner" }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
