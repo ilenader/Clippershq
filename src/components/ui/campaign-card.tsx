@@ -108,8 +108,8 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
           <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-black/90 via-black/60 to-transparent" />
 
           {/* Name overlay */}
-          <div className="absolute top-0 inset-x-0 p-3 md:p-4 pr-8">
-            <h3 className="text-sm md:text-base lg:text-lg font-bold text-white drop-shadow-lg leading-tight line-clamp-2">
+          <div className="absolute top-0 inset-x-0 p-4 pr-8">
+            <h3 className="text-base lg:text-lg font-bold text-white drop-shadow-lg leading-tight line-clamp-2">
               {campaign.name}
             </h3>
             {campaign.platform && (
@@ -139,7 +139,7 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
         )}
 
         {/* Solid stats block */}
-        <div className="bg-[var(--bg-primary)] p-3 md:p-4 border-t border-white/10 transition-transform duration-300 ease-out group-hover:-translate-y-1 space-y-3">
+        <div className="bg-[var(--bg-primary)] p-4 border-t border-white/10 transition-transform duration-300 ease-out group-hover:-translate-y-1 space-y-3">
           {hasStats && (
             <div className="flex items-center justify-between gap-2">
               {campaign.minViews != null && campaign.minViews > 0 && (
