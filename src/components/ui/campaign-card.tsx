@@ -81,8 +81,9 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
         className="relative w-full rounded-xl overflow-hidden border border-white/20 transition-all duration-300 ease-out group-hover:border-white/40 group-hover:shadow-lg group-hover:shadow-accent/5 opacity-0 animate-[fadeUp_0.5s_cubic-bezier(0.16,1,0.3,1)_forwards]"
         style={index != null ? { animationDelay: `${index * 80}ms` } : undefined}
       >
-        {/* Image section — prefer cardImageUrl (800x800 square slot), fall back to legacy imageUrl. */}
-        <div className="relative aspect-square overflow-hidden">
+        {/* Image section — prefer cardImageUrl (800x800 square slot), fall back to legacy imageUrl.
+            Mobile gets 16:9 so two cards fit in the viewport; md+ keeps the full 1:1 crop. */}
+        <div className="relative aspect-[16/9] md:aspect-square overflow-hidden">
           {(() => {
             const cardSrc = (campaign as any).cardImageUrl || campaign.imageUrl || null;
             if (cardSrc && !imgError) {
@@ -108,8 +109,8 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
           <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-black/90 via-black/60 to-transparent" />
 
           {/* Name overlay */}
-          <div className="absolute top-0 inset-x-0 p-4 pr-8">
-            <h3 className="text-base lg:text-lg font-bold text-white drop-shadow-lg leading-tight line-clamp-2">
+          <div className="absolute top-0 inset-x-0 p-3 md:p-4 pr-8">
+            <h3 className="text-sm md:text-base lg:text-lg font-bold text-white drop-shadow-lg leading-tight line-clamp-2">
               {campaign.name}
             </h3>
             {campaign.platform && (
@@ -120,7 +121,7 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
 
         {/* Budget progress bar */}
         {budget != null && budget > 0 ? (
-          <div className="px-3 pt-2 pb-1.5 bg-[var(--bg-primary)]">
+          <div className="px-3 pt-1.5 md:pt-2 pb-1.5 bg-[var(--bg-primary)]">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-[var(--text-primary)]">${(spent || 0).toLocaleString()} of ${budget.toLocaleString()}</span>
               <span className="text-xs font-bold text-accent">{Math.round(((spent || 0) / budget) * 100)}%</span>
@@ -139,31 +140,31 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
         )}
 
         {/* Solid stats block */}
-        <div className="bg-[var(--bg-primary)] p-4 border-t border-white/10 transition-transform duration-300 ease-out group-hover:-translate-y-1 space-y-3">
+        <div className="bg-[var(--bg-primary)] p-3 md:p-4 border-t border-white/10 transition-transform duration-300 ease-out group-hover:-translate-y-1 space-y-2 md:space-y-3">
           {hasStats && (
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-1.5 md:gap-2">
               {campaign.minViews != null && campaign.minViews > 0 && (
                 <div className="text-center flex-1">
                   <p className="text-[9px] uppercase tracking-widest text-[var(--text-muted)] mb-0.5">Min Views</p>
-                  <p className="text-base xl:text-lg font-bold text-[var(--text-primary)]">{formatViews(campaign.minViews)}</p>
+                  <p className="text-sm md:text-base xl:text-lg font-bold text-[var(--text-primary)]">{formatViews(campaign.minViews)}</p>
                 </div>
               )}
               {cpm != null && cpm > 0 && (
                 <div className="text-center flex-1">
                   <p className="text-[9px] uppercase tracking-widest text-[var(--text-muted)] mb-0.5">CPM</p>
-                  <p className="text-base xl:text-lg font-bold text-accent">${cpm.toFixed(2)}</p>
+                  <p className="text-sm md:text-base xl:text-lg font-bold text-accent">${cpm.toFixed(2)}</p>
                 </div>
               )}
               {campaign.maxPayoutPerClip != null && campaign.maxPayoutPerClip > 0 && (
                 <div className="text-center flex-1">
                   <p className="text-[9px] uppercase tracking-widest text-[var(--text-muted)] mb-0.5">Max/Clip</p>
-                  <p className="text-base xl:text-lg font-bold text-[var(--text-primary)]">${campaign.maxPayoutPerClip}</p>
+                  <p className="text-sm md:text-base xl:text-lg font-bold text-[var(--text-primary)]">${campaign.maxPayoutPerClip}</p>
                 </div>
               )}
               {campaign.maxClipsPerUserPerDay != null && campaign.maxClipsPerUserPerDay > 0 && (
                 <div className="text-center flex-1">
                   <p className="text-[9px] uppercase tracking-widest text-[var(--text-muted)] mb-0.5">Daily Limit</p>
-                  <p className="text-base xl:text-lg font-bold text-[var(--text-primary)]">{campaign.maxClipsPerUserPerDay}</p>
+                  <p className="text-sm md:text-base xl:text-lg font-bold text-[var(--text-primary)]">{campaign.maxClipsPerUserPerDay}</p>
                 </div>
               )}
             </div>
