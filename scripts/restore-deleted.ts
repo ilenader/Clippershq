@@ -37,7 +37,11 @@ async function main() {
   try {
     const [userCount, campaignCount, clipCount] = await Promise.all([
       db.user.count({ where: { isDeleted: true, deletedAt: { gte: cutoff } } }),
-      db.campaign.count({ where: { isArchived: true, status: "ARCHIVED", updatedAt: { gte: cutoff } } }),
+      // CampaignStatus enum has no "ARCHIVED" value — the convention is
+      // isArchived=true + archivedAt timestamp; status sits at "PAUSED".
+      // Scope the restore to things the reset tool actually archived by
+      // using archivedAt as the cutoff key.
+      db.campaign.count({ where: { isArchived: true, archivedAt: { gte: cutoff } } }),
       db.clip.count({ where: { isDeleted: true, updatedAt: { gte: cutoff } } }),
     ]);
 
@@ -55,8 +59,8 @@ async function main() {
         data: { isDeleted: false, deletedAt: null },
       });
       const c = await tx.campaign.updateMany({
-        where: { isArchived: true, status: "ARCHIVED", updatedAt: { gte: cutoff } },
-        data: { isArchived: false, status: "PAUSED" },
+        where: { isArchived: true, archivedAt: { gte: cutoff } },
+        data: { isArchived: false, archivedAt: null, archivedById: null },
       });
       const cl = await tx.clip.updateMany({
         where: { isDeleted: true, updatedAt: { gte: cutoff } },

@@ -223,12 +223,20 @@ export async function POST(req: NextRequest) {
       let c = 0, p = 0, u = 0;
 
       if (deleteCampaigns && targets.campaignIds.length > 0) {
-        // Campaign soft-delete = reuse existing isArchived flag. The app
-        // already treats isArchived=true as "hidden from all campaign views"
-        // and there's an existing restore flow at /api/campaigns/[id]/restore.
+        // Campaign soft-delete = reuse existing archive flow. Match the exact
+        // field set written by /api/campaigns/[id] PATCH (archive action) so
+        // reset-archived campaigns are indistinguishable from manually-
+        // archived ones and can be restored via the existing UI.
+        // CampaignStatus enum: ACTIVE | PAUSED | COMPLETED | DRAFT — no ARCHIVED
+        // value exists; PAUSED is the convention for archived rows.
         const updated = await tx.campaign.updateMany({
           where: { id: { in: targets.campaignIds }, isArchived: false },
-          data: { isArchived: true, status: "ARCHIVED" },
+          data: {
+            isArchived: true,
+            archivedAt: now,
+            archivedById: session.user.id,
+            status: "PAUSED",
+          },
         });
         c = updated.count;
         // Deactivate any still-active tracking jobs on these campaigns so the
