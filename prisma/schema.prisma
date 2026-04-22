@@ -90,6 +90,11 @@ model User {
   lastPWAOpenAt DateTime?
   timezone      String?
   streakRestoredAt DateTime?
+  // Soft-delete flag for the pre-launch reset tool (/admin/reset-data).
+  // Never set on OWNER or ADMIN. Reversible via scripts/restore-deleted.ts.
+  // When true: session callback force-logs the user out (src/lib/auth.ts).
+  isDeleted     Boolean    @default(false)
+  deletedAt     DateTime?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

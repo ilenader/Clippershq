@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "cron:tracking": "tsx scripts/run-tracking-cron.ts",
+    "restore:deleted": "tsx scripts/restore-deleted.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

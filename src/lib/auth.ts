@@ -187,8 +187,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           try {
             const dbUser = await db.user.findUnique({
               where: { id: user.id },
-              select: { role: true, status: true, discordId: true, username: true, email: true },
+              select: { role: true, status: true, discordId: true, username: true, email: true, isDeleted: true },
             });
+            if (dbUser?.isDeleted) {
+              // Soft-deleted users (e.g. swept by /admin/reset-data) get no
+              // active session. Returning null here effectively force-logs
+              // them out; their next request sees an unauthenticated state.
+              console.log(`[AUTH] Soft-deleted user ${user.id} attempted to load session — rejecting.`);
+              return null as any;
+            }
             if (dbUser) {
               // Auto-promote owner if email matches and role isn't OWNER yet
               if (OWNER_EMAIL && dbUser.email === OWNER_EMAIL && dbUser.role !== "OWNER") {
