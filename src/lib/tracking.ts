@@ -427,10 +427,25 @@ async function processTrackingJob(
         ? calculateOwnerEarnings(stats.views, (clip.campaign as any).ownerCpm, breakdown.baseEarnings, cCpm)
         : 0;
 
-      // Budget cap + earnings save — serializable transaction to prevent race conditions
+      // Budget cap + earnings save — serializable transaction to prevent race conditions.
+      // Wrapped in a retry loop (up to 3 attempts) with exponential backoff (500ms, 1000ms)
+      // between attempts. Applies to BOTH source="cron" and source="manual". The earlier
+      // behavior silently swallowed P2034 conflicts on cron, which left stats growing but
+      // earnings pinned at old values — see /admin/force-recalc for the cleanup tool.
       let autoPausedBudget: number | null = null;
       let autoPausedSpent: number | null = null;
-      try {
+
+      // Snapshot the pre-transaction newEarnings/newOwnerAmt so each retry starts from the
+      // same inputs. Without this, attempt 2 would see values already mutated by attempt 1's
+      // ratio-cap branch, leading to double-capping and wrong results.
+      const initialNewEarnings = newEarnings;
+      const initialNewOwnerAmt = newOwnerAmt;
+
+      const runEarningsTx = async () => {
+        newEarnings = initialNewEarnings;
+        newOwnerAmt = initialNewOwnerAmt;
+        autoPausedBudget = null;
+        autoPausedSpent = null;
         await db.$transaction(async (tx: any) => {
           // Inline budget status using tx (not external getCampaignBudgetStatus which uses its own db)
           const txCampaign = await tx.campaign.findUnique({
@@ -513,71 +528,41 @@ async function processTrackingJob(
             }
           }
         }, { isolationLevel: "Serializable" as any });
-      } catch (txErr: any) {
-        if (txErr?.code === "P2034" && source === "manual") {
-          // Manual checks have no cron retry — wait 500ms and try once more
-          console.log(`[BUDGET] Transaction conflict for clip ${clip.id}, retrying in 500ms (manual)`);
-          await new Promise((r) => setTimeout(r, 500));
-          try {
-            await db.$transaction(async (tx: any) => {
-              const txCampaign = await tx.campaign.findUnique({ where: { id: clip.campaignId }, select: { budget: true, pricingModel: true } });
-              if (txCampaign?.budget && txCampaign.budget > 0) {
-                const earningsAgg = await tx.clip.aggregate({ where: { campaignId: clip.campaignId, isDeleted: false, status: "APPROVED", videoUnavailable: false }, _sum: { earnings: true } });
-                let spent = Math.round((earningsAgg._sum.earnings ?? 0) * 100) / 100;
-                if (txCampaign.pricingModel === "CPM_SPLIT") {
-                  const ownerAgg = await tx.agencyEarning.aggregate({ where: { campaignId: clip.campaignId }, _sum: { amount: true } });
-                  spent = Math.round((spent + (ownerAgg._sum.amount ?? 0)) * 100) / 100;
-                }
-                const freshClip = await tx.clip.findUnique({ where: { id: clip.id }, select: { earnings: true } });
-                const currentClipEarnings = freshClip?.earnings || 0;
-                let thisClipCurrentOwner = 0;
-                if (isCpmSplit) {
-                  const existingAe = await tx.agencyEarning.findUnique({ where: { clipId: clip.id } });
-                  thisClipCurrentOwner = existingAe?.amount || 0;
-                }
-                const otherSpent = spent - currentClipEarnings - thisClipCurrentOwner;
-                const remaining = Math.max(txCampaign.budget - otherSpent, 0);
-                const totalForThisClip = newEarnings + newOwnerAmt;
-                if (remaining <= 0) { newEarnings = currentClipEarnings; newOwnerAmt = thisClipCurrentOwner; }
-                else if (totalForThisClip > remaining) {
-                  const clipperCpmVal = (clip.campaign as any).clipperCpm || (clip.campaign as any).cpmRate || 1;
-                  const ownerCpmVal = (clip.campaign as any).ownerCpm || 0;
-                  const totalCpm = clipperCpmVal + ownerCpmVal;
-                  newOwnerAmt = Math.round(remaining * (ownerCpmVal / totalCpm) * 100) / 100;
-                  newEarnings = Math.round(remaining * (clipperCpmVal / totalCpm) * 100) / 100;
-                  if (newEarnings + newOwnerAmt > remaining) newEarnings = Math.round((remaining - newOwnerAmt) * 100) / 100;
-                  newEarnings = Math.max(newEarnings, 0); newOwnerAmt = Math.max(newOwnerAmt, 0);
-                }
-                const newTotalSpent = otherSpent + newEarnings + newOwnerAmt;
-                if (Math.round(newTotalSpent * 100) / 100 >= Math.round(txCampaign.budget * 100) / 100) {
-                  await tx.campaign.update({ where: { id: clip.campaignId }, data: { status: "PAUSED", lastBudgetPauseAt: new Date() } });
-                  autoPausedBudget = txCampaign.budget; autoPausedSpent = newTotalSpent;
-                  details.push(`Campaign ${clip.campaignId}: AUTO-PAUSED (budget $${txCampaign.budget} reached)`);
-                }
-              }
-              if (newEarnings !== (clip.earnings || 0)) {
-                await tx.clip.update({ where: { id: clip.id }, data: { earnings: newEarnings, baseEarnings: breakdown.baseEarnings, bonusPercent: breakdown.bonusPercent, bonusAmount: breakdown.bonusAmount } });
-              }
-              if (isCpmSplit) {
-                if (newOwnerAmt > 0) { await tx.agencyEarning.upsert({ where: { clipId: clip.id }, create: { campaignId: clip.campaignId, clipId: clip.id, amount: newOwnerAmt, views: stats.views }, update: { amount: newOwnerAmt, views: stats.views } }); }
-                else { try { await tx.agencyEarning.delete({ where: { clipId: clip.id } }); } catch {} }
-              }
-            }, { isolationLevel: "Serializable" as any });
-            console.log(`[BUDGET] Retry succeeded for clip ${clip.id}`);
-          } catch (retryErr: any) {
-            console.error(`[BUDGET] Retry also failed for clip ${clip.id}:`, retryErr?.message);
-            newEarnings = clip.earnings || 0;
-            newOwnerAmt = 0;
+      };
+
+      const MAX_ATTEMPTS = 3;
+      let lastTxErr: any = null;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          await runEarningsTx();
+          lastTxErr = null;
+          if (attempt > 1) {
+            console.log(`[TRACKING] Clip ${clip.id}: earnings tx succeeded on attempt ${attempt} (${source})`);
           }
-        } else if (txErr?.code === "P2034") {
-          console.log(`[BUDGET] Transaction conflict for clip ${clip.id}, will retry next cron`);
-          newEarnings = clip.earnings || 0;
-          newOwnerAmt = 0;
-        } else {
-          console.error(`[BUDGET-CHECK] Transaction error for clip ${clip.id}:`, txErr?.message);
-          newEarnings = clip.earnings || 0;
-          newOwnerAmt = 0;
+          break;
+        } catch (txErr: any) {
+          lastTxErr = txErr;
+          const isConflict = txErr?.code === "P2034";
+          const moreRetries = attempt < MAX_ATTEMPTS;
+          if (isConflict && moreRetries) {
+            const waitMs = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms
+            console.log(`[TRACKING] Clip ${clip.id}: P2034 conflict on attempt ${attempt}, retrying in ${waitMs}ms (${source})`);
+            await new Promise((r) => setTimeout(r, waitMs));
+            continue;
+          }
+          // Non-conflict error OR last attempt — stop retrying.
+          break;
         }
+      }
+      if (lastTxErr) {
+        // Loud, greppable final-failure log. Earnings stay at their prior value so the
+        // next cron cycle retries; we don't want to push stale-but-calculated data forward.
+        console.error(
+          `[TRACKING-RECALC-FAIL] Clip ${clip.id} (${source}): earnings tx FAILED after ${MAX_ATTEMPTS} attempts — code=${lastTxErr?.code || "?"} message=${lastTxErr?.message || "unknown"}`,
+        );
+        details.push(`Clip ${clip.id}: earnings tx failed after ${MAX_ATTEMPTS} attempts (${lastTxErr?.code || "?"})`);
+        newEarnings = clip.earnings || 0;
+        newOwnerAmt = 0;
       }
 
       // Log auto-pause event outside transaction
