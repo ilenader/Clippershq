@@ -11,7 +11,7 @@ import { MultiDropdown } from "@/components/ui/dropdown-filter";
 import { TrackingModal } from "@/components/tracking-modal";
 import {
   Film, Check, X, Flag, ExternalLink, RotateCcw, Trash2,
-  Shield, AlertTriangle, Zap, Settings2, Activity,
+  Shield, AlertTriangle, Zap, Settings2, Activity, Copy,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import type { SessionUser } from "@/lib/auth-types";
@@ -51,7 +51,32 @@ const fraudColors: Record<FraudLevel, { bg: string; text: string; border: string
 
 export default function AdminClipsPage() {
   const { data: session } = useSession();
-  const isOwner = (session?.user as SessionUser)?.role === "OWNER";
+  const sessionRole = (session?.user as SessionUser)?.role;
+  const isOwner = sessionRole === "OWNER";
+  const isAdminOrOwner = sessionRole === "OWNER" || sessionRole === "ADMIN";
+
+  // Small helper used by the clip-ID copy button on each row (OWNER/ADMIN only).
+  // Uses the modern async clipboard API with a legacy textarea fallback for
+  // browsers without navigator.clipboard (old iOS Safari over HTTP, etc.).
+  const copyClipId = useCallback(async (clipId: string) => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(clipId);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = clipId;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast.success("Clip ID copied");
+    } catch {
+      toast.error("Couldn't copy — long-press to select");
+    }
+  }, []);
   const [clips, setClips] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const mountedRef = useRef(true);
@@ -423,6 +448,23 @@ export default function AdminClipsPage() {
                     })()}
                   </div>
                 </div>
+
+                {/* Clip ID — OWNER/ADMIN only. Shows truncated ID with a copy
+                    button that writes the FULL id to the clipboard. Useful for
+                    /admin/force-recalc, logs cross-referencing, DB queries. */}
+                {isAdminOrOwner && (
+                  <div className="mt-1 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => copyClipId(clip.id)}
+                      title={`Copy full ID: ${clip.id}`}
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-[var(--text-muted)] hover:text-accent hover:bg-[var(--bg-card-hover)] transition-colors"
+                    >
+                      <span className="font-mono">ID: {clip.id.slice(0, 12)}…</span>
+                      <Copy className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
 
                 {/* Fraud reasons (owner only, if suspicious) */}
                 {fraud && fraud.reasons.length > 0 && (
