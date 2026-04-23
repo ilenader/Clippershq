@@ -220,11 +220,25 @@ export default function CommunityPage() {
   // Real-time: refresh campaigns when channel or ticket activity arrives.
   useEffect(() => {
     const handler = () => { loadCampaigns(); };
+    // Optimistic unread-zero when the active channel is marked read. The
+    // ServerStrip reads its badges from `campaigns`, so zeroing the matching
+    // campaign entry flips the dot off immediately. A follow-up loadCampaigns
+    // reconciles with server state in case of drift.
+    const readHandler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const cid = detail?.campaignId;
+      if (cid) {
+        setCampaigns((prev) => prev.map((c) => (c.id === cid ? { ...c, totalUnread: 0 } : c)));
+      }
+      loadCampaigns();
+    };
     window.addEventListener("sse:channel_message", handler);
     window.addEventListener("sse:ticket_message", handler);
+    window.addEventListener("community:channel_read", readHandler);
     return () => {
       window.removeEventListener("sse:channel_message", handler);
       window.removeEventListener("sse:ticket_message", handler);
+      window.removeEventListener("community:channel_read", readHandler);
     };
   }, [loadCampaigns]);
 

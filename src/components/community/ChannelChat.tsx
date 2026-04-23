@@ -79,6 +79,48 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
   const fetchingRef = useRef(false);
   // Track whether the user is near the bottom so we know whether to auto-scroll new messages.
   const nearBottomRef = useRef(true);
+  // Debounce + in-flight guard for the mark-read endpoint. Scroll fires rapid
+  // events, and incoming SSE messages can also trigger mark-read — without the
+  // guard we'd hammer the endpoint dozens of times per second.
+  const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markReadInFlightRef = useRef(false);
+
+  /**
+   * Hit the mark-read endpoint and broadcast an optimistic event so the
+   * sidebar + server strip can zero the campaign's unread badge immediately
+   * without waiting for the next /api/community/campaigns refetch. The event
+   * carries channelId + campaignId so listeners can scope the update.
+   * Debounced 500ms to absorb rapid scroll fires.
+   */
+  const markRead = useCallback((opts?: { immediate?: boolean }) => {
+    const run = async () => {
+      if (markReadInFlightRef.current) return;
+      markReadInFlightRef.current = true;
+      try {
+        const res = await fetch(`/api/community/channels/${channelId}/mark-read`, { method: "POST" });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        window.dispatchEvent(
+          new CustomEvent("community:channel_read", {
+            detail: { channelId, campaignId: data?.campaignId || null },
+          }),
+        );
+      } catch {
+        // Network hiccup — next scroll/SSE will retry.
+      } finally {
+        markReadInFlightRef.current = false;
+      }
+    };
+    if (markReadTimerRef.current) {
+      clearTimeout(markReadTimerRef.current);
+      markReadTimerRef.current = null;
+    }
+    if (opts?.immediate) {
+      run();
+      return;
+    }
+    markReadTimerRef.current = setTimeout(run, 500);
+  }, [channelId]);
 
   const scrollToBottom = useCallback((smooth = true) => {
     const el = bottomAnchorRef.current;
@@ -110,13 +152,17 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
       setNextCursor(data.nextCursor || null);
       // Wait for DOM, then scroll to bottom.
       setTimeout(() => scrollToBottom(false), 30);
+      // Opening a channel is itself a "read" — the GET already upserted server-side,
+      // but we still need to emit the event so the sidebar/strip badges update without
+      // a full /api/community/campaigns refetch.
+      markRead({ immediate: true });
     } catch {
       // silent — empty state shows
     } finally {
       fetchingRef.current = false;
       setLoading(false);
     }
-  }, [channelId, scrollToBottom]);
+  }, [channelId, scrollToBottom, markRead]);
 
   useEffect(() => {
     setLoading(true);
@@ -147,12 +193,17 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
     return () => window.removeEventListener("keydown", handler);
   }, [searchQuery, replyTo]);
 
-  // On unmount or channel switch: poke the GET endpoint so server-side ChannelReadStatus
-  // advances to "now". GET handler already does an upsert — this is a cheap tail call.
+  // On unmount or channel switch: explicit mark-read so ChannelReadStatus.lastReadAt
+  // catches any messages that arrived between the open-time mark-read and the close.
+  // No optimistic event needed here — the sidebar re-queries on channel switch anyway.
   useEffect(() => {
     const id = channelId;
     return () => {
-      fetch(`/api/community/channels/${id}/messages?limit=1`).catch(() => {});
+      if (markReadTimerRef.current) {
+        clearTimeout(markReadTimerRef.current);
+        markReadTimerRef.current = null;
+      }
+      fetch(`/api/community/channels/${id}/mark-read`, { method: "POST" }).catch(() => {});
     };
   }, [channelId]);
 
@@ -182,7 +233,11 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
     setLoadingMore(false);
   }, [channelId, nextCursor, loadingMore]);
 
-  // Scroll handler: near-bottom tracking + fetch-older trigger.
+  // Scroll handler: near-bottom tracking + fetch-older trigger + mark-read.
+  // The 50px tolerance matches the bug report; isNearBottom() uses 200 for the
+  // auto-scroll-on-new-message heuristic, but "the user has actually reached
+  // the bottom" is tighter and shouldn't keep firing while they're still
+  // scrolling through backlog.
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -191,7 +246,11 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
     if (el.scrollTop < 120 && nextCursor && !loadingMore) {
       loadMore();
     }
-  }, [isNearBottom, nextCursor, loadingMore, loadMore]);
+    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+    if (distanceFromBottom < 50) {
+      markRead();
+    }
+  }, [isNearBottom, nextCursor, loadingMore, loadMore, markRead]);
 
   // Ably: new message arrives.
   useEffect(() => {
@@ -226,8 +285,16 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
       // No optimistic temp — the POST response already appended the sender's own message,
       // so we just dedupe by id and append incoming messages from other users.
       setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
-      if (nearBottomRef.current || detail.userId === viewerId) {
+      const shouldAutoScroll = nearBottomRef.current || detail.userId === viewerId;
+      if (shouldAutoScroll) {
         setTimeout(() => scrollToBottom(true), 20);
+      }
+      // If the viewer was already at the bottom when a new message arrived,
+      // they're actively reading — mark it read so the badge doesn't blip
+      // back on. Skip when the viewer scrolled away; they'll trigger a
+      // mark-read themselves when they come back to the bottom.
+      if (shouldAutoScroll && detail.userId !== viewerId) {
+        markRead();
       }
     };
     const onDeleted = (e: Event) => {
@@ -258,7 +325,7 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
       window.removeEventListener("sse:channel_message_deleted", onDeleted);
       window.removeEventListener("sse:channel_reaction", onReaction);
     };
-  }, [channelId, viewerId, scrollToBottom]);
+  }, [channelId, viewerId, scrollToBottom, markRead]);
 
   // Typing indicator — listen for `typing` events, add/refresh per-user entries,
   // auto-evict after 4s. Filter out the viewer's own typing pings.
