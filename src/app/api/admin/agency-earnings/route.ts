@@ -33,6 +33,12 @@ export async function GET() {
                 clipUrl: true, earnings: true, bonusPercent: true, bonusAmount: true,
                 reviewedAt: true, createdAt: true,
                 clipAccount: { select: { username: true, platform: true } },
+                // Live views from ClipStat — AgencyEarning.views is a
+                // denormalized snapshot that drifts when budget caps out or
+                // admin fix tools write `amount` without refreshing `views`.
+                // Reading the latest ClipStat row keeps this page in sync
+                // with /clips (which already reads stats[0].views).
+                stats: { orderBy: { checkedAt: "desc" }, take: 1, select: { views: true } },
               },
             },
           },
@@ -47,7 +53,10 @@ export async function GET() {
       // Default pricingModel for campaigns created before the field existed
       const pricing = c.pricingModel || "AGENCY_FEE";
       const totalOwnerEarnings = c.agencyEarnings.reduce((s: number, e: any) => s + (e.amount || 0), 0);
-      const totalViews = c.agencyEarnings.reduce((s: number, e: any) => s + (e.views || 0), 0);
+      const totalViews = c.agencyEarnings.reduce(
+        (s: number, e: any) => s + (e.clip?.stats?.[0]?.views ?? e.views ?? 0),
+        0,
+      );
       // For AGENCY_FEE: the fee is the campaign's agencyFee field (flat amount)
       // For CPM_SPLIT: earnings come from AgencyEarning records (views × ownerCpm)
       const displayEarnings = pricing === "CPM_SPLIT" ? Math.round(totalOwnerEarnings * 100) / 100 : (c.agencyFee || 0);
@@ -56,7 +65,7 @@ export async function GET() {
         clipUrl: ae.clip?.clipUrl || null,
         accountName: ae.clip?.clipAccount?.username || null,
         accountPlatform: ae.clip?.clipAccount?.platform || null,
-        views: ae.views || 0,
+        views: ae.clip?.stats?.[0]?.views ?? ae.views ?? 0,
         clipperEarnings: Math.round((ae.clip?.earnings || 0) * 100) / 100,
         bonusPercent: ae.clip?.bonusPercent || 0,
         bonusAmount: Math.round((ae.clip?.bonusAmount || 0) * 100) / 100,
