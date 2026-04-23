@@ -83,29 +83,13 @@ export function CommunitySidebarNav({
   // the campaign totalUnread now folds in unread DMs too.
   useEffect(() => {
     const handler = () => { cacheRef.current = null; load({ skipCache: true }); };
-    // Optimistic zero when the user scrolls to the bottom of a channel (or
-    // opens one). ChannelChat emits `community:channel_read` with campaignId
-    // so we can clear just that campaign's badge without waiting for the next
-    // /api/community/campaigns round-trip. We still refetch authoritatively
-    // to catch ticket unread drift.
-    const readHandler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      const cid = detail?.campaignId;
-      if (cid) {
-        setCampaigns((prev) => prev.map((c) => (c.id === cid ? { ...c, totalUnread: 0 } : c)));
-      }
-      cacheRef.current = null;
-      load({ skipCache: true });
-    };
     window.addEventListener("sse:channel_message", handler);
     window.addEventListener("sse:channel_message_deleted", handler);
     window.addEventListener("sse:ticket_message", handler);
-    window.addEventListener("community:channel_read", readHandler);
     return () => {
       window.removeEventListener("sse:channel_message", handler);
       window.removeEventListener("sse:channel_message_deleted", handler);
       window.removeEventListener("sse:ticket_message", handler);
-      window.removeEventListener("community:channel_read", readHandler);
     };
   }, [load]);
 
