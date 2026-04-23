@@ -4,7 +4,27 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * NextResponse.redirect() requires an absolute URL. `new URL(path, req.url)`
+ * resolves against req.url, which on Railway (behind the platform proxy) is
+ * the internal bind host `http://localhost:8080` — so the Location header
+ * sent to the browser was pointing at localhost. Prefer, in order: the
+ * authoritative NEXTAUTH_URL, then x-forwarded-host/proto set by the proxy,
+ * then finally req.url as a last-resort fallback for dev.
+ */
+function publicBaseUrl(req: NextRequest): string {
+  const env = process.env.NEXTAUTH_URL?.trim();
+  if (env) return env.replace(/\/$/, "");
+  const fwdHost = req.headers.get("x-forwarded-host");
+  const fwdProto = req.headers.get("x-forwarded-proto") || "https";
+  if (fwdHost) return `${fwdProto}://${fwdHost}`;
+  return new URL(req.url).origin;
+}
+
 export async function GET(req: NextRequest) {
+  const base = publicBaseUrl(req);
+  const redirectTo = (path: string) => NextResponse.redirect(`${base}${path}`);
+
   try {
     // Brute-force defense: cap verification attempts per source IP. If tokens were
     // ever shortened or if an attacker harvested multiple magic links, this prevents
@@ -16,14 +36,14 @@ export async function GET(req: NextRequest) {
     const rl = checkRateLimit(`magic-verify:${ip}`, 10, 60_000);
     if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
-    if (!db) return NextResponse.redirect(new URL("/login?error=unavailable", req.url));
+    if (!db) return redirectTo("/login?error=unavailable");
 
     const token = req.nextUrl.searchParams.get("token");
-    if (!token) return NextResponse.redirect(new URL("/login?error=invalid-link", req.url));
+    if (!token) return redirectTo("/login?error=invalid-link");
 
     const record = await db.magicLinkToken.findUnique({ where: { token } });
     if (!record || record.used || record.expiresAt < new Date()) {
-      return NextResponse.redirect(new URL("/login?error=invalid-link", req.url));
+      return redirectTo("/login?error=invalid-link");
     }
 
     // Atomic token consumption: only one concurrent verify can mark it used
@@ -32,14 +52,14 @@ export async function GET(req: NextRequest) {
       data: { used: true },
     });
     if (claimed.count === 0) {
-      return NextResponse.redirect(new URL("/login?error=invalid-link", req.url));
+      return redirectTo("/login?error=invalid-link");
     }
 
     // Find or create user — magic links only mint sessions for CLIENT role
     let user = await db.user.findUnique({ where: { email: record.email } });
     if (user && user.role !== "CLIENT") {
       // Refuse to authenticate clippers/admins/owners via magic link
-      return NextResponse.redirect(new URL("/login?error=invalid-link", req.url));
+      return redirectTo("/login?error=invalid-link");
     }
     if (!user) {
       user = await db.user.create({
@@ -67,7 +87,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Set the session cookie
-    const response = NextResponse.redirect(new URL("/client", req.url));
+    const response = redirectTo("/client");
     const secureCookie = process.env.NODE_ENV === "production";
     const cookieName = secureCookie ? "__Secure-authjs.session-token" : "authjs.session-token";
     response.cookies.set(cookieName, sessionToken, {
@@ -81,6 +101,6 @@ export async function GET(req: NextRequest) {
     return response;
   } catch (err: any) {
     console.error("[VERIFY-MAGIC-LINK] Error:", err?.message);
-    return NextResponse.redirect(new URL("/login?error=server-error", req.url));
+    return redirectTo("/login?error=server-error");
   }
 }
