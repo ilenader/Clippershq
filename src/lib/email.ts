@@ -46,19 +46,32 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
     return false;
   }
 
+  // Hard 10s timeout on the Resend call. Without it a slow/unreachable Resend
+  // hangs the whole route indefinitely — that was turning client invites into
+  // a UI-freezing spinner that never resolves. AbortController guarantees the
+  // fetch completes one way or the other.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10_000);
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ from, to: params.to, subject: params.subject, html: params.html }),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     if (res.ok) {
       console.log(`[EMAIL OK] Sent to ${params.to}`);
     } else {
       console.error(`[EMAIL FAIL] ${res.status}`);
     }
     return res.ok;
-  } catch (err) {
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err?.name === "AbortError") {
+      console.error(`[EMAIL TIMEOUT] Resend timed out after 10s for ${params.to}`);
+      return false;
+    }
     console.error("[EMAIL ERROR]", err);
     return false;
   }

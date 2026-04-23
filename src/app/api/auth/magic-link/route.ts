@@ -5,6 +5,9 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
+// Safety net: Next kills the handler after 15s even if the email fetch's own
+// timeout somehow fails. Prevents a runaway request from holding the UI spinner.
+export const maxDuration = 15;
 
 export async function POST(req: Request) {
   try {
@@ -45,12 +48,18 @@ export async function POST(req: Request) {
     const baseUrl = process.env.NEXTAUTH_URL || "https://clipershq.com";
     const link = `${baseUrl}/auth/verify?token=${token}`;
 
-    // Send email
+    // Fire-and-forget the email send. The DB token is already written and that
+    // is what actually gates verification, so the route returns the instant the
+    // insert succeeds — regardless of how slow or flaky Resend is. Delivery
+    // errors are logged; the UI has a "Resend Link" button if a retry is ever
+    // needed.
     try {
       const { sendClientInviteEmail } = await import("@/lib/email");
-      await sendClientInviteEmail(email, link);
+      sendClientInviteEmail(email, link).catch((err: any) => {
+        console.error("[EMAIL BACKGROUND FAIL]", err?.message || err);
+      });
     } catch (err: any) {
-      console.error("[MAGIC-LINK] Email send failed:", err?.message);
+      console.error("[MAGIC-LINK] Email module import failed:", err?.message);
     }
 
     return NextResponse.json({ success: true });

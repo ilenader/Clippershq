@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 export async function POST(req: Request) {
   try {
@@ -48,11 +49,14 @@ export async function POST(req: Request) {
       const baseUrl = process.env.NEXTAUTH_URL || "https://clipershq.com";
       const link = `${baseUrl}/auth/verify?token=${token}`;
 
+      // Fire-and-forget — see magic-link route for rationale.
       try {
         const { sendClientInviteEmail } = await import("@/lib/email");
-        await sendClientInviteEmail(email, link);
+        sendClientInviteEmail(email, link).catch((err: any) => {
+          console.error("[EMAIL BACKGROUND FAIL]", err?.message || err);
+        });
       } catch (err: any) {
-        console.error("[REQUEST-MAGIC-LINK] Email send failed:", err?.message);
+        console.error("[REQUEST-MAGIC-LINK] Email module import failed:", err?.message);
       }
     }
 
