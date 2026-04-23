@@ -37,6 +37,13 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    // PAST campaigns are display-only. CLIPPER and ADMIN see them in the
+    // horizontal strip on /campaigns but can't open the detail page. Only
+    // OWNER can view/edit (to flip back to ACTIVE).
+    if (campaign.status === "PAST" && role !== "OWNER") {
+      return NextResponse.json({ error: "This campaign has ended" }, { status: 403 });
+    }
+
     // CLIPPERs: strip sensitive owner/agency fields
     if (role === "CLIPPER") {
       const { ownerCpm, agencyFee, clientName, aiKnowledge, bannedContent, captionRules, hashtagRules, ownerUserId, ...publicFields } = campaign as any;
@@ -198,6 +205,19 @@ export async function PATCH(
         where: { id },
         select: { status: true, budget: true },
       });
+
+      // PAST status is OWNER-only — both setting a campaign to PAST and
+      // moving a campaign off PAST require OWNER. ADMIN can't flip this
+      // toggle. Done before the update call so the block short-circuits
+      // cleanly and doesn't race with the pendingEdit workflow above.
+      const settingToPast = data.status === "PAST";
+      const movingOffPast = oldCampaign?.status === "PAST" && data.status && data.status !== "PAST";
+      if ((settingToPast || movingOffPast) && role !== "OWNER") {
+        return NextResponse.json(
+          { error: "Only the owner can toggle a campaign's PAST state." },
+          { status: 403 },
+        );
+      }
 
       // Manual pause: clear lastBudgetPauseAt so auto-resume won't unpause it
       if (data.status === "PAUSED" && oldCampaign?.status !== "PAUSED") {

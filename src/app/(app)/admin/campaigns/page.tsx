@@ -15,7 +15,7 @@ import { ImageUpload } from "@/components/ui/image-upload";
 import { CampaignImageSlots } from "@/components/ui/CampaignImageSlots";
 import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
 import { CampaignImage } from "@/components/ui/campaign-image";
-import { Plus, Megaphone, Mail, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit, ChevronDown, Download } from "lucide-react";
+import { Plus, Megaphone, Mail, Pause, Play, Pencil, Trash2, Users, CheckCircle, XCircle, Clock, FileEdit, ChevronDown, Download, Archive, RotateCcw } from "lucide-react";
 import { formatRelative } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 
@@ -29,6 +29,7 @@ const statusFilterOptions = [
   { value: "ACTIVE", label: "Active" },
   { value: "PAUSED", label: "Paused" },
   { value: "DRAFT", label: "In Review" },
+  { value: "PAST", label: "Past" },
 ];
 
 const defaultForm = {
@@ -75,7 +76,7 @@ export default function AdminCampaignsPage() {
 
   const load = () => {
     const fetches: Promise<any>[] = [
-      fetch("/api/campaigns?scope=manage").then((r) => r.json()),
+      fetch("/api/campaigns?scope=manage&includePast=true").then((r) => r.json()),
       fetch("/api/campaigns/spend").then((r) => r.json()),
       fetch("/api/campaigns/members").then((r) => r.json()),
     ];
@@ -276,6 +277,28 @@ export default function AdminCampaignsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       toast.success(`Campaign ${newStatus === "ACTIVE" ? "resumed" : "paused"}.`);
+      load();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update status.");
+    }
+  };
+
+  // OWNER-only. Flipping to PAST hides the campaign from clippers/admins, stops
+  // tracking, and blocks new clip submissions. Reactivate returns the campaign
+  // to ACTIVE so everything resumes. Backed by a PATCH status on the detail
+  // route, which already gates the PAST transitions behind OWNER role.
+  const flipPastStatus = async (c: any) => {
+    const goingToPast = c.status !== "PAST";
+    const newStatus = goingToPast ? "PAST" : "ACTIVE";
+    try {
+      const res = await fetch(`/api/campaigns/${c.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      toast.success(goingToPast ? "Campaign moved to Past." : "Campaign reactivated.");
       load();
     } catch (err: any) {
       toast.error(err.message || "Failed to update status.");
@@ -567,6 +590,16 @@ export default function AdminCampaignsPage() {
                         fetch(`/api/campaigns/${c.id}/events`).then((r) => r.json()).then(setHistoryEvents).catch(() => setHistoryEvents([])).finally(() => setHistoryLoading(false));
                       }} icon={<Clock className="h-3 w-3" />}>
                         History
+                      </Button>
+                    )}
+                    {isOwner && (c.status === "ACTIVE" || c.status === "PAUSED") && (
+                      <Button size="sm" variant="outline" onClick={() => flipPastStatus(c)} icon={<Archive className="h-3 w-3" />}>
+                        Move to Past
+                      </Button>
+                    )}
+                    {isOwner && c.status === "PAST" && (
+                      <Button size="sm" variant="outline" onClick={() => flipPastStatus(c)} icon={<RotateCcw className="h-3 w-3" />}>
+                        Reactivate
                       </Button>
                     )}
                     {isOwner && (

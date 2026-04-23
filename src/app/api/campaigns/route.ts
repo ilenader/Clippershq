@@ -26,6 +26,11 @@ export async function GET(req: NextRequest) {
   const scope = req.nextUrl.searchParams.get("scope");
   // ?archived=true → owner-only: show only archived campaigns
   const showArchived = req.nextUrl.searchParams.get("archived") === "true";
+  // ?includePast=true → include PAST campaigns in the default result.
+  // Default excludes PAST so ACTIVE-campaign views (dashboards, campaigns list
+  // "active" grid) stay clean. The separate /api/campaigns/past endpoint is
+  // the channel for the past-only horizontal strip on the /campaigns page.
+  const includePast = req.nextUrl.searchParams.get("includePast") === "true";
 
   if (!db) return NextResponse.json([]);
 
@@ -48,8 +53,12 @@ export async function GET(req: NextRequest) {
       }
     } else if (role === "CLIPPER") {
       if (!status) {
-        where.status = { in: ["ACTIVE", "PAUSED"] };
+        where.status = { in: includePast ? ["ACTIVE", "PAUSED", "PAST"] : ["ACTIVE", "PAUSED"] };
       }
+    } else if (!status && !includePast) {
+      // OWNER/ADMIN with no explicit status filter: still hide PAST by default
+      // so the existing admin dashboards don't suddenly get past campaigns.
+      where.status = { not: "PAST" };
     }
 
     const campaigns = await db.campaign.findMany({

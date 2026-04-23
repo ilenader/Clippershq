@@ -74,13 +74,16 @@ export async function GET() {
 
     if (campaignIds.length === 0) return NextResponse.json({ campaigns: [] });
 
-    // Campaign metadata (archived excluded for non-owners).
+    // Campaign metadata. Non-owners also lose visibility on PAST campaigns —
+    // the community channels keep existing for OWNER to archive messages, but
+    // clippers/admins should stop seeing them in the sidebar the moment the
+    // campaign flips to PAST.
     const campaigns = await db.campaign.findMany({
       where: {
         id: { in: campaignIds },
-        ...(role === "OWNER" ? {} : { isArchived: false }),
+        ...(role === "OWNER" ? {} : { isArchived: false, status: { not: "PAST" } }),
       },
-      select: { id: true, name: true, imageUrl: true, platform: true, status: true },
+      select: { id: true, name: true, imageUrl: true, communityAvatarUrl: true, platform: true, status: true },
       orderBy: [{ status: "asc" }, { name: "asc" }],
     });
 

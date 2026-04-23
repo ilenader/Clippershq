@@ -377,7 +377,7 @@ async function processTrackingJob(
       console.log(`[TRACKING] Clip ${clip.id}: user is BANNED — stats saved but earnings frozen`);
     }
 
-    if (!userBanned && clip.status === "APPROVED" && clip.campaign && freshCampaign?.status !== "PAUSED" && freshCampaign?.status !== "ARCHIVED") {
+    if (!userBanned && clip.status === "APPROVED" && clip.campaign && freshCampaign?.status !== "PAUSED" && freshCampaign?.status !== "ARCHIVED" && freshCampaign?.status !== "PAST") {
       // Budget-lock: old clips from before a budget pause keep their earnings
       const oldEarnings = clip.earnings || 0;
       const budgetPauseAt = freshCampaign?.lastBudgetPauseAt ? new Date(freshCampaign.lastBudgetPauseAt) : null;
@@ -604,7 +604,7 @@ async function processTrackingJob(
         } catch {}
       }
     } // end budget-lock else
-    } else if (clip.status === "APPROVED" && (freshCampaign?.status === "PAUSED" || freshCampaign?.status === "ARCHIVED")) {
+    } else if (clip.status === "APPROVED" && (freshCampaign?.status === "PAUSED" || freshCampaign?.status === "ARCHIVED" || freshCampaign?.status === "PAST")) {
       console.log(`[BUDGET-CHECK] Skipping earnings for clip ${clip.id} — campaign is ${freshCampaign?.status}`);
     }
 
@@ -786,6 +786,13 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
       where.campaignId = { in: campaignIds };
     } else {
       where.nextCheckAt = { lte: new Date() };
+    }
+    // Skip PAST campaigns entirely — earnings are frozen at the moment the
+    // owner flips the campaign, and we don't want to burn Apify quota on them.
+    // Manual checks (campaignIds targeted) still run so the owner can force a
+    // last snapshot if they flipped by mistake and reactivate.
+    if (!campaignIds) {
+      where.clip = { campaign: { status: { not: "PAST" } } };
     }
 
     const dueJobs = await db.trackingJob.findMany({

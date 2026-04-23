@@ -35,6 +35,10 @@ interface CampaignCardProps {
   spent?: number;
   index?: number;
   className?: string;
+  /** When true, the card renders as a non-interactive read-only tile: no
+   *  link, grayscale filter, PAST badge, no hover effects. Used in the
+   *  "Past campaigns" horizontal strip on /campaigns. */
+  isPast?: boolean;
 }
 
 function formatViews(n: number): string {
@@ -43,7 +47,7 @@ function formatViews(n: number): string {
   return String(n);
 }
 
-export function CampaignCard({ campaign, href, children, showStats = true, budget, spent, index, className = "" }: CampaignCardProps) {
+export function CampaignCard({ campaign, href, children, showStats = true, budget, spent, index, className = "", isPast = false }: CampaignCardProps) {
   const [imgError, setImgError] = useState(false);
 
   const cpm = campaign.clipperCpm ?? campaign.cpmRate ?? null;
@@ -75,12 +79,26 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
     : campaign.targetAudience === "worldwide" ? "text-purple-400"
     : "text-amber-400";
 
+  // Past variant renders a <div> (not <Link>) so clicks are inert, applies
+  // grayscale + dimmed opacity, and drops hover-related classes. Everything
+  // else is visually identical so the past strip matches the active grid.
+  const WrapperTag: any = isPast ? "div" : Link;
+  const wrapperProps: any = isPast ? { className: `block ${className}` } : { href, className: `block group ${className}` };
+  const innerClass = isPast
+    ? "relative w-full rounded-xl overflow-hidden border border-white/15 grayscale opacity-80 cursor-default opacity-0 animate-[fadeUp_0.5s_cubic-bezier(0.16,1,0.3,1)_forwards]"
+    : "relative w-full rounded-xl overflow-hidden border border-white/20 transition-all duration-300 ease-out group-hover:border-white/40 group-hover:shadow-lg group-hover:shadow-accent/5 opacity-0 animate-[fadeUp_0.5s_cubic-bezier(0.16,1,0.3,1)_forwards]";
+
   return (
-    <Link href={href} className={`block group ${className}`}>
+    <WrapperTag {...wrapperProps}>
       <div
-        className="relative w-full rounded-xl overflow-hidden border border-white/20 transition-all duration-300 ease-out group-hover:border-white/40 group-hover:shadow-lg group-hover:shadow-accent/5 opacity-0 animate-[fadeUp_0.5s_cubic-bezier(0.16,1,0.3,1)_forwards]"
+        className={innerClass}
         style={index != null ? { animationDelay: `${index * 80}ms` } : undefined}
       >
+        {isPast && (
+          <span className="absolute top-2 right-2 z-10 rounded-md bg-gray-700/90 backdrop-blur-sm px-2 py-1 text-xs font-bold text-white">
+            PAST
+          </span>
+        )}
         {/* Image section — prefer cardImageUrl (800x800 square slot), fall back to legacy imageUrl.
             Mobile gets 16:9 so two cards fit in the viewport; md+ keeps the full 1:1 crop. */}
         <div className="relative aspect-[16/9] md:aspect-square overflow-hidden">
@@ -183,6 +201,6 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
           )}
         </div>
       </div>
-    </Link>
+    </WrapperTag>
   );
 }

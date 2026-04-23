@@ -182,6 +182,11 @@ enum CampaignStatus {
   PAUSED
   COMPLETED
   DRAFT
+  // PAST = archival display state. Manually flagged by OWNER. Clippers see
+  // these on /campaigns in a read-only horizontal strip ("previous campaigns")
+  // but can't click them, can't submit clips to them, and don't see their
+  // community channels. Owner can flip back to ACTIVE any time.
+  PAST
 }
 
 model Campaign {

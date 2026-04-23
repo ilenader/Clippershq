@@ -166,6 +166,9 @@ export async function POST(req: NextRequest) {
     if (campaign.isArchived) {
       return NextResponse.json({ error: "This campaign has been archived" }, { status: 400 });
     }
+    if (campaign.status === "PAST") {
+      return NextResponse.json({ error: "This campaign has ended and is no longer accepting submissions." }, { status: 400 });
+    }
     if (campaign.status === "PAUSED") {
       return NextResponse.json({ error: "This campaign is paused — budget limit reached. Check out other active campaigns!" }, { status: 400 });
     }
