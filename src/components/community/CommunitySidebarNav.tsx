@@ -40,8 +40,11 @@ export function CommunitySidebarNav({
   });
   const [campaigns, setCampaigns] = useState<CommunityCampaign[]>([]);
   const fetchingRef = useRef(false);
-  // 30s in-memory TTL cache so route changes don't trigger a /api/community/campaigns
-  // round-trip every time (this component remounts on every navigation).
+  // 3s in-memory TTL cache so route changes don't trigger a /api/community/campaigns
+  // round-trip every time (this component remounts on every navigation). Kept
+  // short so a user who opens a channel (server-side mark-read fires inside
+  // GET /messages) sees the unread badge drop on the very next sidebar
+  // remount, without needing an SSE event or explicit refetch.
   const cacheRef = useRef<{ data: CommunityCampaign[]; time: number } | null>(null);
 
   // Persist open/close preference.
@@ -52,7 +55,7 @@ export function CommunitySidebarNav({
   const load = useCallback(async (opts?: { skipCache?: boolean }) => {
     if (role === "CLIENT") return;
     if (fetchingRef.current) return;
-    if (!opts?.skipCache && cacheRef.current && Date.now() - cacheRef.current.time < 30_000) {
+    if (!opts?.skipCache && cacheRef.current && Date.now() - cacheRef.current.time < 3_000) {
       setCampaigns(cacheRef.current.data);
       return;
     }
