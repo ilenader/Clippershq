@@ -335,8 +335,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             anchors at max-lg:top-14 (below this 56 px topbar) so they don't
             overlap. Do NOT re-add safe-area-inset-top padding to the community
             overlay — that caused stacked padding and a visible black band in
-            an earlier attempt. */}
-        <div className="lg:hidden flex items-center justify-between h-14 px-3 border-b border-[var(--border-color)] bg-[var(--bg-glass)] backdrop-blur-xl">
+            an earlier attempt.
+            `max-lg:fixed top-0 z-40`: pins the bar to the layout viewport so
+            iOS's keyboard-open visual-viewport shift can't push it off-screen
+            on /community and /community/tickets. z-40 keeps it below the
+            mobile sidebar drawer (z-50) and any app modals. */}
+        <div className="lg:hidden flex items-center justify-between h-14 px-3 border-b border-[var(--border-color)] bg-[var(--bg-glass)] backdrop-blur-xl max-lg:fixed max-lg:top-0 max-lg:left-0 max-lg:right-0 max-lg:z-40">
           <div className="flex items-center gap-2 flex-shrink-0 whitespace-nowrap">
             <button onClick={() => setMobileOpen(true)} className="rounded-lg p-1.5 text-[var(--text-primary)] hover:bg-[var(--bg-input)] cursor-pointer">
               <Menu className="h-5 w-5" />
@@ -350,10 +354,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="hidden lg:block">
           <Navbar />
         </div>
+        {/* max-lg:pt-14 reserves 56 px under the now-fixed mobile topbar on
+            ordinary pages so content doesn't hide behind it. /community is
+            skipped because its layout uses position:fixed overlays anchored
+            at max-lg:top-14 directly against the layout viewport. */}
         <main className={`flex-1 overflow-x-hidden animate-[fadeIn_200ms_ease-out] ${
           pathname?.startsWith("/community")
             ? "overflow-hidden p-4 lg:p-6"
-            : "overflow-y-auto p-4 lg:p-6"
+            : "overflow-y-auto p-4 lg:p-6 max-lg:pt-14"
         }`}>{children}</main>
       </div>
       {/* Hide the support ChatWidget on /community — the community has its own
