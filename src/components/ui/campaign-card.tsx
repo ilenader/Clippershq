@@ -27,6 +27,9 @@ interface CampaignCardProps {
     maxClipsPerUserPerDay?: number;
     targetAudience?: string | null;
     targetCountries?: string | null;
+    /** Display-only spent value for status=PAST showcase tiles. Normal
+     *  campaigns compute spent from live clip earnings. */
+    manualSpent?: number | null;
   };
   href: string;
   children?: React.ReactNode;
@@ -58,8 +61,13 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
     (campaign.maxClipsPerUserPerDay != null && campaign.maxClipsPerUserPerDay > 0)
   );
 
+  // Past tiles are manually-curated showcases — use the owner-entered
+  // manualSpent rather than the live clip-earnings sum, which is always 0
+  // for display-only campaigns. Falls through to `spent` for normal tiles.
+  const effectiveSpent = isPast && campaign.manualSpent != null ? campaign.manualSpent : (spent || 0);
+
   const progressPct = budget && budget > 0
-    ? Math.min(((spent || 0) / budget) * 100, 100)
+    ? Math.min((effectiveSpent / budget) * 100, 100)
     : 100;
 
   const audienceLabel = campaign.targetAudience === "usa" ? "USA Audience"
@@ -141,8 +149,8 @@ export function CampaignCard({ campaign, href, children, showStats = true, budge
         {budget != null && budget > 0 ? (
           <div className="px-3 pt-1.5 md:pt-2 pb-1.5 bg-[var(--bg-primary)]">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-[var(--text-primary)]">${(spent || 0).toLocaleString()} of ${budget.toLocaleString()}</span>
-              <span className="text-xs font-bold text-accent">{Math.round(((spent || 0) / budget) * 100)}%</span>
+              <span className="text-xs font-medium text-[var(--text-primary)]">${effectiveSpent.toLocaleString()} of ${budget.toLocaleString()}</span>
+              <span className="text-xs font-bold text-accent">{Math.round((effectiveSpent / budget) * 100)}%</span>
             </div>
             <div className="h-2 w-full rounded-full bg-[var(--bg-input)] overflow-hidden">
               <div

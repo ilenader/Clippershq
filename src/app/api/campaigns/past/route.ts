@@ -40,6 +40,8 @@ export async function GET() {
         maxPayoutPerClip: true,
         maxClipsPerUserPerDay: true,
         budget: true,
+        manualSpent: true,
+        clientName: true,
         targetAudience: true,
         targetCountries: true,
         updatedAt: true,

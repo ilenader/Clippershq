@@ -237,6 +237,11 @@ model Campaign {
   archivedAt         DateTime?
   archivedById       String?
   lastBudgetPauseAt  DateTime?
+  // Only used for status=PAST display-only campaigns created in the
+  // /admin/past-campaigns showcase. Normal campaigns compute spent from live
+  // clip earnings; past campaigns are historical marketing tiles with no
+  // clips or tracking jobs backing them, so the owner enters spent manually.
+  manualSpent        Float?
   targetAudience     String?
   targetCountries    String?
   accountCountries   String?

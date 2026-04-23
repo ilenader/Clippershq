@@ -53,9 +53,16 @@ export interface CampaignImageUrls {
 interface Props {
   value: CampaignImageUrls;
   onChange: (next: CampaignImageUrls) => void;
+  /** Optional subset of slot keys to display. Defaults to all three. The
+   *  past-campaigns page passes `["card"]` since banner/avatar are only
+   *  meaningful for campaigns with a detail page and community channel. */
+  onlySlots?: SlotKey[];
 }
 
-export function CampaignImageSlots({ value, onChange }: Props) {
+export function CampaignImageSlots({ value, onChange, onlySlots }: Props) {
+  const visibleSlots = onlySlots && onlySlots.length > 0
+    ? SLOTS.filter((s) => onlySlots.includes(s.key))
+    : SLOTS;
   const [activeSlot, setActiveSlot] = useState<Slot | null>(null);
   const [srcDataUrl, setSrcDataUrl] = useState<string | null>(null);
 
@@ -109,8 +116,8 @@ export function CampaignImageSlots({ value, onChange }: Props) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {SLOTS.map((slot) => (
+      <div className={`grid grid-cols-1 gap-4 ${visibleSlots.length > 1 ? "md:grid-cols-3" : ""}`}>
+        {visibleSlots.map((slot) => (
           <SlotCard
             key={slot.key}
             slot={slot}
