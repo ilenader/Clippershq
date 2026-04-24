@@ -469,7 +469,11 @@ export async function POST(
           reviewedAt: new Date(),
         },
       });
-      publishToUser(clip.userId, "clip_updated", { clipId: id, status: action }).catch(() => {});
+      // Deliberately NOT pushing a clip_updated SSE to the clipper here —
+      // their /api/clips/mine response now maps FLAGGED → PENDING, and a
+      // live SSE with raw status: "FLAGGED" would either be ignored by the
+      // client (if it also maps) or trigger the panic UX we're hiding.
+      // OWNER/ADMIN dashboards re-query flags via their own endpoints.
     }
 
     // ── Sync user totalEarnings, totalViews, and level ──

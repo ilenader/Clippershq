@@ -40,7 +40,22 @@ export async function GET(request: Request) {
       orderBy: { createdAt: "desc" },
       take: 5000,
     });
-    return NextResponse.json(clips);
+
+    // Clipper-facing fraud hiding. When OWNER/ADMIN flags a clip (manually or
+    // automatically via tracking.ts fraud scoring), the row stays FLAGGED in
+    // the DB so owners can triage it. Clippers however should see the clip
+    // as PENDING — "FLAGGED" caused panic and support tickets even though
+    // it's just a manual-review queue, not a rejection. Fraud fields are
+    // stripped from the payload so they can't leak to the clipper's network
+    // tab either. Owners/admins still see the full row via /api/clips.
+    const sanitized = clips.map((c: any) => {
+      const { fraudScore, fraudReasons, fraudCheckedAt, ...rest } = c;
+      return {
+        ...rest,
+        status: c.status === "FLAGGED" ? "PENDING" : c.status,
+      };
+    });
+    return NextResponse.json(sanitized);
   } catch {
     return NextResponse.json([]);
   }
