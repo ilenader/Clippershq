@@ -73,8 +73,17 @@ export function MessageInput({
     ta.style.height = `${Math.min(ta.scrollHeight, 128)}px`;
   }, [value]);
 
-  // Focus on mount and whenever the user chooses to reply to something.
-  useEffect(() => { textareaRef.current?.focus(); }, []);
+  // Focus on mount (desktop only) and whenever the user chooses to reply.
+  // Mobile auto-focus is skipped because iOS Safari shifts the layout viewport
+  // on programmatic focus inside a position:fixed ancestor, visually cutting
+  // the input bar in half on initial render. Users tap the textarea to start
+  // typing anyway — that's a genuine user gesture iOS handles cleanly.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isMobile = window.matchMedia("(max-width: 1024px)").matches;
+    if (isMobile) return;
+    textareaRef.current?.focus();
+  }, []);
   useEffect(() => { if (replyTo) textareaRef.current?.focus(); }, [replyTo]);
 
   const send = async () => {
