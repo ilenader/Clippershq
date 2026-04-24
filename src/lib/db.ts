@@ -1,4 +1,10 @@
 // @ts-nocheck
+// DATABASE_URL must use Supabase Transaction pooler (port 6543) with ?pgbouncer=true&connection_limit=1
+// Session mode (port 5432) caused production outage 2026-04-24.
+//
+// ⚠ Read the detailed note in createPrismaClient() below before changing pooler mode —
+// there is prior debugging history around prepared-statement errors in transaction
+// mode that must be reconciled with the above directive.
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 

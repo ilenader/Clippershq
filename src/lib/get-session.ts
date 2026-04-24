@@ -4,6 +4,46 @@ import { cookies } from "next/headers";
 import { isDevBypassEnabled, getDevSession, DEV_AUTH_COOKIE } from "@/lib/dev-auth";
 import type { DevRole } from "@/lib/dev-auth";
 
+/**
+ * Retry wrapper for auth() calls that hit the DB session store.
+ *
+ * Production outage 2026-04-24: Supabase pooler reached MaxClientsInSession
+ * and auth() began throwing before any downstream code could recover. A single
+ * retry after a brief backoff absorbs transient pool-exhaustion spikes without
+ * masking real failures. Non-pool errors rethrow immediately.
+ *
+ * Up to 2 attempts total (1 initial + 1 retry) with 200ms backoff. If both
+ * attempts fail, the original error propagates.
+ */
+async function authWithRetry(): Promise<any> {
+  const MAX_ATTEMPTS = 2;
+  let lastErr: any;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await auth();
+    } catch (err: any) {
+      lastErr = err;
+      const msg = String(err?.message || "").toLowerCase();
+      const code = err?.code || "";
+      const isPoolExhaustion =
+        code === "P2024" ||
+        msg.includes("maxclientsinsession") ||
+        msg.includes("max clients") ||
+        msg.includes("timed out fetching") ||
+        msg.includes("connection pool") ||
+        msg.includes("too many clients");
+      if (!isPoolExhaustion || attempt === MAX_ATTEMPTS) {
+        throw err;
+      }
+      console.warn(
+        `[DB-POOL-RETRY] auth() pool exhaustion on attempt ${attempt}/${MAX_ATTEMPTS}, retrying in 200ms — code=${code || "?"} msg=${err?.message || "unknown"}`,
+      );
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+  throw lastErr;
+}
+
 interface SessionUser {
   id: string;
   name?: string | null;
@@ -60,8 +100,8 @@ export async function getSession(): Promise<SessionResult | null> {
     }
   }
 
-  // Fall through to real auth
-  const session = await auth();
+  // Fall through to real auth — wrapped in retry for DB pool resilience.
+  const session = await authWithRetry();
   if (!session?.user) return null;
   return session as unknown as SessionResult;
 }
