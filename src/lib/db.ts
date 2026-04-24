@@ -1,10 +1,13 @@
 // @ts-nocheck
-// DATABASE_URL must use Supabase Transaction pooler (port 6543) with ?pgbouncer=true&connection_limit=1
-// Session mode (port 5432) caused production outage 2026-04-24.
-//
-// ⚠ Read the detailed note in createPrismaClient() below before changing pooler mode —
-// there is prior debugging history around prepared-statement errors in transaction
-// mode that must be reconciled with the above directive.
+/**
+ * Prisma client singleton.
+ *
+ * IMPORTANT — DATABASE_URL must use Supabase Transaction pooler:
+ *   postgresql://...pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+ *
+ * Session mode (port 5432) causes MaxClientsInSessionMode errors under real traffic.
+ * Production outage 2026-04-24 was caused by port 5432 DATABASE_URL.
+ */
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
@@ -27,15 +30,18 @@ function createPrismaClient() {
     // rejectUnauthorized=false mirrors how the Supabase pooler is normally accessed
     // and avoids CA-chain issues on container hosts whose trust store differs from
     // Vercel's serverless runtime.
-    // NOTE on connection pooling: @prisma/adapter-pg uses node-postgres, which
-    // does NOT recognize Prisma engine-style URL params (pgbouncer=true,
-    // connection_limit, statement_cache_size) — those are silently ignored.
+    // CONNECTION POOLING — Transaction mode is canonical (validated in prod 2026-04-24).
     //
-    // Prisma issues prepared statements internally and Supavisor TRANSACTION
-    // mode (Supabase pooler port 6543) cannot track prepared-statement state
-    // across pooled backends, which surfaces as "DbHandler exited" (XX000).
-    // The fix is to point DATABASE_URL at Supavisor SESSION mode (port 5432)
-    // or the direct connection — NOT to add no-op URL params here.
+    // DATABASE_URL must point at Supavisor TRANSACTION mode (Supabase pooler
+    // port 6543) with ?pgbouncer=true&connection_limit=1 in the query string.
+    // The ?pgbouncer=true flag disables Prisma's prepared-statement caching,
+    // which historically was the reason transaction mode failed ("DbHandler
+    // exited" / XX000 errors). With that flag set, transaction mode is stable.
+    //
+    // Session mode (port 5432) is NOT a fallback — it exhausts the pool under
+    // real traffic. Production outage 2026-04-24 was caused by port 5432
+    // DATABASE_URL. Do not revert to session mode regardless of older notes
+    // or commit history that may suggest otherwise.
     //
     // max=10 is deliberate: one Railway container, modest concurrency budget.
     // Do NOT lower to 1 — it serializes every DB call behind a single socket

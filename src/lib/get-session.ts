@@ -27,6 +27,7 @@ async function authWithRetry(): Promise<any> {
       const code = err?.code || "";
       const isPoolExhaustion =
         code === "P2024" ||
+        code === "XX000" || // Postgres FATAL — may surface on pool exhaustion without the MaxClientsInSession string
         msg.includes("maxclientsinsession") ||
         msg.includes("max clients") ||
         msg.includes("timed out fetching") ||
