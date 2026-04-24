@@ -40,8 +40,13 @@ export function computeBalance(input: BalanceInput): BalanceResult {
     .filter((c) => c.status === "APPROVED")
     .reduce((s, c) => s + (c.earnings || 0), 0));
 
+  // FLAGGED clips are hidden from CLIPPERs behind a PENDING facade
+  // (see /api/clips/mine + /api/earnings sanitization). Bucket them with
+  // PENDING here so the balance reported to the clipper matches the status
+  // they see on their clip cards. APPROVED/available is NEVER touched —
+  // FLAGGED earnings must never count toward withdrawable balance.
   const pendingEarnings = round2(input.clips
-    .filter((c) => c.status === "PENDING")
+    .filter((c) => c.status === "PENDING" || c.status === "FLAGGED")
     .reduce((s, c) => s + (c.earnings || 0), 0));
 
   const paidOut = round2(input.payouts

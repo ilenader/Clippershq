@@ -311,7 +311,7 @@ export async function updateStreak(userId: string): Promise<void> {
     where: {
       userId,
       isDeleted: false,
-      OR: [{ status: "APPROVED" }, { status: "PENDING" }, { streakDayLocked: true }],
+      OR: [{ status: "APPROVED" }, { status: "PENDING" }, { status: "FLAGGED" }, { streakDayLocked: true }],
       createdAt: { gte: todayStart, lte: todayEnd },
     },
     select: { id: true },

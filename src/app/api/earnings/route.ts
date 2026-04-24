@@ -13,13 +13,18 @@ export async function GET(request: Request) {
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
 
-  // Role isolation: personal earnings data is clipper-only
-  const role = (session.user as any).role;
-  if (role !== "CLIPPER") {
+  if (!db) return NextResponse.json({ totalEarned: 0, available: 0, campaignBalances: [] });
+
+  // Role isolation: personal earnings data is clipper-only. Fresh DB role read
+  // (don't trust session.user.role — it can go stale across role changes) so
+  // the FLAGGED sanitization below is gated on authoritative data.
+  const currentUser = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true },
+  });
+  if (currentUser?.role !== "CLIPPER") {
     return NextResponse.json({ totalEarned: 0, approvedEarnings: 0, pendingEarnings: 0, paidOut: 0, lockedInPayouts: 0, available: 0, campaignBalances: [], clipEarnings: [] });
   }
-
-  if (!db) return NextResponse.json({ totalEarned: 0, available: 0, campaignBalances: [] });
 
   const { searchParams } = new URL(request.url);
   const filterParam = searchParams.get("campaignIds");
@@ -64,10 +69,13 @@ export async function GET(request: Request) {
       campaignName: nameMap[b.campaignId] || "Unknown",
     }));
 
-    // Clip earnings for chart display
+    // Clip earnings for chart display. FLAGGED is mapped to PENDING for the
+    // clipper facade (same rule as /api/clips/mine). computeBalance above
+    // already buckets FLAGGED as pending, so this keeps the per-clip chart
+    // consistent with the summary numbers above.
     const clipEarnings = clips.map((c: any) => ({
       earnings: c.earnings,
-      status: c.status,
+      status: c.status === "FLAGGED" ? "PENDING" : c.status,
       campaignId: c.campaignId,
       createdAt: c.createdAt,
     }));
