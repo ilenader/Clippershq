@@ -369,7 +369,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {!pathname?.startsWith("/community") && (
         <ChatWidget userId={effectiveSession.user.id} role={effectiveRole} />
       )}
-      {!isPWA && effectiveRole !== "CLIENT" && <PWAInstallPopup />}
+      {!isPWA && effectiveRole !== "CLIENT" && !pathname?.startsWith("/community") && <PWAInstallPopup />}
       {/* Community: DM toast (CLIPPER only) + top-of-page call banner (all non-CLIENT roles) */}
       {effectiveRole !== "CLIENT" && <DmToast viewerId={effectiveSession.user.id} viewerRole={effectiveRole} />}
       {effectiveRole !== "CLIENT" && <CallBanner />}
