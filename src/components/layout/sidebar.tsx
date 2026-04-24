@@ -26,6 +26,7 @@ import {
   Smartphone,
   BookOpen,
   Gauge,
+  Handshake,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useInstallPrompt } from "@/hooks/use-pwa";
@@ -105,6 +106,7 @@ const ownerExtraNav: NavSection = {
   title: "Owner",
   items: [
     { label: "Past Campaigns", href: "/admin/past-campaigns", icon: <Archive className="h-[18px] w-[18px]" /> },
+    { label: "Referral Override", href: "/admin/referral-override", icon: <Handshake className="h-[18px] w-[18px]" /> },
     { label: "Archive", href: "/admin/archive", icon: <Archive className="h-[18px] w-[18px]" /> },
     { label: "Team", href: "/admin/team", icon: <Shield className="h-[18px] w-[18px]" /> },
     { label: "Agency Earnings", href: "/admin/agency-earnings", icon: <DollarSign className="h-[18px] w-[18px]" /> },

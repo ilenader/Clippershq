@@ -85,6 +85,12 @@ model User {
   lastActiveDate DateTime?
   referralCode  String?    @unique
   referredById  String?
+  // When OWNER manually sets someone's referrer via /admin/referral-override,
+  // these fields record who did it and when. Natural referrals (via link) leave
+  // both null. Used so the override can be cleanly reversed without touching
+  // natural referrals, and for audit/investigation.
+  referrerOverriddenBy   String?
+  referrerOverriddenAt   DateTime?
   manualBonusOverride Float?
   isPWAUser     Boolean    @default(false)
   lastPWAOpenAt DateTime?
