@@ -485,19 +485,18 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
   }
 
   return (
-    // `flex-1` (not `h-full`) so this container resolves its height via the
-    // flex algorithm instead of depending on a percentage-height ancestor
-    // chain. iOS Safari has a well-known quirk where `height: 100%` against a
-    // flex-1 parent sometimes paints at intrinsic (content) size on initial
-    // render — that showed up here as the "compressed until you focus the
-    // input" layout, because focusing the textarea triggered a reflow that
-    // finally resolved the percentage height. flex-1 + min-h-0 avoids the
-    // dependency entirely and stays stable across keyboard open/close.
-    <div className="relative flex flex-col flex-1 min-h-0 bg-[var(--bg-primary)]">
+    // Matches TicketPanel's working chat wrapper exactly (`flex flex-col
+    // h-full min-h-0`). Both components mount as the sole child of the
+    // page-level chat wrapper `flex-1 min-h-0 overflow-hidden flex flex-col`
+    // — since TicketView resolves `h-full` reliably through that chain on
+    // iOS Safari, ChannelChat should too. A prior attempt to swap in
+    // `flex-1` introduced the input-cut-in-half regression because iOS laid
+    // out children past the fixed-ancestor bottom before reconciling the
+    // flex resolution.
+    <div className="relative flex flex-col h-full min-h-0 bg-[var(--bg-primary)]">
       {/* Channel header — shows the channel name persistently inside the chat area
-          so the context is visible below the campaign tabs on desktop and mobile.
-          `flex-shrink-0` locks its height so the messages area owns any spare space. */}
-      <div className="flex-shrink-0 flex items-center gap-2 px-3 sm:px-4 py-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+          so the context is visible below the campaign tabs on desktop and mobile. */}
+      <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
         <HeaderIcon className="h-4 w-4 lg:h-5 lg:w-5 text-[var(--text-muted)] flex-shrink-0" />
         <h2 className="text-base lg:text-lg font-semibold text-[var(--text-primary)] truncate">
           {channelName}
@@ -505,7 +504,7 @@ export function ChannelChat({ channelId, channelType, channelName, campaignId, v
       </div>
 
       {isAdminOrOwner && (
-        <div className="flex-shrink-0 px-3 sm:px-4 py-2 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+        <div className="px-3 sm:px-4 py-2 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
             <input
