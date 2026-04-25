@@ -52,11 +52,11 @@ export async function sendCommunityAnnouncementEmail(
     subject: `Announcement: ${campaignName}`,
     html: wrap(`
       <p class="accent-blue" style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px;">New Announcement</p>
-      <h1 style="color: #ffffff !important; font-size: 24px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 12px;">${escapeHtml(campaignName)}</h1>
-      <p style="font-size: 14px; color: #6b7280 !important; margin: 0 0 20px;">From <strong style="color: #ffffff !important;">${escapeHtml(senderName)}</strong></p>
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: rgba(255, 255, 255, 0.04) !important; border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3px solid #2596be; border-radius: 0 12px 12px 0; margin: 0 0 28px;">
-        <tr><td style="padding: 14px 18px; background-color: rgba(255, 255, 255, 0.04) !important;">
-          <p style="margin: 0; color: #c8d0d8 !important; font-size: 15px; line-height: 1.6; white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(preview)}</p>
+      <h1 style="color: #000000 !important; font-size: 24px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 12px;">${escapeHtml(campaignName)}</h1>
+      <p style="font-size: 14px; color: #6b7280 !important; margin: 0 0 20px;">From <strong style="color: #000000 !important;">${escapeHtml(senderName)}</strong></p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: rgba(0, 0, 0, 0.04) !important; border: 1px solid rgba(0, 0, 0, 0.08); border-left: 3px solid #2596be; border-radius: 0 12px 12px 0; margin: 0 0 28px;">
+        <tr><td style="padding: 14px 18px; background-color: rgba(0, 0, 0, 0.04) !important;">
+          <p style="margin: 0; color: #4a5568 !important; font-size: 15px; line-height: 1.6; white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(preview)}</p>
         </td></tr>
       </table>
       ${emailButton("View in Community", "https://clipershq.com/community")}
