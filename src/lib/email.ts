@@ -121,6 +121,19 @@ export function wrap(content: string): string {
   .footer-bg { background-color: #000000 !important; }
   .stats-cell { background-color: rgba(255, 255, 255, 0.04) !important; }
   .btn-cell { background-color: #2596be !important; }
+  /* Content cell hardening — kills any white panel Gmail iOS tries to inject and
+     forces white default text. Inner * makes child backgrounds transparent so the
+     black cell shows through; brand-color carve-outs below keep button + accent
+     panels intact. */
+  .content-cell { background-color: #000000 !important; background: #000000 !important; color: #ffffff !important; }
+  .content-cell * { background-color: transparent !important; }
+  .content-cell p, .content-cell div, .content-cell li, .content-cell span { color: #ffffff !important; }
+  .content-cell strong, .content-cell b { color: #ffffff !important; font-weight: 700 !important; }
+  /* Carve-outs — keep button blue + stats panel tint + warning panels intact. */
+  .content-cell .stats-cell { background-color: rgba(255, 255, 255, 0.04) !important; }
+  .content-cell .btn-cell, .content-cell .btn-cell a { background-color: #2596be !important; color: #ffffff !important; }
+  .content-cell .warn-panel { background-color: rgba(239, 68, 68, 0.08) !important; }
+  .content-cell .warn-panel p { color: #fca5a5 !important; }
   /* Inline content links use brand blue. Override below keeps CTA button text white. */
   a { color: #2596be !important; text-decoration: underline; }
   a:hover { color: #4ab5d8 !important; }
@@ -144,6 +157,20 @@ export function wrap(content: string): string {
   [data-ogsc] .stats-cell, [data-ogsb] .stats-cell { background-color: rgba(255, 255, 255, 0.04) !important; }
   [data-ogsc] .btn-cell, [data-ogsb] .btn-cell { background-color: #2596be !important; }
   [data-ogsc] .btn-cell a, [data-ogsb] .btn-cell a { color: #ffffff !important; }
+  /* Content cell — re-pin even when Gmail/Outlook inject inversion wrappers. */
+  [data-ogsc] .content-cell, [data-ogsb] .content-cell { background-color: #000000 !important; background: #000000 !important; color: #ffffff !important; }
+  [data-ogsc] .content-cell *, [data-ogsb] .content-cell * { background-color: transparent !important; }
+  [data-ogsc] .content-cell p, [data-ogsb] .content-cell p,
+  [data-ogsc] .content-cell div, [data-ogsb] .content-cell div,
+  [data-ogsc] .content-cell li, [data-ogsb] .content-cell li,
+  [data-ogsc] .content-cell span, [data-ogsb] .content-cell span,
+  [data-ogsc] .content-cell strong, [data-ogsb] .content-cell strong,
+  [data-ogsc] .content-cell b, [data-ogsb] .content-cell b { color: #ffffff !important; }
+  [data-ogsc] .content-cell .stats-cell, [data-ogsb] .content-cell .stats-cell { background-color: rgba(255, 255, 255, 0.04) !important; }
+  [data-ogsc] .content-cell .btn-cell, [data-ogsb] .content-cell .btn-cell { background-color: #2596be !important; }
+  [data-ogsc] .content-cell .btn-cell a, [data-ogsb] .content-cell .btn-cell a { color: #ffffff !important; }
+  [data-ogsc] .content-cell .warn-panel, [data-ogsb] .content-cell .warn-panel { background-color: rgba(239, 68, 68, 0.08) !important; }
+  [data-ogsc] .content-cell .warn-panel p, [data-ogsb] .content-cell .warn-panel p { color: #fca5a5 !important; }
   /* iOS Mail blue-link autodetection — disable */
   u + .body { background-color: #000000 !important; }
   u + #body a { color: #2596be !important; text-decoration: underline; }
@@ -174,9 +201,10 @@ export function wrap(content: string): string {
         </td>
       </tr>
 
-      <!-- Content — solid black, auto-height. -->
+      <!-- Content — solid black, auto-height. Triple-pinned (bgcolor attr + bg-color + bg
+           shorthand + class) so Gmail iOS can't inject a white panel. -->
       <tr>
-        <td bgcolor="#000000" class="px-mobile" style="background-color: #000000 !important; padding: 32px 40px 40px; color: #d1d8e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.6; mso-line-height-rule: exactly;">
+        <td bgcolor="#000000" class="content-cell px-mobile" style="background-color: #000000 !important; background: #000000 !important; padding: 32px 40px 40px; color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.6; mso-line-height-rule: exactly;">
           ${content}
         </td>
       </tr>
