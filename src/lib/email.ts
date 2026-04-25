@@ -104,8 +104,8 @@ export function wrap(content: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="x-apple-disable-message-reformatting">
-<meta name="color-scheme" content="dark">
-<meta name="supported-color-schemes" content="dark">
+<meta name="color-scheme" content="dark light">
+<meta name="supported-color-schemes" content="dark light">
 <title>Clippers HQ</title>
 <style type="text/css">
   /* HARD RESET — first rules in the cascade so Gmail iOS Mail honors them even
@@ -129,9 +129,12 @@ export function wrap(content: string): string {
     .content-cell .footnote { color: #6b7280 !important; }
   }
   :root {
-    color-scheme: dark;
-    supported-color-schemes: dark;
+    color-scheme: dark light;
+    supported-color-schemes: dark light;
   }
+  /* By default the white-themed slices are hidden — only the dark variant renders.
+     The prefers-color-scheme: light block below flips visibility for light-mode clients. */
+  .light-only { display: none !important; max-height: 0 !important; overflow: hidden !important; mso-hide: all; }
   body, html, table, td, div, p, span, h1, h2, h3, ol, li, a {
     background-color: #000000 !important;
     color: #e8edf2;
@@ -163,6 +166,38 @@ export function wrap(content: string): string {
     body, html { background-color: #000000 !important; }
     .body-bg { background-color: #000000 !important; }
     .inner-box, .inner-box td { background-color: #000000 !important; }
+  }
+  /* Light-mode variant — Apple Mail (Mac + iOS) and any client that respects
+     prefers-color-scheme: light. Swaps to white-themed slice images and inverts
+     the content surface from black/white to white/black. The body-prefix on
+     content-cell rules increases specificity to beat inline !important colors
+     baked into templates. Brand accent and CTA button stay the same hue in both
+     modes. */
+  @media (prefers-color-scheme: light) {
+    body, html { background-color: #ffffff !important; }
+    .body-bg { background-color: #ffffff !important; }
+    body table, body tr, body td { background-color: #ffffff !important; }
+    .inner-box, .inner-box td { background-color: #ffffff !important; }
+    .footer-bg { background-color: #ffffff !important; }
+    /* Show white slices, hide dark slices */
+    .light-only { display: block !important; max-height: none !important; overflow: visible !important; }
+    .dark-only { display: none !important; max-height: 0 !important; overflow: hidden !important; mso-hide: all; }
+    /* Content surface inversion — body-prefix beats inline !important via specificity */
+    body .content-cell { background-color: #ffffff !important; background: #ffffff !important; color: #000000 !important; }
+    body .content-cell * { background-color: transparent !important; }
+    body .content-cell p, body .content-cell div, body .content-cell li,
+    body .content-cell span, body .content-cell strong, body .content-cell b,
+    body .content-cell h1, body .content-cell h2, body .content-cell h3 { color: #000000 !important; }
+    body .content-cell .accent-blue, body .content-cell .accent-blue * { color: #2596be !important; }
+    body .content-cell .muted { color: #4a5568 !important; }
+    body .content-cell .footnote { color: #6b7280 !important; }
+    /* Carve-outs preserve panels + button across modes */
+    body .content-cell .stats-cell { background-color: rgba(0, 0, 0, 0.04) !important; }
+    body .content-cell .btn-cell, body .content-cell .btn-cell a { background-color: #2596be !important; color: #ffffff !important; }
+    body .content-cell .warn-panel { background-color: rgba(239, 68, 68, 0.08) !important; }
+    body .content-cell .warn-panel p { color: #b91c1c !important; }
+    /* Footer copyright — readable on white */
+    .footer-bg p, .footer-bg a { color: #6b7280 !important; }
   }
   /* Outlook.com / Gmail dark mode — [data-ogsc] (light source) and [data-ogsb] (background source)
      are the wrappers Gmail/Outlook inject when forcing inversion. Re-pin to black. */
@@ -214,10 +249,17 @@ export function wrap(content: string): string {
     <!-- Inner card 600px max — content auto-sizes height. No infinite black past content. -->
     <table class="inner-box email-card" role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="max-width: 600px; width: 100%; background-color: #000000 !important;">
 
-      <!-- Top slice from user's mockup: corner orbs + Clippers HQ logo, baked in. -->
+      <!-- Top slice from user's mockup: corner orbs + Clippers HQ logo, baked in.
+           Dark variant is the default; the light-only div is shown when the client
+           is in light mode (Apple Mail Mac/iOS, etc.) via prefers-color-scheme. -->
       <tr>
         <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0; line-height: 0; font-size: 0; mso-line-height-rule: exactly;">
-          <img src="https://clipershq.com/email-bg-top.png" width="600" height="180" alt="Clippers HQ" border="0" class="top-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+          <div class="dark-only">
+            <img src="https://clipershq.com/email-bg-top.png" width="600" height="180" alt="Clippers HQ" border="0" class="top-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+          </div>
+          <div class="light-only" style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">
+            <img src="https://clipershq.com/email-bg-top-white.png" width="600" height="180" alt="Clippers HQ" border="0" class="top-glow-img-white" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+          </div>
         </td>
       </tr>
 
@@ -236,10 +278,16 @@ export function wrap(content: string): string {
         </td>
       </tr>
 
-      <!-- Bottom slice from user's mockup: cinematic curve glow + Clippers HQ logo, baked in. -->
+      <!-- Bottom slice from user's mockup: cinematic curve glow + Clippers HQ logo, baked in.
+           Same dark/light pair as the top slice. -->
       <tr>
         <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0; line-height: 0; font-size: 0; mso-line-height-rule: exactly;">
-          <img src="https://clipershq.com/email-bg-bottom.png" width="600" height="150" alt="Clippers HQ" border="0" class="bottom-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+          <div class="dark-only">
+            <img src="https://clipershq.com/email-bg-bottom.png" width="600" height="150" alt="Clippers HQ" border="0" class="bottom-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+          </div>
+          <div class="light-only" style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">
+            <img src="https://clipershq.com/email-bg-bottom-white.png" width="600" height="150" alt="Clippers HQ" border="0" class="bottom-glow-img-white" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+          </div>
         </td>
       </tr>
 
