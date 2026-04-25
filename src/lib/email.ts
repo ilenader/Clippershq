@@ -246,10 +246,10 @@ export function wrap(content: string): string {
       <tr>
         <td bgcolor="#ffffff" align="center" style="background-color: #ffffff !important; padding: 0; line-height: 0; font-size: 0; mso-line-height-rule: exactly;">
           <div class="default-light">
-            <img src="https://clipershq.com/email-bg-top-white.png" width="600" height="180" alt="Clippers HQ" border="0" class="top-glow-img-white" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+            <img src="https://clipershq.com/email-bg-top.png" width="600" height="180" alt="Clippers HQ" border="0" class="top-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
           </div>
           <div class="dark-mode-only" style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">
-            <img src="https://clipershq.com/email-bg-top.png" width="600" height="180" alt="Clippers HQ" border="0" class="top-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+            <img src="https://clipershq.com/email-bg-top-white.png" width="600" height="180" alt="Clippers HQ" border="0" class="top-glow-img-white" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
           </div>
         </td>
       </tr>
@@ -272,10 +272,10 @@ export function wrap(content: string): string {
       <tr>
         <td bgcolor="#ffffff" align="center" style="background-color: #ffffff !important; padding: 0; line-height: 0; font-size: 0; mso-line-height-rule: exactly;">
           <div class="default-light">
-            <img src="https://clipershq.com/email-bg-bottom-white.png" width="600" height="150" alt="Clippers HQ" border="0" class="bottom-glow-img-white" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+            <img src="https://clipershq.com/email-bg-bottom.png" width="600" height="150" alt="Clippers HQ" border="0" class="bottom-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
           </div>
           <div class="dark-mode-only" style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">
-            <img src="https://clipershq.com/email-bg-bottom.png" width="600" height="150" alt="Clippers HQ" border="0" class="bottom-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+            <img src="https://clipershq.com/email-bg-bottom-white.png" width="600" height="150" alt="Clippers HQ" border="0" class="bottom-glow-img-white" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
           </div>
         </td>
       </tr>
