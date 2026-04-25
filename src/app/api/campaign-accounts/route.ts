@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { invalidateCache } from "@/lib/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +87,9 @@ export async function POST(req: NextRequest) {
     const join = await db.campaignAccount.create({
       data: { clipAccountId, campaignId },
     });
+    // Drop the cached community-campaigns list so the new campaign appears in
+    // the clipper's sidebar immediately instead of after the 60s TTL window.
+    invalidateCache(`community.campaigns.${session.user.id}.CLIPPER`);
     // Community audit trail — owner/admin-visible "joined" entry. Best-effort; ignored on failure.
     try {
       const acct = await db.clipAccount.findUnique({
@@ -136,6 +140,9 @@ export async function DELETE(req: NextRequest) {
     await db.campaignAccount.delete({
       where: { clipAccountId_campaignId: { clipAccountId, campaignId } },
     });
+    // Symmetric cache drop — leaving a campaign should remove it from the
+    // clipper's sidebar immediately, not after the 60s TTL window.
+    invalidateCache(`community.campaigns.${session.user.id}.CLIPPER`);
     // Community audit trail — "left" entry.
     try {
       await db.communityActivity.create({

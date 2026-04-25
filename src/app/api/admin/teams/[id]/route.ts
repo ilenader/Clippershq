@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { checkBanStatus } from "@/lib/check-ban";
+import { invalidateCache, invalidateCachePrefix } from "@/lib/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 /** POST - add member to team or assign campaign */
@@ -41,6 +42,10 @@ export async function POST(
       // Promote to ADMIN only if explicitly requested via promoteToAdmin flag
       if (body.promoteToAdmin && user.role === "CLIPPER") {
         await db.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
+        // Drop the user's role + visible-campaigns caches so ADMIN-level access
+        // takes effect on their next request, not after the 120s TTL window.
+        invalidateCache(`user.role.${user.id}`);
+        invalidateCachePrefix(`community.campaigns.${user.id}.`);
       }
 
       await logAudit({
