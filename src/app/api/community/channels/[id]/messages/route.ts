@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
-import { publishToUsers } from "@/lib/ably";
+import { publishToUser, publishToUsers } from "@/lib/ably";
 import { getCampaignSubscriberIds, userHasCampaignCommunityAccess } from "@/lib/community";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createNotification } from "@/lib/notifications";
@@ -94,6 +94,32 @@ export async function GET(
       create: { channelId, userId: session.user.id, lastReadAt: new Date() },
       update: { lastReadAt: new Date() },
     }).catch(() => {});
+
+    // Clear bell-icon notifications scoped to this channel — covers both @reply
+    // pings (COMMUNITY_REPLY) and announcement broadcasts (CLIP_FLAGGED). The
+    // JSON-fragment match prevents collisions with other metadata that may
+    // happen to contain the channelId substring elsewhere. Push notif_refresh
+    // afterwards so the navbar bell updates without waiting for the 15s poll.
+    db.notification.updateMany({
+      where: {
+        userId: session.user.id,
+        isRead: false,
+        OR: [
+          { type: "COMMUNITY_REPLY" },
+          { type: "CLIP_FLAGGED" },
+        ],
+        metadata: { contains: `"channelId":"${channelId}"` },
+      },
+      data: { isRead: true },
+    })
+      .then((res: { count: number }) => {
+        if (res.count > 0) {
+          publishToUser(session.user.id, "notif_refresh", {}).catch(() => {});
+        }
+      })
+      .catch((err: any) => {
+        console.error("[NOTIF-CLEAR-FAIL]", err?.message);
+      });
 
     return NextResponse.json({
       messages: visible,

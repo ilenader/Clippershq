@@ -59,6 +59,27 @@ export async function GET(
       data: { isRead: true },
     }).catch(() => {});
 
+    // Clear bell-icon notifications scoped to this ticket. Ticket notifications
+    // use the overloaded CLIP_FLAGGED type with {ticketId, campaignId} metadata.
+    // Push notif_refresh after the clear so the navbar bell updates instantly.
+    db.notification.updateMany({
+      where: {
+        userId: session.user.id,
+        isRead: false,
+        type: "CLIP_FLAGGED",
+        metadata: { contains: `"ticketId":"${ticketId}"` },
+      },
+      data: { isRead: true },
+    })
+      .then((res: { count: number }) => {
+        if (res.count > 0) {
+          publishToUser(session.user.id, "notif_refresh", {}).catch(() => {});
+        }
+      })
+      .catch((err: any) => {
+        console.error("[NOTIF-CLEAR-FAIL]", err?.message);
+      });
+
     return NextResponse.json({
       messages: page,
       nextCursor: hasMore ? page[page.length - 1].id : null,
