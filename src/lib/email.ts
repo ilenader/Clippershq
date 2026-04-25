@@ -95,8 +95,21 @@ async function sendEmailWithRetry(params: EmailParams): Promise<boolean> {
 // ─── Template wrapper ────────────────────────────────────────
 
 function wrap(content: string): string {
+  // Brand lockup — triangle PNG + thin white separator + "Clippers HQ" wordmark.
+  // Reused in header and footer. Lives inline so the function stays self-contained.
+  const lockup = `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto; background-color: #000000 !important;">
+    <tr style="background-color: #000000;">
+      <td valign="middle" style="padding-right: 12px; background-color: #000000 !important; line-height: 1;">
+        <img src="https://clipershq.com/email-logo-triangle.png" width="22" height="22" alt="Clippers HQ" style="display: block; border: 0;" />
+      </td>
+      <td valign="middle" style="padding-left: 12px; border-left: 1px solid #ffffff; height: 22px; line-height: 22px; background-color: #000000 !important;">
+        <span style="color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; background-color: #000000 !important;">Clippers</span><span style="color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 400; letter-spacing: 0.5px; background-color: #000000 !important;">&nbsp;HQ</span>
+      </td>
+    </tr>
+  </table>`;
+
   return `<!DOCTYPE html>
-<html style="background-color: #0a0d12;">
+<html style="background-color: #000000;">
 <head>
 <meta charset="utf-8">
 <meta name="color-scheme" content="dark only">
@@ -104,39 +117,60 @@ function wrap(content: string): string {
 <style type="text/css">
   :root { color-scheme: dark only; }
   body, html, table, td, div, p, span, h1, h2, h3, ol, li, a {
-    background-color: #0a0d12 !important;
+    background-color: #000000 !important;
     color: #e8edf2 !important;
   }
-  .inner-box, .inner-box td { background-color: #111720 !important; }
-  .footer-bg { background-color: #0d1117 !important; }
+  .inner-box, .inner-box td { background-color: #000000 !important; }
+  .footer-bg { background-color: #000000 !important; }
   .stats-cell { background-color: #0d1117 !important; }
   .btn-cell { background-color: #2596be !important; }
   .btn-cell a { background-color: #2596be !important; color: #ffffff !important; }
   @media (prefers-color-scheme: light) {
     body, html, table, td, div, p, span, h1, h2, h3 {
-      background-color: #0a0d12 !important;
+      background-color: #000000 !important;
       color: #e8edf2 !important;
     }
-    .inner-box, .inner-box td { background-color: #111720 !important; }
+    .inner-box, .inner-box td { background-color: #000000 !important; }
   }
-  u + .body { background-color: #0a0d12 !important; }
+  u + .body { background-color: #000000 !important; }
 </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0a0d12 !important; color: #e8edf2; -webkit-text-size-adjust: 100%;">
-<div class="body" style="background-color: #0a0d12;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0d12 !important;">
-<tr style="background-color: #0a0d12;"><td align="center" style="padding: 24px 16px; background-color: #0a0d12 !important;">
-  <table class="inner-box" role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #111720 !important; border-radius: 16px; border: 1px solid #1c2333; overflow: hidden;">
-    <tr style="background-color: #111720;"><td style="padding: 24px 24px 16px; text-align: center; border-bottom: 1px solid #1c2333; background-color: #111720 !important;">
-      <img src="https://clipershq.com/icon-512.png" width="40" height="40" alt="" style="display: block; margin: 0 auto 8px;" />
-      <h2 style="color: #ffffff !important; font-size: 20px; margin: 0; letter-spacing: 2px; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">CLIPPERS HQ</h2>
-    </td></tr>
-    <tr style="background-color: #111720;"><td style="padding: 24px; color: #e8edf2; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-      ${content}
-    </td></tr>
-    <tr style="background-color: #0d1117;"><td class="footer-bg" style="padding: 16px 24px; border-top: 1px solid #1c2333; text-align: center; background-color: #0d1117 !important;">
-      <p style="color: #6b7280 !important; font-size: 12px; margin: 0; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280 !important; text-decoration: none; background-color: #0d1117 !important;">clipershq.com</a></p>
-    </td></tr>
+<body bgcolor="#000000" style="margin: 0; padding: 0; background-color: #000000 !important; color: #e8edf2; -webkit-text-size-adjust: 100%;">
+<div class="body" style="background-color: #000000;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#000000" style="background-color: #000000 !important;">
+<tr style="background-color: #000000;"><td align="center" bgcolor="#000000" style="padding: 24px 16px; background-color: #000000 !important;">
+  <table class="inner-box" role="presentation" width="600" cellpadding="0" cellspacing="0" bgcolor="#000000" style="max-width: 600px; width: 100%; background-color: #000000 !important;">
+    <!-- Header + content cell with corner-glow background image. bgcolor fallback for Outlook. -->
+    <tr style="background-color: #000000;">
+      <td bgcolor="#000000" background="https://clipershq.com/email-glow-corners.png" style="background-color: #000000 !important; background-image: url(https://clipershq.com/email-glow-corners.png); background-repeat: no-repeat; background-position: center top; background-size: 100% auto;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: transparent;">
+          <tr><td align="center" style="padding: 56px 24px 40px; background-color: transparent;">
+            ${lockup}
+          </td></tr>
+          <tr><td style="padding: 8px 32px 48px; color: #e8edf2; background-color: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            ${content}
+          </td></tr>
+        </table>
+      </td>
+    </tr>
+    <!-- Bottom cinematic glow strip. Empty cell with background-image; bgcolor fallback for Outlook. -->
+    <tr style="background-color: #000000;">
+      <td bgcolor="#000000" height="120" background="https://clipershq.com/email-glow-bottom.png" style="background-color: #000000 !important; background-image: url(https://clipershq.com/email-glow-bottom.png); background-repeat: no-repeat; background-position: center bottom; background-size: 100% auto; height: 120px; line-height: 120px; mso-line-height-rule: exactly; font-size: 1px;">
+        &nbsp;
+      </td>
+    </tr>
+    <!-- Footer logo lockup -->
+    <tr style="background-color: #000000;">
+      <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 8px 24px 4px;">
+        ${lockup}
+      </td>
+    </tr>
+    <!-- Copyright -->
+    <tr style="background-color: #000000;">
+      <td class="footer-bg" bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 12px 24px 32px;">
+        <p style="color: #6b7280 !important; font-size: 12px; margin: 0; background-color: #000000 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280 !important; text-decoration: none; background-color: #000000 !important;">clipershq.com</a></p>
+      </td>
+    </tr>
   </table>
 </td></tr>
 </table>
