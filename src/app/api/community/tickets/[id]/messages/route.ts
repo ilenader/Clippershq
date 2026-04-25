@@ -73,7 +73,9 @@ export async function GET(
     })
       .then((res: { count: number }) => {
         if (res.count > 0) {
-          publishToUser(session.user.id, "notif_refresh", {}).catch(() => {});
+          publishToUser(session.user.id, "notif_refresh", {})
+            .then(() => console.log(`[NOTIF-REFRESH] published for ${session.user.id} (ticket ${ticketId}, ${res.count} cleared)`))
+            .catch((err: any) => console.error(`[NOTIF-REFRESH-FAIL]`, err?.message));
         }
       })
       .catch((err: any) => {
