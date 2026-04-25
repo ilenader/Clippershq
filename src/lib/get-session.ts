@@ -3,88 +3,22 @@ import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { isDevBypassEnabled, getDevSession, DEV_AUTH_COOKIE } from "@/lib/dev-auth";
 import type { DevRole } from "@/lib/dev-auth";
+import { withDbRetry } from "@/lib/db-retry";
 
 /**
  * Retry wrapper for auth() calls that hit the DB session store.
  *
- * Production incidents:
- *  - 2026-04-24: Supabase pooler hit MaxClientsInSession; the original v1 narrow
- *    pool-exhaustion match caught this case.
- *  - 2026-04-25: A second blip surfaced as a generic PrismaClientKnownRequestError
- *    on prisma.session.findUnique() — same root cause (transient connection
- *    issue) but the narrow string/code match missed it. Broadened the detection
- *    to cover every transient-connection pattern Prisma can emit, plus the
- *    PrismaClient* error names. Non-transient errors (validation, etc.) still
- *    rethrow immediately.
+ * Production incidents that motivated retry here, then prompted broadening to
+ * every read path (see src/lib/db-retry.ts):
+ *  - 2026-04-24: Supabase pooler hit MaxClientsInSession; auth() crashed.
+ *  - 2026-04-25: PrismaClientKnownRequestError on session.findUnique surfaced.
+ *  - 2026-04-25 (later): scheduledVoiceCall.findMany P1008 took down a page.
  *
- * Up to 3 attempts total with exponential backoff (100ms, 300ms, 800ms). If all
- * attempts fail, the original error propagates.
+ * Logic now lives in `withDbRetry` — kept as a thin alias so existing call
+ * sites and the "auth"-labelled log lines stay consistent.
  */
-function isTransientDbError(err: any): boolean {
-  if (!err) return false;
-  const msg: string = err?.message || "";
-  const lower = msg.toLowerCase();
-  const code: string = err?.code || "";
-  const name: string = err?.name || "";
-
-  // Connection / pool / network failure signals
-  if (lower.includes("maxclientsinsession")) return true;
-  if (lower.includes("max clients")) return true;
-  if (lower.includes("too many clients")) return true;
-  if (lower.includes("timed out fetching")) return true;
-  if (lower.includes("connection pool")) return true;
-  if (lower.includes("connection terminated")) return true;
-  if (lower.includes("connection refused")) return true;
-  if (lower.includes("server has closed the connection")) return true;
-  if (lower.includes("can't reach database")) return true;
-  if (msg.includes("ECONNRESET")) return true;
-  if (msg.includes("ETIMEDOUT")) return true;
-
-  // Prisma + Postgres error codes for transient connection failures
-  if (code === "XX000") return true;
-  if (code === "P2024") return true;
-  if (code === "P1001") return true;
-  if (code === "P1002") return true;
-  if (code === "P1008") return true;
-  if (code === "P1017") return true;
-
-  // PrismaClientKnownRequestError on session-load paths — almost always
-  // transient; safe to retry the auth() lookup. Narrow to session/findUnique/
-  // findMany so we don't re-issue mutations.
-  if (
-    name === "PrismaClientKnownRequestError" &&
-    (lower.includes("session") || lower.includes("findunique") || lower.includes("findmany"))
-  ) {
-    return true;
-  }
-  if (name === "PrismaClientInitializationError") return true;
-  if (name === "PrismaClientRustPanicError") return true;
-  if (name === "PrismaClientUnknownRequestError") return true;
-
-  return false;
-}
-
 async function authWithRetry(): Promise<any> {
-  const MAX_ATTEMPTS = 3;
-  const BACKOFF_MS = [100, 300, 800];
-  let lastErr: any;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      return await auth();
-    } catch (err: any) {
-      lastErr = err;
-      const transient = isTransientDbError(err);
-      if (!transient || attempt === MAX_ATTEMPTS) {
-        throw err;
-      }
-      const delay = BACKOFF_MS[attempt - 1];
-      console.warn(
-        `[DB-RETRY] auth() transient failure on attempt ${attempt}/${MAX_ATTEMPTS}, retrying in ${delay}ms — name=${err?.name || "?"} code=${err?.code || "?"} msg=${err?.message || "unknown"}`,
-      );
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
-  throw lastErr;
+  return withDbRetry(() => auth(), "auth");
 }
 
 interface SessionUser {

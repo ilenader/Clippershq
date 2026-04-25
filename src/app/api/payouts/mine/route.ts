@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { withDbRetry } from "@/lib/db-retry";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -19,26 +20,32 @@ export async function GET() {
   if (!db) return NextResponse.json([]);
 
   try {
-    const payouts = await db.payoutRequest.findMany({
-      where: { userId: session.user.id },
-      include: {
-        campaign: { select: { name: true } },
-        scheduledCalls: { orderBy: { createdAt: "desc" }, take: 1 },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 1000,
-    });
+    const payouts = await withDbRetry(
+      () => db.payoutRequest.findMany({
+        where: { userId: session.user.id },
+        include: {
+          campaign: { select: { name: true } },
+          scheduledCalls: { orderBy: { createdAt: "desc" }, take: 1 },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 1000,
+      }),
+      "payouts.mine",
+    );
     return NextResponse.json(payouts);
   } catch (err: any) {
     console.error("GET /api/payouts/mine error:", err?.message);
-    // Fallback: try without scheduledCalls in case of relation error
+    // Fallback: try without scheduledCalls in case of relation error (schema drift)
     try {
-      const payouts = await db.payoutRequest.findMany({
-        where: { userId: session.user.id },
-        include: { campaign: { select: { name: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 1000,
-      });
+      const payouts = await withDbRetry(
+        () => db.payoutRequest.findMany({
+          where: { userId: session.user.id },
+          include: { campaign: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 1000,
+        }),
+        "payouts.mine.fallback",
+      );
       return NextResponse.json(payouts);
     } catch {
       return NextResponse.json([]);

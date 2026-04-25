@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { withDbRetry } from "@/lib/db-retry";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -30,16 +31,19 @@ export async function GET(request: Request) {
     };
     if (campaignIds.length > 0) where.campaignId = { in: campaignIds };
 
-    const clips = await db.clip.findMany({
-      where,
-      include: {
-        campaign: { select: { name: true, platform: true } },
-        clipAccount: { select: { username: true, platform: true } },
-        stats: { orderBy: { checkedAt: "desc" }, take: 1 },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 5000,
-    });
+    const clips: any[] = await withDbRetry(
+      () => db.clip.findMany({
+        where,
+        include: {
+          campaign: { select: { name: true, platform: true } },
+          clipAccount: { select: { username: true, platform: true } },
+          stats: { orderBy: { checkedAt: "desc" }, take: 1 },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5000,
+      }),
+      "clips.mine",
+    );
 
     // Clipper-facing fraud hiding. When OWNER/ADMIN flags a clip (manually or
     // automatically via tracking.ts fraud scoring), the row stays FLAGGED in

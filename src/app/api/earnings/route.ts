@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { computeBalance, computeCampaignBalances } from "@/lib/balance";
 import { checkBanStatus } from "@/lib/check-ban";
+import { withDbRetry } from "@/lib/db-retry";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +19,13 @@ export async function GET(request: Request) {
   // Role isolation: personal earnings data is clipper-only. Fresh DB role read
   // (don't trust session.user.role — it can go stale across role changes) so
   // the FLAGGED sanitization below is gated on authoritative data.
-  const currentUser = await db.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
+  const currentUser = await withDbRetry<{ role: string } | null>(
+    () => db.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    }),
+    "earnings.user",
+  );
   if (currentUser?.role !== "CLIPPER") {
     return NextResponse.json({ totalEarned: 0, approvedEarnings: 0, pendingEarnings: 0, paidOut: 0, lockedInPayouts: 0, available: 0, campaignBalances: [], clipEarnings: [] });
   }
@@ -39,16 +43,22 @@ export async function GET(request: Request) {
     }
 
     const [clips, payouts] = await Promise.all([
-      db.clip.findMany({
-        where: clipWhere,
-        select: { id: true, earnings: true, status: true, campaignId: true, createdAt: true },
-        take: 5000,
-      }),
-      db.payoutRequest.findMany({
-        where: payoutWhere,
-        select: { amount: true, status: true, campaignId: true },
-        take: 1000,
-      }),
+      withDbRetry<any[]>(
+        () => db.clip.findMany({
+          where: clipWhere,
+          select: { id: true, earnings: true, status: true, campaignId: true, createdAt: true },
+          take: 5000,
+        }),
+        "earnings.clips",
+      ),
+      withDbRetry<any[]>(
+        () => db.payoutRequest.findMany({
+          where: payoutWhere,
+          select: { amount: true, status: true, campaignId: true },
+          take: 1000,
+        }),
+        "earnings.payouts",
+      ),
     ]);
 
     const balance = computeBalance({ clips, payouts });
@@ -56,11 +66,14 @@ export async function GET(request: Request) {
 
     // Get campaign names
     const campaignIds = campaignBalances.map((b) => b.campaignId);
-    const campaigns = campaignIds.length > 0
-      ? await db.campaign.findMany({
-          where: { id: { in: campaignIds } },
-          select: { id: true, name: true },
-        })
+    const campaigns: any[] = campaignIds.length > 0
+      ? await withDbRetry(
+          () => db.campaign.findMany({
+            where: { id: { in: campaignIds } },
+            select: { id: true, name: true },
+          }),
+          "earnings.campaigns",
+        )
       : [];
 
     const nameMap = Object.fromEntries(campaigns.map((c: any) => [c.id, c.name]));

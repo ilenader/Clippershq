@@ -4,6 +4,7 @@ import { checkBanStatus } from "@/lib/check-ban";
 import { userHasCampaignCommunityAccess, getCampaignSubscriberIds } from "@/lib/community";
 import { publishToUsers } from "@/lib/ably";
 import { createNotification } from "@/lib/notifications";
+import { withDbRetry } from "@/lib/db-retry";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -37,12 +38,15 @@ export async function GET(req: NextRequest) {
     if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const calls = await db.scheduledVoiceCall.findMany({
-    where,
-    include: { createdBy: { select: { id: true, username: true, image: true } } },
-    orderBy: { scheduledAt: "desc" },
-    take: 200,
-  });
+  const calls: any[] = await withDbRetry(
+    () => db.scheduledVoiceCall.findMany({
+      where,
+      include: { createdBy: { select: { id: true, username: true, image: true } } },
+      orderBy: { scheduledAt: "desc" },
+      take: 200,
+    }),
+    "voice.calls.list",
+  );
 
   // Status-filtered requests get a flat array; legacy callers still get {upcoming, past}.
   if (statusParam) return NextResponse.json(calls);

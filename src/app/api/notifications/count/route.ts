@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { withDbRetry } from "@/lib/db-retry";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +22,12 @@ export async function GET() {
   if (!db || !db.notification) return NextResponse.json({ count: 0 });
 
   try {
-    const count = await db.notification.count({
-      where: { userId: session.user.id, isRead: false },
-    });
+    const count = await withDbRetry(
+      () => db.notification.count({
+        where: { userId: session.user.id, isRead: false },
+      }),
+      "notif.count",
+    );
     return NextResponse.json({ count });
   } catch {
     return NextResponse.json({ count: 0 });

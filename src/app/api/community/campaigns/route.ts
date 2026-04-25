@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { withDbRetry } from "@/lib/db-retry";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -78,14 +79,17 @@ export async function GET() {
     // the community channels keep existing for OWNER to archive messages, but
     // clippers/admins should stop seeing them in the sidebar the moment the
     // campaign flips to PAST.
-    const campaigns = await db.campaign.findMany({
-      where: {
-        id: { in: campaignIds },
-        ...(role === "OWNER" ? {} : { isArchived: false, status: { not: "PAST" } }),
-      },
-      select: { id: true, name: true, imageUrl: true, communityAvatarUrl: true, platform: true, status: true },
-      orderBy: [{ status: "asc" }, { name: "asc" }],
-    });
+    const campaigns: any[] = await withDbRetry(
+      () => db.campaign.findMany({
+        where: {
+          id: { in: campaignIds },
+          ...(role === "OWNER" ? {} : { isArchived: false, status: { not: "PAST" } }),
+        },
+        select: { id: true, name: true, imageUrl: true, communityAvatarUrl: true, platform: true, status: true },
+        orderBy: [{ status: "asc" }, { name: "asc" }],
+      }),
+      "community.campaigns",
+    );
 
     // Unread counts — one round-trip per campaign. Acceptable up to ~50 campaigns per user.
     // For each: find channels, find last-read per channel, sum messages created after lastRead.

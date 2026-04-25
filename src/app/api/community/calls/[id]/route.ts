@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
 import { publishToUsers } from "@/lib/ably";
 import { getCampaignSubscriberIds, userHasCampaignCommunityAccess } from "@/lib/community";
+import { withDbRetry } from "@/lib/db-retry";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +21,16 @@ export async function GET(
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   const { id } = await params;
-  const call = await db.scheduledVoiceCall.findUnique({
-    where: { id },
-    include: {
-      createdBy: { select: { id: true, username: true, image: true } },
-      campaign: { select: { id: true, name: true } },
-    },
-  });
+  const call = await withDbRetry(
+    () => db.scheduledVoiceCall.findUnique({
+      where: { id },
+      include: {
+        createdBy: { select: { id: true, username: true, image: true } },
+        campaign: { select: { id: true, name: true } },
+      },
+    }),
+    "voice.call.get",
+  );
   if (!call) return NextResponse.json({ error: "Call not found" }, { status: 404 });
   return NextResponse.json(call);
 }
@@ -71,10 +75,13 @@ export async function PATCH(
   }
 
   // Per-campaign authorization for ADMIN. Global calls are OWNER-only to modify.
-  const existing = await db.scheduledVoiceCall.findUnique({
-    where: { id },
-    select: { campaignId: true, isGlobal: true },
-  });
+  const existing = await withDbRetry<{ campaignId: string | null; isGlobal: boolean } | null>(
+    () => db.scheduledVoiceCall.findUnique({
+      where: { id },
+      select: { campaignId: true, isGlobal: true },
+    }),
+    "voice.call.authcheck",
+  );
   if (!existing) return NextResponse.json({ error: "Call not found" }, { status: 404 });
   if (existing.isGlobal && role !== "OWNER") {
     return NextResponse.json({ error: "Only owners can modify global calls" }, { status: 403 });
@@ -134,7 +141,10 @@ export async function DELETE(
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   const { id } = await params;
-  const call = await db.scheduledVoiceCall.findUnique({ where: { id } });
+  const call = await withDbRetry<any>(
+    () => db.scheduledVoiceCall.findUnique({ where: { id } }),
+    "voice.call.delcheck",
+  );
   if (!call) return NextResponse.json({ error: "Call not found" }, { status: 404 });
 
   // Per-campaign authorization for ADMIN. Global calls are OWNER-only to cancel.

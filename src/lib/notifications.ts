@@ -2,6 +2,7 @@
  * Notification system — creates in-app notifications for users.
  */
 import { db } from "@/lib/db";
+import { withDbRetry } from "@/lib/db-retry";
 
 export type NotificationType =
   | "CLIP_SUBMITTED" | "CLIP_APPROVED" | "CLIP_REJECTED" | "CLIP_FLAGGED"
@@ -35,18 +36,24 @@ export async function createNotification(
 export async function getUnreadCount(userId: string): Promise<number> {
   if (!db || !db.notification) return 0;
   try {
-    return await db.notification.count({ where: { userId, isRead: false } });
+    return await withDbRetry(
+      () => db.notification.count({ where: { userId, isRead: false } }),
+      "notif.unreadCount",
+    );
   } catch { return 0; }
 }
 
 export async function getNotifications(userId: string, limit = 20): Promise<any[]> {
   if (!db || !db.notification) return [];
   try {
-    return await db.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    });
+    return await withDbRetry(
+      () => db.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      }),
+      "notif.list",
+    );
   } catch { return []; }
 }
 
