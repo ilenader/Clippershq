@@ -95,19 +95,9 @@ async function sendEmailWithRetry(params: EmailParams): Promise<boolean> {
 // ─── Template wrapper ────────────────────────────────────────
 
 export function wrap(content: string): string {
-  // Brand lockup — triangle PNG + thin white separator + "Clippers HQ" wordmark.
-  // Reused in header and footer. Lives inline so the function stays self-contained.
-  const lockup = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" bgcolor="#000000" style="margin: 0 auto; background-color: #000000 !important;">
-    <tr>
-      <td bgcolor="#000000" valign="middle" style="padding-right: 12px; background-color: #000000 !important; line-height: 1;">
-        <img src="https://clipershq.com/email-logo-triangle.png" width="22" height="22" alt="Clippers HQ" style="display: block; border: 0;" />
-      </td>
-      <td bgcolor="#000000" valign="middle" style="padding-left: 12px; border-left: 1px solid #ffffff; height: 22px; line-height: 22px; background-color: #000000 !important;">
-        <span style="color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.5px;">Clippers</span><span style="color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 400; letter-spacing: 0.5px;">&nbsp;HQ</span>
-      </td>
-    </tr>
-  </table>`;
-
+  // Header + footer chrome (corner glows / curve glow / logo lockup) is BAKED INTO
+  // the user's mockup PNG, sliced into top + bottom bands. We just place the slices
+  // as <img> tags. Content sits between them on plain black, auto-sizing naturally.
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" style="background-color: #000000;">
 <head>
@@ -157,62 +147,51 @@ export function wrap(content: string): string {
   /* iOS Mail blue-link autodetection — disable */
   u + .body { background-color: #000000 !important; }
   u + #body a { color: #2596be !important; text-decoration: underline; }
-  /* Mobile — proportional scaling. Glows are <img> so width:100% works directly. */
+  /* Mobile — card fills viewport, glow images scale proportionally. */
   @media only screen and (max-width: 600px) {
+    .email-card { width: 100% !important; max-width: 100% !important; }
+    .top-glow-img, .bottom-glow-img { width: 100% !important; height: auto !important; }
     .px-mobile { padding-left: 24px !important; padding-right: 24px !important; }
   }
 </style>
 </head>
-<body bgcolor="#000000" id="body" class="body-bg" style="margin: 0; padding: 0; background-color: #000000 !important; color: #d1d8e0; -webkit-text-size-adjust: 100%;">
+<body bgcolor="#000000" id="body" class="body-bg" style="margin: 0; padding: 0; background-color: #000000 !important; color: #d1d8e0; -webkit-text-size-adjust: 100%; min-height: 100vh;">
 <!-- Hidden preheader. Zero-width joiners pad whitespace so Gmail won't preview body content. -->
 <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all; font-size: 1px; line-height: 1px; color: #000000;">&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;</div>
-<div class="body-bg" style="background-color: #000000 !important;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" class="body-bg" style="background-color: #000000 !important;">
+<!-- FULL-WIDTH BLACK WRAPPER. min-width:100% prevents Gmail web from showing a white frame
+     around the 600px card on wide viewports. -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" class="body-bg" style="background-color: #000000 !important; min-width: 100%;">
 <tr>
-  <td align="center" bgcolor="#000000" style="background-color: #000000 !important; padding: 32px 16px;">
+  <td align="center" valign="top" bgcolor="#000000" class="body-bg" style="background-color: #000000 !important; padding: 24px 0;">
 
-    <!-- Inner card 600px max -->
-    <table class="inner-box" role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="max-width: 600px; width: 100%; background-color: #000000 !important;">
+    <!-- Inner card 600px max — content auto-sizes height. No infinite black past content. -->
+    <table class="inner-box email-card" role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="max-width: 600px; width: 100%; background-color: #000000 !important;">
 
-      <!-- Top corner-glow as IMAGE (not background). Width 100% with cap at 600px = scales on mobile. -->
+      <!-- Top slice from user's mockup: corner orbs + Clippers HQ logo, baked in. -->
       <tr>
         <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0; line-height: 0; font-size: 0; mso-line-height-rule: exactly;">
-          <img src="https://clipershq.com/email-glow-corners.png" width="600" height="200" alt="" border="0" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+          <img src="https://clipershq.com/email-bg-top.png" width="600" height="270" alt="Clippers HQ" border="0" class="top-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
         </td>
       </tr>
 
-      <!-- Header lockup -->
+      <!-- Content — solid black, auto-height. -->
       <tr>
-        <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0 24px 32px;">
-          ${lockup}
-        </td>
-      </tr>
-
-      <!-- Content -->
-      <tr>
-        <td bgcolor="#000000" class="px-mobile" style="background-color: #000000 !important; padding: 0 40px 48px; color: #d1d8e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.6; mso-line-height-rule: exactly;">
+        <td bgcolor="#000000" class="px-mobile" style="background-color: #000000 !important; padding: 32px 40px 40px; color: #d1d8e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.6; mso-line-height-rule: exactly;">
           ${content}
         </td>
       </tr>
 
-      <!-- Footer lockup -->
+      <!-- Copyright — sits between content and bottom glow on plain black. -->
       <tr>
-        <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 24px 24px 8px;">
-          ${lockup}
-        </td>
-      </tr>
-
-      <!-- Copyright -->
-      <tr>
-        <td class="footer-bg" bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0 24px 16px;">
+        <td class="footer-bg" bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0 24px 24px;">
           <p style="color: #6b7280 !important; font-size: 12px; margin: 0; background-color: #000000 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280 !important; text-decoration: none;">clipershq.com</a></p>
         </td>
       </tr>
 
-      <!-- Bottom cinematic curve as IMAGE (not background). Final visual element. -->
+      <!-- Bottom slice from user's mockup: cinematic curve glow + Clippers HQ logo, baked in. -->
       <tr>
         <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0; line-height: 0; font-size: 0; mso-line-height-rule: exactly;">
-          <img src="https://clipershq.com/email-glow-bottom.png" width="600" height="120" alt="" border="0" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+          <img src="https://clipershq.com/email-bg-bottom.png" width="600" height="225" alt="Clippers HQ" border="0" class="bottom-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
         </td>
       </tr>
 
@@ -220,7 +199,6 @@ export function wrap(content: string): string {
   </td>
 </tr>
 </table>
-</div>
 </body>
 </html>`;
 }
