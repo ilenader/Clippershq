@@ -108,6 +108,26 @@ export function wrap(content: string): string {
 <meta name="supported-color-schemes" content="dark">
 <title>Clippers HQ</title>
 <style type="text/css">
+  /* HARD RESET — first rules in the cascade so Gmail iOS Mail honors them even
+     when it ignores nested overrides further down. Inline element attrs in the
+     templates are the ultimate fallback if <style> is stripped entirely. */
+  body, html { background: #000000 !important; background-color: #000000 !important; color: #ffffff !important; }
+  table, tr, td { background-color: #000000 !important; }
+  .content-cell, .content-cell * { background-color: transparent !important; }
+  .content-cell { background: #000000 !important; background-color: #000000 !important; color: #ffffff !important; }
+  .content-cell .accent-blue { color: #2596be !important; }
+  .content-cell .muted { color: #c8d0d8 !important; }
+  /* Re-pin under @media only screen — Gmail iOS scopes some rules to media queries. */
+  @media only screen {
+    body, table, td, .content-cell { background: #000000 !important; background-color: #000000 !important; }
+    .content-cell, .content-cell p, .content-cell span, .content-cell strong,
+    .content-cell b, .content-cell li, .content-cell h1, .content-cell h2, .content-cell h3 {
+      color: #ffffff !important;
+    }
+    .content-cell .accent-blue { color: #2596be !important; }
+    .content-cell .muted { color: #c8d0d8 !important; }
+    .content-cell .footnote { color: #6b7280 !important; }
+  }
   :root {
     color-scheme: dark;
     supported-color-schemes: dark;
@@ -153,7 +173,7 @@ export function wrap(content: string): string {
   [data-ogsc] div, [data-ogsb] div { background-color: #000000 !important; }
   [data-ogsc] p, [data-ogsb] p { background-color: transparent !important; }
   [data-ogsc] h1, [data-ogsb] h1, [data-ogsc] h2, [data-ogsb] h2 { color: #ffffff !important; }
-  [data-ogsc] span, [data-ogsb] span { color: #d1d8e0 !important; }
+  [data-ogsc] span, [data-ogsb] span { color: #ffffff !important; }
   [data-ogsc] .stats-cell, [data-ogsb] .stats-cell { background-color: rgba(255, 255, 255, 0.04) !important; }
   [data-ogsc] .btn-cell, [data-ogsb] .btn-cell { background-color: #2596be !important; }
   [data-ogsc] .btn-cell a, [data-ogsb] .btn-cell a { color: #ffffff !important; }
@@ -178,18 +198,18 @@ export function wrap(content: string): string {
   @media only screen and (max-width: 600px) {
     .email-card { width: 100% !important; max-width: 100% !important; }
     .top-glow-img, .bottom-glow-img { width: 100% !important; height: auto !important; }
-    .px-mobile { padding-left: 24px !important; padding-right: 24px !important; }
+    .px-mobile { padding: 16px 24px 24px !important; }
   }
 </style>
 </head>
-<body bgcolor="#000000" id="body" class="body-bg" style="margin: 0; padding: 0; background-color: #000000 !important; color: #d1d8e0; -webkit-text-size-adjust: 100%; min-height: 100vh;">
+<body bgcolor="#000000" id="body" class="body-bg" style="margin: 0; padding: 0; background-color: #000000 !important; background: #000000 !important; color: #ffffff !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; min-height: 100vh;">
 <!-- Hidden preheader. Zero-width joiners pad whitespace so Gmail won't preview body content. -->
 <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all; font-size: 1px; line-height: 1px; color: #000000;">&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;</div>
 <!-- FULL-WIDTH BLACK WRAPPER. min-width:100% prevents Gmail web from showing a white frame
      around the 600px card on wide viewports. -->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" class="body-bg" style="background-color: #000000 !important; min-width: 100%;">
 <tr>
-  <td align="center" valign="top" bgcolor="#000000" class="body-bg" style="background-color: #000000 !important; padding: 24px 0;">
+  <td align="center" valign="top" bgcolor="#000000" class="body-bg" style="background-color: #000000 !important; padding: 16px 0;">
 
     <!-- Inner card 600px max — content auto-sizes height. No infinite black past content. -->
     <table class="inner-box email-card" role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="max-width: 600px; width: 100%; background-color: #000000 !important;">
@@ -197,21 +217,21 @@ export function wrap(content: string): string {
       <!-- Top slice from user's mockup: corner orbs + Clippers HQ logo, baked in. -->
       <tr>
         <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0; line-height: 0; font-size: 0; mso-line-height-rule: exactly;">
-          <img src="https://clipershq.com/email-bg-top.png" width="600" height="270" alt="Clippers HQ" border="0" class="top-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+          <img src="https://clipershq.com/email-bg-top.png" width="600" height="180" alt="Clippers HQ" border="0" class="top-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
         </td>
       </tr>
 
       <!-- Content — solid black, auto-height. Triple-pinned (bgcolor attr + bg-color + bg
            shorthand + class) so Gmail iOS can't inject a white panel. -->
       <tr>
-        <td bgcolor="#000000" class="content-cell px-mobile" style="background-color: #000000 !important; background: #000000 !important; padding: 32px 40px 40px; color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.6; mso-line-height-rule: exactly;">
+        <td bgcolor="#000000" class="content-cell px-mobile" style="background-color: #000000 !important; background: #000000 !important; padding: 24px 32px 32px; color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.6; mso-line-height-rule: exactly;">
           ${content}
         </td>
       </tr>
 
       <!-- Copyright — sits between content and bottom glow on plain black. -->
       <tr>
-        <td class="footer-bg" bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0 24px 24px;">
+        <td class="footer-bg" bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0 24px 12px;">
           <p style="color: #6b7280 !important; font-size: 12px; margin: 0; background-color: #000000 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280 !important; text-decoration: none;">clipershq.com</a></p>
         </td>
       </tr>
@@ -219,7 +239,7 @@ export function wrap(content: string): string {
       <!-- Bottom slice from user's mockup: cinematic curve glow + Clippers HQ logo, baked in. -->
       <tr>
         <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0; line-height: 0; font-size: 0; mso-line-height-rule: exactly;">
-          <img src="https://clipershq.com/email-bg-bottom.png" width="600" height="225" alt="Clippers HQ" border="0" class="bottom-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+          <img src="https://clipershq.com/email-bg-bottom.png" width="600" height="150" alt="Clippers HQ" border="0" class="bottom-glow-img" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
         </td>
       </tr>
 
@@ -271,8 +291,8 @@ export async function sendClipApproved(email: string, campaignName: string, earn
     html: wrap(`
       <p style="font-size: 16px; color: #ffffff !important; margin: 0 0 12px;">Great news!</p>
       <p style="font-size: 15px; color: #c8d0d8 !important; margin: 0 0 16px;">Your clip for <strong style="color: #ffffff !important;">${escapeHtml(campaignName)}</strong> has been approved.</p>
-      ${earnings > 0 ? `<p style="font-size: 22px; color: #2596be !important; font-weight: 700; margin: 0 0 16px;">Current earnings: $${earnings.toFixed(2)}</p>` : ""}
-      <p style="font-size: 14px; color: #6b7280 !important; margin: 0;">Tracking has started — we'll monitor views and calculate your earnings automatically.</p>
+      ${earnings > 0 ? `<p class="accent-blue" style="font-size: 22px; color: #2596be !important; font-weight: 700; margin: 0 0 16px;">Current earnings: $${earnings.toFixed(2)}</p>` : ""}
+      <p class="footnote" style="font-size: 14px; color: #6b7280 !important; margin: 0;">Tracking has started — we'll monitor views and calculate your earnings automatically.</p>
     `),
   });
 }
@@ -295,8 +315,8 @@ export async function sendPayoutApproved(email: string, amount: number): Promise
     subject: "Payout sent",
     html: wrap(`
       <p style="font-size: 16px; color: #ffffff !important; margin: 0 0 12px;">Your payout has been sent.</p>
-      <p style="font-size: 28px; color: #2596be !important; font-weight: 700; line-height: 1.2; margin: 0 0 16px;">$${amount.toFixed(2)}</p>
-      <p style="font-size: 14px; color: #6b7280 !important; margin: 0;">Check your wallet for the transfer. It may take a few business days to arrive.</p>
+      <p class="accent-blue" style="font-size: 28px; color: #2596be !important; font-weight: 700; line-height: 1.2; margin: 0 0 16px;">$${amount.toFixed(2)}</p>
+      <p class="footnote" style="font-size: 14px; color: #6b7280 !important; margin: 0;">Check your wallet for the transfer. It may take a few business days to arrive.</p>
     `),
   });
 }
@@ -348,7 +368,7 @@ export async function sendCampaignAlertEmail(email: string, campaignName: string
     subject: safeSubject(`New Campaign: ${campaignName}`),
     html: wrap(`
       <div style="text-align: center; padding: 8px 0 16px;">
-        <span style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">New Campaign Available</span>
+        <span class="accent-blue" style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">New Campaign Available</span>
       </div>
       <h1 style="color: #ffffff !important; font-size: 24px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 16px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(campaignName)}</h1>
       <p style="color: #c8d0d8 !important; font-size: 15px; margin: 0 0 24px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(desc)}</p>
@@ -356,7 +376,7 @@ export async function sendCampaignAlertEmail(email: string, campaignName: string
         <tr>
           <td class="stats-cell" style="padding: 18px; text-align: center; border-right: 1px solid rgba(255, 255, 255, 0.08); background-color: rgba(255, 255, 255, 0.04) !important;">
             <p style="color: #6b7280 !important; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">CPM Rate</p>
-            <p style="color: #2596be !important; font-size: 22px; font-weight: 700; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${cpm ? "$" + cpm.toFixed(2) : "\u2014"}</p>
+            <p class="accent-blue" style="color: #2596be !important; font-size: 22px; font-weight: 700; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${cpm ? "$" + cpm.toFixed(2) : "\u2014"}</p>
           </td>
           <td class="stats-cell" style="padding: 18px; text-align: center; background-color: rgba(255, 255, 255, 0.04) !important;">
             <p style="color: #6b7280 !important; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Budget</p>
@@ -463,7 +483,7 @@ export async function sendClientInviteEmail(email: string, link: string): Promis
     to: email,
     subject: "You're invited to view your campaign on Clippers HQ",
     html: wrap(`
-      <p style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px;">You've been invited</p>
+      <p class="accent-blue" style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px;">You've been invited</p>
       <h1 style="color: #ffffff !important; font-size: 24px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 16px;">View your campaign on Clippers HQ</h1>
       <p style="font-size: 15px; color: #c8d0d8 !important; margin: 0 0 16px;">You've been invited to view your campaign performance.</p>
       <p style="font-size: 14px; color: #6b7280 !important; margin: 0 0 28px;">Click the button below to access your dashboard. This link expires in 24 hours.</p>

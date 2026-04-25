@@ -51,7 +51,7 @@ export async function sendCommunityAnnouncementEmail(
     to,
     subject: `Announcement: ${campaignName}`,
     html: wrap(`
-      <p style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px;">New Announcement</p>
+      <p class="accent-blue" style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px;">New Announcement</p>
       <h1 style="color: #ffffff !important; font-size: 24px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 12px;">${escapeHtml(campaignName)}</h1>
       <p style="font-size: 14px; color: #6b7280 !important; margin: 0 0 20px;">From <strong style="color: #ffffff !important;">${escapeHtml(senderName)}</strong></p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: rgba(255, 255, 255, 0.04) !important; border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3px solid #2596be; border-radius: 0 12px 12px 0; margin: 0 0 28px;">
