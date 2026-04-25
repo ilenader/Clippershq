@@ -139,7 +139,7 @@ export function Sidebar({ role }: SidebarProps) {
     if (role === "CLIENT") return;
     const load = () => {
       const now = Date.now();
-      if (now - communityUnreadRef.current.time < 30000) {
+      if (now - communityUnreadRef.current.time < 3000) {
         setTotalCommunityUnread(communityUnreadRef.current.value);
         return;
       }
@@ -165,9 +165,15 @@ export function Sidebar({ role }: SidebarProps) {
     };
     window.addEventListener("sse:channel_message", handler);
     window.addEventListener("sse:ticket_message", handler);
+    // notif_refresh fires on every notification read (incl. our community/ticket
+    // bell-clear push) — re-using it here gives the parent badge instant
+    // invalidation when the user opens a channel or ticket, without waiting for
+    // the next post or the 3s cache to expire.
+    window.addEventListener("sse:notif_refresh", handler);
     return () => {
       window.removeEventListener("sse:channel_message", handler);
       window.removeEventListener("sse:ticket_message", handler);
+      window.removeEventListener("sse:notif_refresh", handler);
       if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [role]);
