@@ -79,7 +79,11 @@ export function Navbar() {
         }
       } catch {}
     };
-    const interval = setInterval(fetchCount, 15000);
+    // 60s safety-net poll — Ably push (sse:notif_refresh) is the real-time path;
+    // this only catches the rare case where Ably drops or backgrounded tabs miss
+    // events. Reduced from 15s on 2026-04-25 to cut DB load at scale (each active
+    // user was 4 calls/min just for the bell badge).
+    const interval = setInterval(fetchCount, 60000);
     return () => clearInterval(interval);
   }, [userId, fetchNotifList]);
 

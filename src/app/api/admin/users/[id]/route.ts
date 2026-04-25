@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { getGamificationState } from "@/lib/gamification";
 import { checkBanStatus } from "@/lib/check-ban";
+import { invalidateCache, invalidateCachePrefix } from "@/lib/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -161,6 +162,11 @@ export async function PATCH(
       data: updateData,
       select: { id: true, username: true, email: true, role: true, status: true, level: true, currentStreak: true, longestStreak: true, manualBonusOverride: true, bonusPercentage: true, totalEarnings: true, referralCode: true, referredById: true },
     });
+    // Invalidate caches that depend on this user's role/membership.
+    if (updateData.role !== undefined) {
+      invalidateCache(`user.role.${id}`);
+      invalidateCachePrefix(`community.campaigns.${id}.`);
+    }
     return NextResponse.json(updated);
   } catch (err: any) {
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });

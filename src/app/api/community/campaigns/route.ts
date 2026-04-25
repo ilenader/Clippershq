@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
 import { withDbRetry } from "@/lib/db-retry";
+import { cachedRead } from "@/lib/cache";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -31,65 +32,74 @@ export async function GET() {
   if (!db) return NextResponse.json({ campaigns: [] });
 
   try {
-    // Resolve visible campaign IDs based on role.
-    let campaignIds: string[] = [];
-    if (role === "OWNER") {
-      const rows = await db.campaign.findMany({
-        where: { isArchived: false },
-        select: { id: true },
-      });
-      campaignIds = rows.map((r: any) => r.id);
-    } else if (role === "ADMIN") {
-      const [teamCampaigns, directAdmins, ownedCampaigns, createdCampaigns] = await Promise.all([
-        db.teamCampaign.findMany({
-          where: { team: { members: { some: { userId: session.user.id } } } },
-          select: { campaignId: true },
-        }),
-        db.campaignAdmin.findMany({
-          where: { userId: session.user.id },
-          select: { campaignId: true },
-        }),
-        db.campaign.findMany({
-          where: { ownerUserId: session.user.id },
+    // Resolve visible campaign list (IDs + metadata) — cached 60s per user/role
+    // since membership and campaign metadata only change on admin action. The
+    // unread enrichment below runs fresh each request so badges stay live.
+    // Cache key MUST include both userId AND role: a user's role can flip
+    // (OWNER promote/demote) and their visible campaign set changes accordingly.
+    const cacheKey = `community.campaigns.${session.user.id}.${role}`;
+    const campaigns: any[] = await cachedRead(cacheKey, 60_000, async () => {
+      let campaignIds: string[] = [];
+      if (role === "OWNER") {
+        const rows = await db.campaign.findMany({
+          where: { isArchived: false },
           select: { id: true },
-        }),
-        db.campaign.findMany({
-          where: { createdById: session.user.id },
-          select: { id: true },
-        }),
-      ]);
-      campaignIds = Array.from(new Set<string>([
-        ...teamCampaigns.map((t: any) => t.campaignId as string),
-        ...directAdmins.map((a: any) => a.campaignId as string),
-        ...ownedCampaigns.map((c: any) => c.id as string),
-        ...createdCampaigns.map((c: any) => c.id as string),
-      ]));
-    } else {
-      // CLIPPER
-      const memberships = await db.campaignAccount.findMany({
-        where: { clipAccount: { userId: session.user.id } },
-        select: { campaignId: true },
-      });
-      campaignIds = Array.from(new Set<string>(memberships.map((m: any) => m.campaignId as string)));
-    }
+        });
+        campaignIds = rows.map((r: any) => r.id);
+      } else if (role === "ADMIN") {
+        const [teamCampaigns, directAdmins, ownedCampaigns, createdCampaigns] = await Promise.all([
+          db.teamCampaign.findMany({
+            where: { team: { members: { some: { userId: session.user.id } } } },
+            select: { campaignId: true },
+          }),
+          db.campaignAdmin.findMany({
+            where: { userId: session.user.id },
+            select: { campaignId: true },
+          }),
+          db.campaign.findMany({
+            where: { ownerUserId: session.user.id },
+            select: { id: true },
+          }),
+          db.campaign.findMany({
+            where: { createdById: session.user.id },
+            select: { id: true },
+          }),
+        ]);
+        campaignIds = Array.from(new Set<string>([
+          ...teamCampaigns.map((t: any) => t.campaignId as string),
+          ...directAdmins.map((a: any) => a.campaignId as string),
+          ...ownedCampaigns.map((c: any) => c.id as string),
+          ...createdCampaigns.map((c: any) => c.id as string),
+        ]));
+      } else {
+        // CLIPPER
+        const memberships = await db.campaignAccount.findMany({
+          where: { clipAccount: { userId: session.user.id } },
+          select: { campaignId: true },
+        });
+        campaignIds = Array.from(new Set<string>(memberships.map((m: any) => m.campaignId as string)));
+      }
 
-    if (campaignIds.length === 0) return NextResponse.json({ campaigns: [] });
+      if (campaignIds.length === 0) return [];
 
-    // Campaign metadata. Non-owners also lose visibility on PAST campaigns —
-    // the community channels keep existing for OWNER to archive messages, but
-    // clippers/admins should stop seeing them in the sidebar the moment the
-    // campaign flips to PAST.
-    const campaigns: any[] = await withDbRetry(
-      () => db.campaign.findMany({
-        where: {
-          id: { in: campaignIds },
-          ...(role === "OWNER" ? {} : { isArchived: false, status: { not: "PAST" } }),
-        },
-        select: { id: true, name: true, imageUrl: true, communityAvatarUrl: true, platform: true, status: true },
-        orderBy: [{ status: "asc" }, { name: "asc" }],
-      }),
-      "community.campaigns",
-    );
+      // Campaign metadata. Non-owners also lose visibility on PAST campaigns —
+      // the community channels keep existing for OWNER to archive messages, but
+      // clippers/admins should stop seeing them in the sidebar the moment the
+      // campaign flips to PAST.
+      return await withDbRetry<any[]>(
+        () => db.campaign.findMany({
+          where: {
+            id: { in: campaignIds },
+            ...(role === "OWNER" ? {} : { isArchived: false, status: { not: "PAST" } }),
+          },
+          select: { id: true, name: true, imageUrl: true, communityAvatarUrl: true, platform: true, status: true },
+          orderBy: [{ status: "asc" }, { name: "asc" }],
+        }),
+        "community.campaigns",
+      );
+    });
+
+    if (campaigns.length === 0) return NextResponse.json({ campaigns: [] });
 
     // Unread counts — one round-trip per campaign. Acceptable up to ~50 campaigns per user.
     // For each: find channels, find last-read per channel, sum messages created after lastRead.

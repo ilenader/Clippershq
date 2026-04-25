@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { computeBalance, computeCampaignBalances } from "@/lib/balance";
 import { checkBanStatus } from "@/lib/check-ban";
 import { withDbRetry } from "@/lib/db-retry";
+import { cachedRead } from "@/lib/cache";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -16,15 +17,21 @@ export async function GET(request: Request) {
 
   if (!db) return NextResponse.json({ totalEarned: 0, available: 0, campaignBalances: [] });
 
-  // Role isolation: personal earnings data is clipper-only. Fresh DB role read
-  // (don't trust session.user.role — it can go stale across role changes) so
-  // the FLAGGED sanitization below is gated on authoritative data.
-  const currentUser = await withDbRetry<{ role: string } | null>(
-    () => db.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    }),
-    "earnings.user",
+  // Role isolation: personal earnings data is clipper-only. Cached 120s per
+  // userId — role only changes on admin promote/demote. Stale role for up to
+  // 2 minutes after a role flip is acceptable; admin can pre-warm refresh by
+  // calling invalidateCache(`user.role.${userId}`) in the promotion handler.
+  // FLAGGED sanitization below is gated on this lookup.
+  const currentUser = await cachedRead(
+    `user.role.${session.user.id}`,
+    120_000,
+    () => withDbRetry<{ role: string } | null>(
+      () => db.user.findUnique({
+        where: { id: session.user.id },
+        select: { role: true },
+      }),
+      "earnings.user",
+    ),
   );
   if (currentUser?.role !== "CLIPPER") {
     return NextResponse.json({ totalEarned: 0, approvedEarnings: 0, pendingEarnings: 0, paidOut: 0, lockedInPayouts: 0, available: 0, campaignBalances: [], clipEarnings: [] });
