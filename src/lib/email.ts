@@ -124,13 +124,29 @@ export function wrap(content: string): string {
   .footer-bg { background-color: #000000 !important; }
   .stats-cell { background-color: rgba(255, 255, 255, 0.04) !important; }
   .btn-cell { background-color: #2596be !important; }
-  .btn-cell a { background-color: #2596be !important; color: #ffffff !important; }
+  /* Inline content links use brand blue. Override below keeps CTA button text white. */
+  a { color: #2596be !important; text-decoration: underline; }
+  a:hover { color: #4ab5d8 !important; }
+  .btn-cell a { background-color: #2596be !important; color: #ffffff !important; text-decoration: none !important; }
   @media (prefers-color-scheme: light) {
     body, html, table, td, div, p, span, h1, h2, h3 {
       background-color: #000000 !important;
       color: #e8edf2 !important;
     }
     .inner-box, .inner-box td { background-color: #000000 !important; }
+  }
+  /* Mobile — scale glow PNGs proportionally instead of locking to 600px. */
+  @media only screen and (max-width: 600px) {
+    .corner-glow-cell {
+      background-size: 100% auto !important;
+    }
+    .bottom-glow-cell {
+      background-size: 100% auto !important;
+      height: 80px !important;
+    }
+    .bottom-glow-cell img {
+      height: 80px !important;
+    }
   }
   u + .body { background-color: #000000 !important; }
 </style>
@@ -140,35 +156,37 @@ export function wrap(content: string): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#000000" style="background-color: #000000 !important;">
 <tr style="background-color: #000000;"><td align="center" bgcolor="#000000" style="padding: 24px 16px; background-color: #000000 !important;">
   <table class="inner-box" role="presentation" width="600" cellpadding="0" cellspacing="0" bgcolor="#000000" style="max-width: 600px; width: 100%; background-color: #000000 !important;">
-    <!-- Header + content cell with corner-glow background image. bgcolor fallback for Outlook. -->
+    <!-- Header + content cell with corner-glow background. Locked at 600x800; longer content
+         flows past the glow onto plain black for a clean transition. -->
     <tr style="background-color: #000000;">
-      <td bgcolor="#000000" background="https://clipershq.com/email-glow-corners.png" style="background-color: #000000 !important; background-image: url(https://clipershq.com/email-glow-corners.png); background-repeat: no-repeat; background-position: center top; background-size: 100% auto;">
+      <td class="corner-glow-cell" bgcolor="#000000" background="https://clipershq.com/email-glow-corners.png" style="background-color: #000000 !important; background-image: url(https://clipershq.com/email-glow-corners.png); background-repeat: no-repeat; background-position: center top; background-size: 600px 800px; mso-line-height-rule: exactly; line-height: 1.5;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: transparent;">
           <tr><td align="center" style="padding: 56px 24px 40px; background-color: transparent;">
             ${lockup}
           </td></tr>
-          <tr><td style="padding: 16px 40px 48px; color: #d1d8e0; background-color: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <tr><td style="padding: 16px 40px 48px; color: #d1d8e0; background-color: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; mso-line-height-rule: exactly; line-height: 1.5;">
             ${content}
           </td></tr>
         </table>
       </td>
     </tr>
-    <!-- Bottom cinematic glow strip. Empty cell with background-image; bgcolor fallback for Outlook. -->
-    <tr style="background-color: #000000;">
-      <td bgcolor="#000000" height="120" background="https://clipershq.com/email-glow-bottom.png" style="background-color: #000000 !important; background-image: url(https://clipershq.com/email-glow-bottom.png); background-repeat: no-repeat; background-position: center bottom; background-size: 100% auto; height: 120px; line-height: 120px; mso-line-height-rule: exactly; font-size: 1px;">
-        &nbsp;
-      </td>
-    </tr>
-    <!-- Footer logo lockup -->
+    <!-- Footer logo lockup (above glow, on plain black) -->
     <tr style="background-color: #000000;">
       <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 8px 24px 4px;">
         ${lockup}
       </td>
     </tr>
-    <!-- Copyright -->
+    <!-- Copyright (above glow, on plain black) -->
     <tr style="background-color: #000000;">
-      <td class="footer-bg" bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 12px 24px 32px;">
+      <td class="footer-bg" bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 12px 24px 24px;">
         <p style="color: #6b7280 !important; font-size: 12px; margin: 0; background-color: #000000 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280 !important; text-decoration: none; background-color: #000000 !important;">clipershq.com</a></p>
+      </td>
+    </tr>
+    <!-- Bottom cinematic glow strip — final visual element. 1x1 transparent spacer img
+         guarantees the cell holds its 120px height in Yahoo/AOL where empty cells collapse. -->
+    <tr style="background-color: #000000;">
+      <td class="bottom-glow-cell" bgcolor="#000000" height="120" background="https://clipershq.com/email-glow-bottom.png" style="background-color: #000000 !important; background-image: url(https://clipershq.com/email-glow-bottom.png); background-repeat: no-repeat; background-position: center bottom; background-size: 600px 120px; height: 120px; min-height: 120px; mso-line-height-rule: exactly; line-height: 120px; font-size: 1px;">
+        <img src="https://clipershq.com/email-spacer.png" width="1" height="120" alt="" style="display: block; border: 0; height: 120px;" />
       </td>
     </tr>
   </table>
@@ -179,10 +197,12 @@ export function wrap(content: string): string {
 </html>`;
 }
 
-/** Centered button for emails (uses table for email client compatibility) */
+/** Centered button for emails (uses table for email client compatibility).
+ *  Wrapper bg is transparent so no dark halo appears around rounded corners on the
+ *  pure-black chrome. Only the .btn-cell carries the brand accent. */
 export function emailButton(text: string, href: string): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto; background-color: #111720 !important;">
-<tr style="background-color: #111720;"><td class="btn-cell" align="center" style="border-radius: 8px; background-color: #2596be !important;">
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto; background-color: transparent !important;">
+<tr style="background-color: transparent;"><td class="btn-cell" bgcolor="#2596be" align="center" style="border-radius: 8px; background-color: #2596be !important;">
   <a href="${href}" target="_blank" style="display: inline-block; padding: 14px 32px; color: #ffffff !important; font-size: 16px; font-weight: 600; text-decoration: none; background-color: #2596be !important; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
     ${text}
   </a>
@@ -296,7 +316,7 @@ export async function sendCampaignAlertEmail(email: string, campaignName: string
       <div style="text-align: center; padding: 8px 0 16px;">
         <span style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">New Campaign Available</span>
       </div>
-      <h1 style="color: #ffffff !important; font-size: 26px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 16px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(campaignName)}</h1>
+      <h1 style="color: #ffffff !important; font-size: 24px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 16px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(campaignName)}</h1>
       <p style="color: #c8d0d8 !important; font-size: 15px; margin: 0 0 24px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(desc)}</p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 28px; background-color: rgba(255, 255, 255, 0.04) !important; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;">
         <tr>
@@ -410,7 +430,7 @@ export async function sendClientInviteEmail(email: string, link: string): Promis
     subject: "You're invited to view your campaign on Clippers HQ",
     html: wrap(`
       <p style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px;">You've been invited</p>
-      <h1 style="color: #ffffff !important; font-size: 22px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 16px;">View your campaign on Clippers HQ</h1>
+      <h1 style="color: #ffffff !important; font-size: 24px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 16px;">View your campaign on Clippers HQ</h1>
       <p style="font-size: 15px; color: #c8d0d8 !important; margin: 0 0 16px;">You've been invited to view your campaign performance.</p>
       <p style="font-size: 14px; color: #6b7280 !important; margin: 0 0 28px;">Click the button below to access your dashboard. This link expires in 24 hours.</p>
       ${emailButton("Access Dashboard", link)}
