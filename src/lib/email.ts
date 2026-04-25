@@ -97,30 +97,37 @@ async function sendEmailWithRetry(params: EmailParams): Promise<boolean> {
 export function wrap(content: string): string {
   // Brand lockup — triangle PNG + thin white separator + "Clippers HQ" wordmark.
   // Reused in header and footer. Lives inline so the function stays self-contained.
-  const lockup = `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto; background-color: #000000 !important;">
-    <tr style="background-color: #000000;">
-      <td valign="middle" style="padding-right: 12px; background-color: #000000 !important; line-height: 1;">
+  const lockup = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" bgcolor="#000000" style="margin: 0 auto; background-color: #000000 !important;">
+    <tr>
+      <td bgcolor="#000000" valign="middle" style="padding-right: 12px; background-color: #000000 !important; line-height: 1;">
         <img src="https://clipershq.com/email-logo-triangle.png" width="22" height="22" alt="Clippers HQ" style="display: block; border: 0;" />
       </td>
-      <td valign="middle" style="padding-left: 12px; border-left: 1px solid #ffffff; height: 22px; line-height: 22px; background-color: #000000 !important;">
-        <span style="color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; background-color: #000000 !important;">Clippers</span><span style="color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 400; letter-spacing: 0.5px; background-color: #000000 !important;">&nbsp;HQ</span>
+      <td bgcolor="#000000" valign="middle" style="padding-left: 12px; border-left: 1px solid #ffffff; height: 22px; line-height: 22px; background-color: #000000 !important;">
+        <span style="color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.5px;">Clippers</span><span style="color: #ffffff !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 400; letter-spacing: 0.5px;">&nbsp;HQ</span>
       </td>
     </tr>
   </table>`;
 
-  return `<!DOCTYPE html>
-<html style="background-color: #000000;">
+  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" style="background-color: #000000;">
 <head>
 <meta charset="utf-8">
-<meta name="color-scheme" content="dark only">
-<meta name="supported-color-schemes" content="dark only">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<title>Clippers HQ</title>
 <style type="text/css">
-  :root { color-scheme: dark only; }
+  :root {
+    color-scheme: dark;
+    supported-color-schemes: dark;
+  }
   body, html, table, td, div, p, span, h1, h2, h3, ol, li, a {
     background-color: #000000 !important;
-    color: #e8edf2 !important;
+    color: #e8edf2;
   }
   .inner-box, .inner-box td { background-color: #000000 !important; }
+  .body-bg { background-color: #000000 !important; }
   .footer-bg { background-color: #000000 !important; }
   .stats-cell { background-color: rgba(255, 255, 255, 0.04) !important; }
   .btn-cell { background-color: #2596be !important; }
@@ -128,69 +135,90 @@ export function wrap(content: string): string {
   a { color: #2596be !important; text-decoration: underline; }
   a:hover { color: #4ab5d8 !important; }
   .btn-cell a { background-color: #2596be !important; color: #ffffff !important; text-decoration: none !important; }
-  @media (prefers-color-scheme: light) {
-    body, html, table, td, div, p, span, h1, h2, h3 {
-      background-color: #000000 !important;
-      color: #e8edf2 !important;
-    }
+  /* Apple Mail dark mode */
+  @media (prefers-color-scheme: dark) {
+    body, html { background-color: #000000 !important; }
+    .body-bg { background-color: #000000 !important; }
     .inner-box, .inner-box td { background-color: #000000 !important; }
   }
-  /* Mobile — scale glow PNGs proportionally instead of locking to 600px. */
-  @media only screen and (max-width: 600px) {
-    .corner-glow-cell {
-      background-size: 100% auto !important;
-    }
-    .bottom-glow-cell {
-      background-size: 100% auto !important;
-      height: 80px !important;
-    }
-    .bottom-glow-cell img {
-      height: 80px !important;
-    }
-  }
+  /* Outlook.com / Gmail dark mode — [data-ogsc] (light source) and [data-ogsb] (background source)
+     are the wrappers Gmail/Outlook inject when forcing inversion. Re-pin to black. */
+  [data-ogsc] body, [data-ogsb] body { background-color: #000000 !important; }
+  [data-ogsc] .body-bg, [data-ogsb] .body-bg { background-color: #000000 !important; }
+  [data-ogsc] table, [data-ogsb] table { background-color: #000000 !important; }
+  [data-ogsc] td, [data-ogsb] td { background-color: #000000 !important; }
+  [data-ogsc] div, [data-ogsb] div { background-color: #000000 !important; }
+  [data-ogsc] p, [data-ogsb] p { background-color: transparent !important; }
+  [data-ogsc] h1, [data-ogsb] h1, [data-ogsc] h2, [data-ogsb] h2 { color: #ffffff !important; }
+  [data-ogsc] span, [data-ogsb] span { color: #d1d8e0 !important; }
+  [data-ogsc] .stats-cell, [data-ogsb] .stats-cell { background-color: rgba(255, 255, 255, 0.04) !important; }
+  [data-ogsc] .btn-cell, [data-ogsb] .btn-cell { background-color: #2596be !important; }
+  [data-ogsc] .btn-cell a, [data-ogsb] .btn-cell a { color: #ffffff !important; }
+  /* iOS Mail blue-link autodetection — disable */
   u + .body { background-color: #000000 !important; }
+  u + #body a { color: #2596be !important; text-decoration: underline; }
+  /* Mobile — proportional scaling. Glows are <img> so width:100% works directly. */
+  @media only screen and (max-width: 600px) {
+    .px-mobile { padding-left: 24px !important; padding-right: 24px !important; }
+  }
 </style>
 </head>
-<body bgcolor="#000000" style="margin: 0; padding: 0; background-color: #000000 !important; color: #e8edf2; -webkit-text-size-adjust: 100%;">
-<div class="body" style="background-color: #000000;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#000000" style="background-color: #000000 !important;">
-<tr style="background-color: #000000;"><td align="center" bgcolor="#000000" style="padding: 24px 16px; background-color: #000000 !important;">
-  <table class="inner-box" role="presentation" width="600" cellpadding="0" cellspacing="0" bgcolor="#000000" style="max-width: 600px; width: 100%; background-color: #000000 !important;">
-    <!-- Header + content cell with corner-glow background. Locked at 600x800; longer content
-         flows past the glow onto plain black for a clean transition. -->
-    <tr style="background-color: #000000;">
-      <td class="corner-glow-cell" bgcolor="#000000" background="https://clipershq.com/email-glow-corners.png" style="background-color: #000000 !important; background-image: url(https://clipershq.com/email-glow-corners.png); background-repeat: no-repeat; background-position: center top; background-size: 600px 800px; mso-line-height-rule: exactly; line-height: 1.5;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: transparent;">
-          <tr><td align="center" style="padding: 56px 24px 40px; background-color: transparent;">
-            ${lockup}
-          </td></tr>
-          <tr><td style="padding: 16px 40px 48px; color: #d1d8e0; background-color: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; mso-line-height-rule: exactly; line-height: 1.5;">
-            ${content}
-          </td></tr>
-        </table>
-      </td>
-    </tr>
-    <!-- Footer logo lockup (above glow, on plain black) -->
-    <tr style="background-color: #000000;">
-      <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 8px 24px 4px;">
-        ${lockup}
-      </td>
-    </tr>
-    <!-- Copyright (above glow, on plain black) -->
-    <tr style="background-color: #000000;">
-      <td class="footer-bg" bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 12px 24px 24px;">
-        <p style="color: #6b7280 !important; font-size: 12px; margin: 0; background-color: #000000 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280 !important; text-decoration: none; background-color: #000000 !important;">clipershq.com</a></p>
-      </td>
-    </tr>
-    <!-- Bottom cinematic glow strip — final visual element. 1x1 transparent spacer img
-         guarantees the cell holds its 120px height in Yahoo/AOL where empty cells collapse. -->
-    <tr style="background-color: #000000;">
-      <td class="bottom-glow-cell" bgcolor="#000000" height="120" background="https://clipershq.com/email-glow-bottom.png" style="background-color: #000000 !important; background-image: url(https://clipershq.com/email-glow-bottom.png); background-repeat: no-repeat; background-position: center bottom; background-size: 600px 120px; height: 120px; min-height: 120px; mso-line-height-rule: exactly; line-height: 120px; font-size: 1px;">
-        <img src="https://clipershq.com/email-spacer.png" width="1" height="120" alt="" style="display: block; border: 0; height: 120px;" />
-      </td>
-    </tr>
-  </table>
-</td></tr>
+<body bgcolor="#000000" id="body" class="body-bg" style="margin: 0; padding: 0; background-color: #000000 !important; color: #d1d8e0; -webkit-text-size-adjust: 100%;">
+<!-- Hidden preheader. Zero-width joiners pad whitespace so Gmail won't preview body content. -->
+<div style="display: none; max-height: 0; overflow: hidden; mso-hide: all; font-size: 1px; line-height: 1px; color: #000000;">&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;&zwnj;</div>
+<div class="body-bg" style="background-color: #000000 !important;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" class="body-bg" style="background-color: #000000 !important;">
+<tr>
+  <td align="center" bgcolor="#000000" style="background-color: #000000 !important; padding: 32px 16px;">
+
+    <!-- Inner card 600px max -->
+    <table class="inner-box" role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="max-width: 600px; width: 100%; background-color: #000000 !important;">
+
+      <!-- Top corner-glow as IMAGE (not background). Width 100% with cap at 600px = scales on mobile. -->
+      <tr>
+        <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0; line-height: 0; font-size: 0; mso-line-height-rule: exactly;">
+          <img src="https://clipershq.com/email-glow-corners.png" width="600" height="200" alt="" border="0" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+        </td>
+      </tr>
+
+      <!-- Header lockup -->
+      <tr>
+        <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0 24px 32px;">
+          ${lockup}
+        </td>
+      </tr>
+
+      <!-- Content -->
+      <tr>
+        <td bgcolor="#000000" class="px-mobile" style="background-color: #000000 !important; padding: 0 40px 48px; color: #d1d8e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.6; mso-line-height-rule: exactly;">
+          ${content}
+        </td>
+      </tr>
+
+      <!-- Footer lockup -->
+      <tr>
+        <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 24px 24px 8px;">
+          ${lockup}
+        </td>
+      </tr>
+
+      <!-- Copyright -->
+      <tr>
+        <td class="footer-bg" bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0 24px 16px;">
+          <p style="color: #6b7280 !important; font-size: 12px; margin: 0; background-color: #000000 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&copy; 2026 Clippers HQ &mdash; <a href="https://clipershq.com" style="color: #6b7280 !important; text-decoration: none;">clipershq.com</a></p>
+        </td>
+      </tr>
+
+      <!-- Bottom cinematic curve as IMAGE (not background). Final visual element. -->
+      <tr>
+        <td bgcolor="#000000" align="center" style="background-color: #000000 !important; padding: 0; line-height: 0; font-size: 0; mso-line-height-rule: exactly;">
+          <img src="https://clipershq.com/email-glow-bottom.png" width="600" height="120" alt="" border="0" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; outline: none; text-decoration: none;" />
+        </td>
+      </tr>
+
+    </table>
+  </td>
+</tr>
 </table>
 </div>
 </body>
