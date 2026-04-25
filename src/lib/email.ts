@@ -167,7 +167,43 @@ export function wrap(content: string): string {
     .body-bg { background-color: #000000 !important; }
     .inner-box, .inner-box td { background-color: #000000 !important; }
   }
-  /* Light-mode variant — Apple Mail (Mac + iOS) and any client that respects
+  /* iOS-specific override — Gmail iOS Mail and Apple Mail iOS strip many CSS rules
+     but consistently honor @supports (-webkit-touch-callout: none) which fires ONLY
+     on iOS WebKit. This forces the WHITE-themed variant on iOS users regardless of
+     their light/dark preference, since Gmail iOS forces white content area anyway.
+     max-device-width: 1024px scopes to phones + iPads. Other clients ignore this
+     entire block and stay on the dark default. */
+  @media only screen and (max-device-width: 1024px) {
+    @supports (-webkit-touch-callout: none) {
+      body, html { background-color: #ffffff !important; }
+      .body-bg { background-color: #ffffff !important; }
+      body table, body tr, body td { background-color: #ffffff !important; }
+      .inner-box, .inner-box td { background-color: #ffffff !important; }
+      .footer-bg { background-color: #ffffff !important; }
+      /* Show white slices, hide dark slices */
+      .light-only { display: block !important; max-height: none !important; overflow: visible !important; }
+      .dark-only { display: none !important; max-height: 0 !important; overflow: hidden !important; mso-hide: all; }
+      /* Content surface — WHITE bg, BLACK text on iOS. body-prefix beats inline !important. */
+      body .content-cell { background-color: #ffffff !important; background: #ffffff !important; color: #000000 !important; }
+      body .content-cell * { background-color: transparent !important; }
+      body .content-cell p, body .content-cell div, body .content-cell li,
+      body .content-cell span, body .content-cell strong, body .content-cell b,
+      body .content-cell h1, body .content-cell h2, body .content-cell h3 { color: #000000 !important; }
+      body .content-cell .accent-blue, body .content-cell .accent-blue * { color: #2596be !important; }
+      body .content-cell .muted { color: #4a5568 !important; }
+      body .content-cell .footnote { color: #6b7280 !important; }
+      /* Carve-outs preserve panels + button across iOS */
+      body .content-cell .stats-cell { background-color: rgba(0, 0, 0, 0.04) !important; }
+      body .content-cell .btn-cell, body .content-cell .btn-cell a { background-color: #2596be !important; color: #ffffff !important; }
+      body .content-cell .warn-panel { background-color: rgba(239, 68, 68, 0.08) !important; }
+      body .content-cell .warn-panel p { color: #b91c1c !important; }
+      /* Footer copyright — readable on white */
+      .footer-bg p, .footer-bg a { color: #6b7280 !important; }
+      /* Disable Apple Mail's auto-styling of phone numbers, dates, addresses, etc. */
+      body .content-cell a[x-apple-data-detectors] { color: inherit !important; text-decoration: none !important; }
+    }
+  }
+  /* Light-mode variant — Apple Mail (Mac) and any client that respects
      prefers-color-scheme: light. Swaps to white-themed slice images and inverts
      the content surface from black/white to white/black. The body-prefix on
      content-cell rules increases specificity to beat inline !important colors
