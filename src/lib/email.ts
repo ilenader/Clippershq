@@ -94,7 +94,7 @@ async function sendEmailWithRetry(params: EmailParams): Promise<boolean> {
 
 // ─── Template wrapper ────────────────────────────────────────
 
-function wrap(content: string): string {
+export function wrap(content: string): string {
   // Brand lockup — triangle PNG + thin white separator + "Clippers HQ" wordmark.
   // Reused in header and footer. Lives inline so the function stays self-contained.
   const lockup = `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto; background-color: #000000 !important;">
@@ -122,7 +122,7 @@ function wrap(content: string): string {
   }
   .inner-box, .inner-box td { background-color: #000000 !important; }
   .footer-bg { background-color: #000000 !important; }
-  .stats-cell { background-color: #0d1117 !important; }
+  .stats-cell { background-color: rgba(255, 255, 255, 0.04) !important; }
   .btn-cell { background-color: #2596be !important; }
   .btn-cell a { background-color: #2596be !important; color: #ffffff !important; }
   @media (prefers-color-scheme: light) {
@@ -147,7 +147,7 @@ function wrap(content: string): string {
           <tr><td align="center" style="padding: 56px 24px 40px; background-color: transparent;">
             ${lockup}
           </td></tr>
-          <tr><td style="padding: 8px 32px 48px; color: #e8edf2; background-color: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <tr><td style="padding: 16px 40px 48px; color: #d1d8e0; background-color: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
             ${content}
           </td></tr>
         </table>
@@ -180,7 +180,7 @@ function wrap(content: string): string {
 }
 
 /** Centered button for emails (uses table for email client compatibility) */
-function emailButton(text: string, href: string): string {
+export function emailButton(text: string, href: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto; background-color: #111720 !important;">
 <tr style="background-color: #111720;"><td class="btn-cell" align="center" style="border-radius: 8px; background-color: #2596be !important;">
   <a href="${href}" target="_blank" style="display: inline-block; padding: 14px 32px; color: #ffffff !important; font-size: 16px; font-weight: 600; text-decoration: none; background-color: #2596be !important; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
@@ -197,15 +197,15 @@ export async function sendWelcomeEmail(email: string, username: string): Promise
     to: email,
     subject: "Welcome to Clippers HQ",
     html: wrap(`
-      <p style="font-size: 16px; margin: 0 0 12px;">Hey ${escapeHtml(username)},</p>
-      <p style="font-size: 15px; color: #a1a1aa; margin: 0 0 16px;">Welcome to Clippers HQ! Here's how to start earning:</p>
-      <ol style="font-size: 14px; color: #d4d4d8; padding-left: 20px; margin: 0 0 16px;">
-        <li style="margin-bottom: 8px;">Add your TikTok or Instagram account in <strong style="color: #fff;">Accounts</strong></li>
-        <li style="margin-bottom: 8px;">Browse and join a <strong style="color: #fff;">Campaign</strong></li>
-        <li style="margin-bottom: 8px;">Post clips and submit them in <strong style="color: #fff;">Clips</strong></li>
+      <p style="font-size: 16px; color: #ffffff !important; margin: 0 0 12px;">Hey ${escapeHtml(username)},</p>
+      <p style="font-size: 15px; color: #c8d0d8 !important; margin: 0 0 20px;">Welcome to Clippers HQ! Here's how to start earning:</p>
+      <ol style="font-size: 14px; color: #c8d0d8 !important; padding-left: 20px; margin: 0 0 20px; line-height: 1.6;">
+        <li style="margin-bottom: 8px;">Add your TikTok or Instagram account in <strong style="color: #ffffff !important;">Accounts</strong></li>
+        <li style="margin-bottom: 8px;">Browse and join a <strong style="color: #ffffff !important;">Campaign</strong></li>
+        <li style="margin-bottom: 8px;">Post clips and submit them in <strong style="color: #ffffff !important;">Clips</strong></li>
         <li>Earn money based on your views!</li>
       </ol>
-      <p style="font-size: 14px; color: #71717a; margin: 0;">Good luck and happy clipping!</p>
+      <p style="font-size: 14px; color: #6b7280 !important; margin: 0;">Good luck and happy clipping!</p>
     `),
   });
 }
@@ -215,10 +215,10 @@ export async function sendClipApproved(email: string, campaignName: string, earn
     to: email,
     subject: "Your clip was approved",
     html: wrap(`
-      <p style="font-size: 16px; margin: 0 0 12px;">Great news!</p>
-      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${escapeHtml(campaignName)}</strong> has been approved.</p>
-      ${earnings > 0 ? `<p style="font-size: 20px; color: #2596be; font-weight: bold; margin: 0 0 12px;">Current earnings: $${earnings.toFixed(2)}</p>` : ""}
-      <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Tracking has started — we'll monitor views and calculate your earnings automatically.</p>
+      <p style="font-size: 16px; color: #ffffff !important; margin: 0 0 12px;">Great news!</p>
+      <p style="font-size: 15px; color: #c8d0d8 !important; margin: 0 0 16px;">Your clip for <strong style="color: #ffffff !important;">${escapeHtml(campaignName)}</strong> has been approved.</p>
+      ${earnings > 0 ? `<p style="font-size: 22px; color: #2596be !important; font-weight: 700; margin: 0 0 16px;">Current earnings: $${earnings.toFixed(2)}</p>` : ""}
+      <p style="font-size: 14px; color: #6b7280 !important; margin: 0;">Tracking has started — we'll monitor views and calculate your earnings automatically.</p>
     `),
   });
 }
@@ -228,9 +228,9 @@ export async function sendClipRejected(email: string, campaignName: string, reas
     to: email,
     subject: "Clip update",
     html: wrap(`
-      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${escapeHtml(campaignName)}</strong> was not approved.</p>
-      ${reason ? `<p style="font-size: 14px; color: #f87171; margin: 0 0 12px;">Reason: ${escapeHtml(reason)}</p>` : ""}
-      <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Submit another clip to keep your streak going!</p>
+      <p style="font-size: 15px; color: #c8d0d8 !important; margin: 0 0 16px;">Your clip for <strong style="color: #ffffff !important;">${escapeHtml(campaignName)}</strong> was not approved.</p>
+      ${reason ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: rgba(239, 68, 68, 0.08) !important; border: 1px solid rgba(239, 68, 68, 0.15); border-radius: 12px; margin: 0 0 16px;"><tr><td style="padding: 14px 18px; background-color: rgba(239, 68, 68, 0.08) !important;"><p style="font-size: 14px; color: #fca5a5 !important; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Reason: ${escapeHtml(reason)}</p></td></tr></table>` : ""}
+      <p style="font-size: 14px; color: #6b7280 !important; margin: 0;">Submit another clip to keep your streak going!</p>
     `),
   });
 }
@@ -240,9 +240,9 @@ export async function sendPayoutApproved(email: string, amount: number): Promise
     to: email,
     subject: "Payout sent",
     html: wrap(`
-      <p style="font-size: 16px; margin: 0 0 12px;">Your payout has been sent.</p>
-      <p style="font-size: 22px; color: #2596be; font-weight: bold; margin: 0 0 12px;">$${amount.toFixed(2)}</p>
-      <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Check your wallet for the transfer. It may take a few business days to arrive.</p>
+      <p style="font-size: 16px; color: #ffffff !important; margin: 0 0 12px;">Your payout has been sent.</p>
+      <p style="font-size: 28px; color: #2596be !important; font-weight: 700; line-height: 1.2; margin: 0 0 16px;">$${amount.toFixed(2)}</p>
+      <p style="font-size: 14px; color: #6b7280 !important; margin: 0;">Check your wallet for the transfer. It may take a few business days to arrive.</p>
     `),
   });
 }
@@ -252,9 +252,9 @@ export async function sendPayoutRejected(email: string, amount: number, reason?:
     to: email,
     subject: "Payout update",
     html: wrap(`
-      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your payout request of <strong style="color: #fff;">$${amount.toFixed(2)}</strong> was not approved.</p>
-      ${reason ? `<p style="font-size: 14px; color: #f87171; margin: 0 0 12px;">Reason: ${escapeHtml(reason)}</p>` : ""}
-      <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Contact us on Discord if you have questions.</p>
+      <p style="font-size: 15px; color: #c8d0d8 !important; margin: 0 0 16px;">Your payout request of <strong style="color: #ffffff !important;">$${amount.toFixed(2)}</strong> was not approved.</p>
+      ${reason ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: rgba(239, 68, 68, 0.08) !important; border: 1px solid rgba(239, 68, 68, 0.15); border-radius: 12px; margin: 0 0 16px;"><tr><td style="padding: 14px 18px; background-color: rgba(239, 68, 68, 0.08) !important;"><p style="font-size: 14px; color: #fca5a5 !important; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Reason: ${escapeHtml(reason)}</p></td></tr></table>` : ""}
+      <p style="font-size: 14px; color: #6b7280 !important; margin: 0;">Contact us on Discord if you have questions.</p>
     `),
   });
 }
@@ -264,8 +264,8 @@ export async function sendCallScheduled(email: string, amount: number): Promise<
     to: email,
     subject: "Verification call scheduled",
     html: wrap(`
-      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">A verification call has been scheduled for your payout of <strong style="color: #fff;">$${amount.toFixed(2)}</strong>.</p>
-      <p style="font-size: 14px; color: #a1a1aa; margin: 0;">Please select a time that works for you by visiting your Payouts page.</p>
+      <p style="font-size: 15px; color: #c8d0d8 !important; margin: 0 0 16px;">A verification call has been scheduled for your payout of <strong style="color: #ffffff !important;">$${amount.toFixed(2)}</strong>.</p>
+      <p style="font-size: 14px; color: #6b7280 !important; margin: 0;">Please select a time that works for you by visiting your Payouts page.</p>
     `),
   });
 }
@@ -293,24 +293,24 @@ export async function sendCampaignAlertEmail(email: string, campaignName: string
     to: email,
     subject: safeSubject(`New Campaign: ${campaignName}`),
     html: wrap(`
-      <div style="text-align: center; padding: 8px 0 16px; background-color: #111720 !important;">
-        <span style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">New Campaign Available</span>
+      <div style="text-align: center; padding: 8px 0 16px;">
+        <span style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">New Campaign Available</span>
       </div>
-      <h1 style="color: #ffffff !important; font-size: 26px; font-weight: 700; margin: 0 0 16px; text-align: center; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(campaignName)}</h1>
-      <p style="color: #a1a1aa !important; font-size: 15px; margin: 0 0 20px; text-align: center; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(desc)}</p>
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 24px; background-color: #0d1117 !important; border: 1px solid #1c2333; border-radius: 12px;">
-        <tr style="background-color: #0d1117;">
-          <td class="stats-cell" style="padding: 16px; text-align: center; border-right: 1px solid #1c2333; background-color: #0d1117 !important;">
-            <p style="color: #6b7280 !important; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">CPM Rate</p>
-            <p style="color: #2596be !important; font-size: 22px; font-weight: 700; margin: 0; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${cpm ? "$" + cpm.toFixed(2) : "\u2014"}</p>
+      <h1 style="color: #ffffff !important; font-size: 26px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 16px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(campaignName)}</h1>
+      <p style="color: #c8d0d8 !important; font-size: 15px; margin: 0 0 24px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${escapeHtml(desc)}</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 28px; background-color: rgba(255, 255, 255, 0.04) !important; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;">
+        <tr>
+          <td class="stats-cell" style="padding: 18px; text-align: center; border-right: 1px solid rgba(255, 255, 255, 0.08); background-color: rgba(255, 255, 255, 0.04) !important;">
+            <p style="color: #6b7280 !important; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">CPM Rate</p>
+            <p style="color: #2596be !important; font-size: 22px; font-weight: 700; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${cpm ? "$" + cpm.toFixed(2) : "\u2014"}</p>
           </td>
-          <td class="stats-cell" style="padding: 16px; text-align: center; background-color: #0d1117 !important;">
-            <p style="color: #6b7280 !important; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Budget</p>
-            <p style="color: #10b981 !important; font-size: 22px; font-weight: 700; margin: 0; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${budget ? "$" + budget.toLocaleString() : "\u2014"}</p>
+          <td class="stats-cell" style="padding: 18px; text-align: center; background-color: rgba(255, 255, 255, 0.04) !important;">
+            <p style="color: #6b7280 !important; font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Budget</p>
+            <p style="color: #10b981 !important; font-size: 22px; font-weight: 700; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${budget ? "$" + budget.toLocaleString() : "\u2014"}</p>
           </td>
         </tr>
       </table>
-      <p style="color: #d4d4d8 !important; font-size: 14px; text-align: center; margin: 0 0 24px; background-color: #111720 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Check out the details and join when you're ready.</p>
+      <p style="color: #c8d0d8 !important; font-size: 14px; text-align: center; margin: 0 0 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Check out the details and join when you're ready.</p>
       ${emailButton("View Campaign", link)}
     `),
   });
@@ -325,9 +325,9 @@ export async function sendPayoutReminder(email: string, campaignName: string, am
     to: email,
     subject: "Payout reminder",
     html: wrap(`
-      <p style="font-size: 16px; margin: 0 0 12px; text-align: center; background-color: #111720 !important;">Payout Reminder</p>
-      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 16px; text-align: center; background-color: #111720 !important;">You have <strong style="color: #2596be;">${escapeHtml(amount)}</strong> unpaid from <strong style="color: #fff;">${escapeHtml(campaignName)}</strong>.</p>
-      <p style="font-size: 14px; color: #a1a1aa; margin: 0 0 24px; text-align: center; background-color: #111720 !important;">Please request your payout so we can process it.</p>
+      <p style="font-size: 13px; color: #6b7280 !important; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 12px; text-align: center;">Payout Reminder</p>
+      <p style="font-size: 16px; color: #c8d0d8 !important; margin: 0 0 16px; text-align: center;">You have <strong style="color: #2596be;">${escapeHtml(amount)}</strong> unpaid from <strong style="color: #ffffff !important;">${escapeHtml(campaignName)}</strong>.</p>
+      <p style="font-size: 14px; color: #6b7280 !important; margin: 0 0 28px; text-align: center;">Please request your payout so we can process it.</p>
       ${emailButton("Go to Payouts", "https://clipershq.com/payouts")}
     `),
   });
@@ -341,10 +341,14 @@ export async function sendStreakRejectionWarning(email: string, campaignName: st
     to: email,
     subject: "Clip rejected — post again to save your streak!",
     html: wrap(`
-      <p style="font-size: 16px; margin: 0 0 12px;">Your clip was rejected</p>
-      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">Your clip for <strong style="color: #fff;">${escapeHtml(campaignName)}</strong> was rejected.</p>
-      <p style="font-size: 18px; color: #f59e0b; font-weight: bold; margin: 0 0 12px;">You have ${timeStr} left to post today to keep your streak!</p>
-      <p style="font-size: 14px; color: #a1a1aa; margin: 0 0 24px;">Submit a new clip now before the day ends.</p>
+      <p style="font-size: 16px; color: #ffffff !important; margin: 0 0 12px;">Your clip was rejected</p>
+      <p style="font-size: 15px; color: #c8d0d8 !important; margin: 0 0 20px;">Your clip for <strong style="color: #ffffff !important;">${escapeHtml(campaignName)}</strong> was rejected.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: rgba(239, 68, 68, 0.08) !important; border: 1px solid rgba(239, 68, 68, 0.15); border-radius: 12px; margin: 0 0 24px;">
+        <tr><td style="padding: 16px 18px; background-color: rgba(239, 68, 68, 0.08) !important;">
+          <p style="font-size: 18px; color: #fca5a5 !important; font-weight: 600; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${timeStr} left to post today to keep your streak!</p>
+        </td></tr>
+      </table>
+      <p style="font-size: 14px; color: #c8d0d8 !important; margin: 0 0 28px;">Submit a new clip now before the day ends.</p>
       ${emailButton("Submit a Clip", "https://clipershq.com/clips")}
     `),
   });
@@ -355,10 +359,14 @@ export async function sendConsecutiveRejectionWarning(email: string, rejectionCo
     to: email,
     subject: "Multiple clips rejected — please review requirements",
     html: wrap(`
-      <p style="font-size: 16px; margin: 0 0 12px;">Quality warning</p>
-      <p style="font-size: 15px; color: #f87171; margin: 0 0 12px;"><strong>${rejectionCount} clips in a row</strong> have been rejected.</p>
-      <p style="font-size: 14px; color: #d4d4d8; margin: 0 0 12px;">Please review the campaign requirements carefully before submitting more clips. Low quality submissions may result in account restrictions.</p>
-      <p style="font-size: 14px; color: #a1a1aa; margin: 0 0 24px;">Check the campaign page for detailed requirements and examples.</p>
+      <p style="font-size: 13px; color: #6b7280 !important; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 12px;">Quality Warning</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: rgba(239, 68, 68, 0.08) !important; border: 1px solid rgba(239, 68, 68, 0.15); border-radius: 12px; margin: 0 0 20px;">
+        <tr><td style="padding: 16px 18px; background-color: rgba(239, 68, 68, 0.08) !important;">
+          <p style="font-size: 16px; color: #fca5a5 !important; font-weight: 600; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${rejectionCount} clips in a row have been rejected.</p>
+        </td></tr>
+      </table>
+      <p style="font-size: 14px; color: #c8d0d8 !important; margin: 0 0 12px;">Please review the campaign requirements carefully before submitting more clips. Low quality submissions may result in account restrictions.</p>
+      <p style="font-size: 14px; color: #6b7280 !important; margin: 0 0 28px;">Check the campaign page for detailed requirements and examples.</p>
       ${emailButton("View Campaigns", "https://clipershq.com/campaigns")}
     `),
   });
@@ -382,16 +390,16 @@ export async function sendChatReplyEmail(params: {
     to,
     subject: `New message from ${safeSender} — Clippers HQ`,
     html: wrap(`
-      <p style="font-size: 13px; color: #a1a1aa !important; margin: 0 0 8px; background-color: #111720 !important;">New message in your support chat</p>
-      <p style="font-size: 16px; margin: 0 0 12px; background-color: #111720 !important;">Hi ${safeRecipient},</p>
-      <p style="font-size: 15px; color: #d4d4d8 !important; margin: 0 0 16px; background-color: #111720 !important;"><strong style="color: #ffffff !important;">${safeSender}</strong> replied to your conversation:</p>
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0d1117 !important; border-left: 3px solid #2596be; border-radius: 0 8px 8px 0; margin: 0 0 24px;">
-        <tr style="background-color: #0d1117;"><td style="padding: 12px 16px; background-color: #0d1117 !important;">
-          <p style="margin: 0; color: #d4d4d8 !important; font-size: 14px; font-style: italic; background-color: #0d1117 !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&ldquo;${preview}${truncated}&rdquo;</p>
+      <p style="font-size: 13px; color: #6b7280 !important; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 12px;">New message in your support chat</p>
+      <p style="font-size: 16px; color: #ffffff !important; margin: 0 0 12px;">Hi ${safeRecipient},</p>
+      <p style="font-size: 15px; color: #c8d0d8 !important; margin: 0 0 20px;"><strong style="color: #ffffff !important;">${safeSender}</strong> replied to your conversation:</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: rgba(255, 255, 255, 0.04) !important; border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3px solid #2596be; border-radius: 0 12px 12px 0; margin: 0 0 28px;">
+        <tr><td style="padding: 14px 18px; background-color: rgba(255, 255, 255, 0.04) !important;">
+          <p style="margin: 0; color: #c8d0d8 !important; font-size: 14px; font-style: italic; line-height: 1.5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">&ldquo;${preview}${truncated}&rdquo;</p>
         </td></tr>
       </table>
       ${emailButton("Reply now", conversationUrl)}
-      <p style="font-size: 12px; color: #71717a !important; margin: 24px 0 0; text-align: center; background-color: #111720 !important;">If you didn&rsquo;t expect this email, you can safely ignore it.</p>
+      <p style="font-size: 12px; color: #6b7280 !important; margin: 28px 0 0; text-align: center;">If you didn&rsquo;t expect this email, you can safely ignore it.</p>
     `),
   });
 }
@@ -401,11 +409,12 @@ export async function sendClientInviteEmail(email: string, link: string): Promis
     to: email,
     subject: "You're invited to view your campaign on Clippers HQ",
     html: wrap(`
-      <p style="font-size: 18px; font-weight: bold; margin: 0 0 16px; color: #2596be;">You've been invited</p>
-      <p style="font-size: 15px; color: #d4d4d8; margin: 0 0 12px;">You've been invited to view your campaign performance on Clippers HQ.</p>
-      <p style="font-size: 14px; color: #a1a1aa; margin: 0 0 24px;">Click the button below to access your dashboard. This link expires in 24 hours.</p>
+      <p style="font-size: 13px; color: #2596be !important; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px;">You've been invited</p>
+      <h1 style="color: #ffffff !important; font-size: 22px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 16px;">View your campaign on Clippers HQ</h1>
+      <p style="font-size: 15px; color: #c8d0d8 !important; margin: 0 0 16px;">You've been invited to view your campaign performance.</p>
+      <p style="font-size: 14px; color: #6b7280 !important; margin: 0 0 28px;">Click the button below to access your dashboard. This link expires in 24 hours.</p>
       ${emailButton("Access Dashboard", link)}
-      <p style="font-size: 12px; color: #71717a; margin: 24px 0 0;">If you didn't expect this email, you can safely ignore it.</p>
+      <p style="font-size: 12px; color: #6b7280 !important; margin: 28px 0 0; text-align: center;">If you didn't expect this email, you can safely ignore it.</p>
     `),
   });
 }
