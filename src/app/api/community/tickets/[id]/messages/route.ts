@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { publishToUser, publishToUsers } from "@/lib/ably";
 import { createNotification } from "@/lib/notifications";
 import { sendChatReplyEmail } from "@/lib/email";
@@ -109,7 +110,6 @@ export async function POST(
   if (role === "CLIENT") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   // No admin multiplier — clippers post here too. 30/min matches chat-msg.
-  const { checkRoleAwareRateLimit, rateLimitResponse } = await import("@/lib/rate-limit");
   const rl = checkRoleAwareRateLimit(`ticket-msg:${session.user.id}`, 30, 60_000, role, 1);
   if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 

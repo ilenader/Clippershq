@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -193,7 +194,6 @@ export async function POST(req: NextRequest) {
   // the role gate above: 1/30min (defense in depth).
   const role = (session.user as any).role;
   const resetLimit = role === "OWNER" ? 5 : 1;
-  const { checkRateLimit, rateLimitResponse } = await import("@/lib/rate-limit");
   const rl = checkRateLimit(`reset-data:${session.user.id}`, resetLimit, 30 * 60_000);
   if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 

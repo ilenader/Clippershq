@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { userHasCampaignCommunityAccess, getCampaignSubscriberIds } from "@/lib/community";
 import { publishToUsers } from "@/lib/ably";
 import { createNotification } from "@/lib/notifications";
@@ -74,7 +75,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { checkRoleAwareRateLimit, rateLimitResponse } = await import("@/lib/rate-limit");
   const rl = checkRoleAwareRateLimit(`voice-call-create:${session.user.id}`, 10, 60 * 60_000, role);
   if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
