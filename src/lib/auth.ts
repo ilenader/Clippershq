@@ -208,6 +208,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               "auth.jwt-firstsignin",
             );
             if (dbUser) {
+              if (dbUser.isDeleted || dbUser.status === "BANNED") {
+                console.log(`[AUTH] First-signin rejected for ${user.id} — deleted or banned.`);
+                return null as any;
+              }
               if (OWNER_EMAIL && dbUser.email === OWNER_EMAIL && dbUser.role !== "OWNER") {
                 await withDbRetry(
                   () => db.user.update({
@@ -289,6 +293,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             // Soft-deleted by /admin/reset-data — propagates within
             // REFRESH_INTERVAL_SEC of the deletion.
             console.log(`[AUTH] Soft-deleted user ${token.sub} — invalidating token.`);
+            return null as any;
+          }
+          if (dbUser.status === "BANNED") {
+            // Banned post-sign-in — propagates within REFRESH_INTERVAL_SEC.
+            // signIn callback already blocks BANNED at sign-in time; this
+            // closes the existing-session gap so a banned user can't keep
+            // hitting authenticated routes for up to 5 min after the ban.
+            console.log(`[AUTH] Banned user ${token.sub} — invalidating token.`);
             return null as any;
           }
 
