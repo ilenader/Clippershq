@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
@@ -16,7 +17,6 @@ export async function POST(req: Request) {
     }
 
     // Rate limit: 3 per email per hour (in-memory, per serverless instance)
-    const { checkRateLimit } = await import("@/lib/rate-limit");
     const rl = checkRateLimit(`magic-link:${email}`, 3, 60 * 60_000);
     if (!rl.allowed) {
       // Always return success to not reveal if email exists

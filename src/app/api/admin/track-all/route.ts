@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/get-session";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -31,8 +32,6 @@ export async function POST(req: NextRequest) {
 
     const campaignIds: string[] = Array.isArray(body.campaignIds) ? body.campaignIds : [];
     const includeInactive: boolean = body.includeInactive === true;
-
-    const { checkRateLimit, rateLimitResponse } = await import("@/lib/rate-limit");
 
     if (campaignIds.length > 0) {
       const blocked: string[] = [];

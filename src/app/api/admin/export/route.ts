@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/get-session";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
@@ -80,7 +81,6 @@ export async function GET(req: NextRequest) {
     if (banCheck) return banCheck;
     if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 
-    const { checkRateLimit, rateLimitResponse } = await import("@/lib/rate-limit");
     const rl = checkRateLimit(`export:${session.user.id}`, 10, 60 * 60_000);
     if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
