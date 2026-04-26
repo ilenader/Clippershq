@@ -17,6 +17,7 @@
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "@prisma/pg-worker": "^6.9.0",
+    "@sentry/nextjs": "^10.50.0",
     "@supabase/supabase-js": "^2.101.1",
     "ably": "^2.21.0",
     "clsx": "^2.1.1",
