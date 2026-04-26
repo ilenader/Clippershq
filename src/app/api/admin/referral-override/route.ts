@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { recalculateUnpaidEarnings } from "@/lib/gamification";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -120,6 +121,10 @@ export async function POST(req: NextRequest) {
   if ("error" in gate) return gate.error;
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
+  const role = (session?.user as any)?.role;
+  const rl = checkRoleAwareRateLimit(`referral-override:${session!.user.id}`, 30, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   let body: any;
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
@@ -219,6 +224,10 @@ export async function DELETE(req: NextRequest) {
   const gate = await assertOwner(session);
   if ("error" in gate) return gate.error;
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
+
+  const role = (session?.user as any)?.role;
+  const rl = checkRoleAwareRateLimit(`referral-override:${session!.user.id}`, 30, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   const userId = req.nextUrl.searchParams.get("userId");
   if (!userId) return NextResponse.json({ error: "userId is required" }, { status: 400 });

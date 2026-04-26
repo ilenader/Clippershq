@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { invalidateCache, invalidateCachePrefix } from "@/lib/cache";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -18,6 +19,9 @@ export async function POST(
 
   const role = (session.user as any).role;
   if (role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const rl = checkRoleAwareRateLimit(`team-edit:${session.user.id}`, 10, 60 * 60_000, role, 3);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   const { id: teamId } = await params;
   let body: any;
@@ -109,6 +113,9 @@ export async function DELETE(
 
   const role = (session.user as any).role;
   if (role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const rl = checkRoleAwareRateLimit(`team-edit:${session.user.id}`, 10, 60 * 60_000, role, 3);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   const { id } = await params;
 

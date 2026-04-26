@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { getGamificationState } from "@/lib/gamification";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { invalidateCache, invalidateCachePrefix } from "@/lib/cache";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -105,6 +106,9 @@ export async function PATCH(
   if (role !== "OWNER") {
     return NextResponse.json({ error: "Only owners can change roles" }, { status: 403 });
   }
+
+  const rl = checkRoleAwareRateLimit(`user-admin-edit:${session.user.id}`, 30, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   const { id } = await params;
   let body: any;

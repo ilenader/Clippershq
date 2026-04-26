@@ -58,6 +58,27 @@ export function checkRateLimit(
 }
 
 /**
+ * Role-aware wrapper around checkRateLimit.
+ *  - OWNER: bypasses entirely (returns allowed without touching the store).
+ *  - ADMIN: gets baseLimit × adminMultiplier (default 5×) for the same window.
+ *  - Everyone else (CLIPPER, CLIENT, undefined): gets baseLimit.
+ *
+ * Pass undefined for `role` to default to base limit. Use this when bulk
+ * admin operations would otherwise be throttled by per-CLIPPER limits.
+ */
+export function checkRoleAwareRateLimit(
+  key: string,
+  baseLimit: number,
+  windowMs: number,
+  role: string | undefined,
+  adminMultiplier = 5,
+): { allowed: boolean; retryAfterMs: number } {
+  if (role === "OWNER") return { allowed: true, retryAfterMs: 0 };
+  const limit = role === "ADMIN" ? baseLimit * adminMultiplier : baseLimit;
+  return checkRateLimit(key, limit, windowMs);
+}
+
+/**
  * Create a user-friendly 429 response with Retry-After header.
  */
 export function rateLimitResponse(retryAfterMs: number): Response {

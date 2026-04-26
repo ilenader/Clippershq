@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -17,6 +18,10 @@ export async function POST(
   if (role !== "ADMIN" && role !== "OWNER") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  // OWNER exempt; ADMIN gets 60/hr (1× base — base IS the admin rate already).
+  const rl = checkRoleAwareRateLimit(`account-review:${session.user.id}`, 60, 60 * 60_000, role, 1);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   let body: any;
   try {

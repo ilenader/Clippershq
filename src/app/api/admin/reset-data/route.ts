@@ -188,6 +188,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Owner role not verified in DB" }, { status: 403 });
   }
 
+  // Custom owner-NOT-exempt limit — even an owner shouldn't run a destructive
+  // wipe 100x/min by accident. OWNER: 5/30min, anyone else who slipped past
+  // the role gate above: 1/30min (defense in depth).
+  const role = (session.user as any).role;
+  const resetLimit = role === "OWNER" ? 5 : 1;
+  const { checkRateLimit, rateLimitResponse } = await import("@/lib/rate-limit");
+  const rl = checkRateLimit(`reset-data:${session.user.id}`, resetLimit, 30 * 60_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   // Production guard — hard to hit this endpoint by accident in prod.
   if (process.env.NODE_ENV === "production") {
     const confirmParam = req.nextUrl.searchParams.get("confirm");

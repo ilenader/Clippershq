@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -17,6 +18,9 @@ export async function POST(
   if (role !== "OWNER") {
     return NextResponse.json({ error: "Only owners can restore campaigns" }, { status: 403 });
   }
+
+  const rl = checkRoleAwareRateLimit(`campaign-restore:${session.user.id}`, 5, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   const { id } = await params;
 

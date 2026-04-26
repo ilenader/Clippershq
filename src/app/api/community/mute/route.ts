@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,10 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
+
+  const rl = checkRateLimit(`community-mute-self:${session.user.id}`, 30, 60 * 60_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   let body: any;
@@ -46,6 +51,10 @@ export async function DELETE(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
+
+  const rl = checkRateLimit(`community-mute-self:${session.user.id}`, 30, 60 * 60_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   let body: any;

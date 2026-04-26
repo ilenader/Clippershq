@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Ably from "ably";
 import { getSession } from "@/lib/get-session";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,12 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // No ADMIN multiplier — this is per-user reconnect behavior, not bulk admin
+  // work. Owners still bypass so dashboards with many subscriptions don't trip.
+  const role = (session.user as any).role;
+  const rl = checkRoleAwareRateLimit(`ably-token:${session.user.id}`, 30, 60_000, role, 1);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   if (!process.env.ABLY_API_KEY) {
     return NextResponse.json({ error: "Ably not configured" }, { status: 503 });

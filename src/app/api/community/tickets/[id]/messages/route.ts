@@ -107,6 +107,12 @@ export async function POST(
 
   const role = (session.user as any).role;
   if (role === "CLIENT") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // No admin multiplier — clippers post here too. 30/min matches chat-msg.
+  const { checkRoleAwareRateLimit, rateLimitResponse } = await import("@/lib/rate-limit");
+  const rl = checkRoleAwareRateLimit(`ticket-msg:${session.user.id}`, 30, 60_000, role, 1);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   const { id: ticketId } = await params;

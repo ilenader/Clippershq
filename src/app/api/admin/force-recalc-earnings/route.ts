@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { recalculateClipEarningsBreakdown, calculateOwnerEarnings, getStreakBonusPercent } from "@/lib/earnings-calc";
 import { loadConfig } from "@/lib/gamification";
@@ -33,9 +34,13 @@ export async function POST(req: NextRequest) {
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
 
-  if ((session.user as any).role !== "OWNER") {
+  const role = (session.user as any).role;
+  if (role !== "OWNER") {
     return NextResponse.json({ error: "Forbidden — owner only" }, { status: 403 });
   }
+
+  const rl = checkRoleAwareRateLimit(`force-recalc:${session.user.id}`, 5, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 

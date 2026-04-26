@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createNotification } from "@/lib/notifications";
 import { sendCallScheduled } from "@/lib/email";
 import { NextRequest, NextResponse } from "next/server";
@@ -149,6 +150,9 @@ export async function POST(req: NextRequest) {
   if (role !== "OWNER") {
     return NextResponse.json({ error: "Only owners can request verification calls." }, { status: 403 });
   }
+
+  const rl = checkRoleAwareRateLimit(`call-create:${session.user.id}`, 10, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   if (!db || !db.scheduledCall) return NextResponse.json({ error: "Database unavailable. Server may need restart." }, { status: 500 });
 

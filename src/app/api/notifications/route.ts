@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { getNotifications, getUnreadCount, markRead } from "@/lib/notifications";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,9 @@ export async function POST(req: NextRequest) {
 
   const banCheck2 = checkBanStatus(session);
   if (banCheck2) return banCheck2;
+
+  const rl = checkRateLimit(`notif-markread:${session.user.id}`, 60, 60_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   let body: any;
   try { body = await req.json(); } catch {

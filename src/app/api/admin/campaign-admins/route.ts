@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Only owners can assign campaign admins" }, { status: 403 });
   }
 
+  const rl = checkRoleAwareRateLimit(`campaign-admins:${session.user.id}`, 10, 60 * 60_000, role, 3);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   let body: any;
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
@@ -88,6 +92,9 @@ export async function DELETE(req: NextRequest) {
   if (role !== "OWNER") {
     return NextResponse.json({ error: "Only owners can remove assignments" }, { status: 403 });
   }
+
+  const rl = checkRoleAwareRateLimit(`campaign-admins:${session.user.id}`, 10, 60 * 60_000, role, 3);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   let body: any;
   try { body = await req.json(); } catch {

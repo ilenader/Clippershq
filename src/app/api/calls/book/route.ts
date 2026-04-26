@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createNotification } from "@/lib/notifications";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest) {
   if (role !== "CLIPPER") {
     return NextResponse.json({ error: "Only clippers can book call slots." }, { status: 403 });
   }
+
+  const rl = checkRateLimit(`call-book:${session.user.id}`, 10, 60 * 60_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   if (!db || !db.scheduledCall) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 

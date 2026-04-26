@@ -73,6 +73,11 @@ export async function POST(req: NextRequest) {
   if (role !== "OWNER" && role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const { checkRoleAwareRateLimit, rateLimitResponse } = await import("@/lib/rate-limit");
+  const rl = checkRoleAwareRateLimit(`voice-call-create:${session.user.id}`, 10, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   let body: any;

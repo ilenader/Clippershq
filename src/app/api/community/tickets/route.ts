@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { userHasCampaignCommunityAccess } from "@/lib/community";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -120,6 +121,11 @@ export async function POST(req: NextRequest) {
 
   const role = (session.user as any).role;
   if (role === "CLIENT") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // No admin multiplier — clippers create tickets too. OWNER bypasses default.
+  const rl = checkRoleAwareRateLimit(`ticket-create:${session.user.id}`, 10, 60 * 60_000, role, 1);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   let body: any;

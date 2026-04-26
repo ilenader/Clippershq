@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +8,12 @@ export const dynamic = "force-dynamic";
 export async function POST() {
   const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if ((session.user as any).role !== "OWNER") return NextResponse.json({ error: "Owner only" }, { status: 403 });
+  const role = (session.user as any).role;
+  if (role !== "OWNER") return NextResponse.json({ error: "Owner only" }, { status: 403 });
+
+  const rl = checkRoleAwareRateLimit(`fix-usernames:${session.user.id}`, 10, 60 * 60_000, role, 3);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 503 });
 
   const accounts = await db.account.findMany({

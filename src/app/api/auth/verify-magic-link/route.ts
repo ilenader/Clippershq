@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/get-client-ip";
 import { NextRequest, NextResponse } from "next/server";
 import { encode } from "next-auth/jwt";
 
@@ -29,11 +30,8 @@ export async function GET(req: NextRequest) {
   try {
     // Brute-force defense: cap verification attempts per source IP. If tokens were
     // ever shortened or if an attacker harvested multiple magic links, this prevents
-    // enumeration. request.ip isn't set on Next server runtime; derive from headers.
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      "unknown";
+    // enumeration.
+    const ip = getClientIp(req);
     const rl = checkRateLimit(`magic-verify:${ip}`, 10, 60_000);
     if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 

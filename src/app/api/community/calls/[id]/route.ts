@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { publishToUsers } from "@/lib/ably";
 import { getCampaignSubscriberIds, userHasCampaignCommunityAccess } from "@/lib/community";
 import { withDbRetry } from "@/lib/db-retry";
@@ -48,6 +49,10 @@ export async function PATCH(
   if (role !== "OWNER" && role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const rl = checkRoleAwareRateLimit(`voice-call-edit:${session.user.id}`, 30, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   let body: any;
@@ -138,6 +143,10 @@ export async function DELETE(
   if (role !== "OWNER" && role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const rl = checkRoleAwareRateLimit(`voice-call-edit:${session.user.id}`, 30, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   const { id } = await params;

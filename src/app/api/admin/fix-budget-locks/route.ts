@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { getCampaignBudgetStatus } from "@/lib/balance";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,9 @@ export async function POST() {
   if (role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
+
+  const rl = checkRoleAwareRateLimit(`fix-budget-locks:${session.user.id}`, 10, 60 * 60_000, role, 3);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 

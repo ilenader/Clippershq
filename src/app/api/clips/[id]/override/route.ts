@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { calculateClipEarnings } from "@/lib/earnings-calc";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -24,6 +25,9 @@ export async function POST(
   if (role !== "OWNER") {
     return NextResponse.json({ error: "Only owners can override stats" }, { status: 403 });
   }
+
+  const rl = checkRoleAwareRateLimit(`clip-override:${session.user.id}`, 30, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   const { id } = await params;
   let body: any;

@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/get-session";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
 
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
 
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
+
+  const rl = checkRateLimit(`user-pwa:${session.user.id}`, 30, 60_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   // Basic PWA-context signal: the app sets X-PWA-Mode: standalone from installed contexts.
   // Not cryptographically bulletproof (headers can be forged with curl), but blocks casual

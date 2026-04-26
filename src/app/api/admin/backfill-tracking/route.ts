@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { roundToNextSlot } from "@/lib/tracking";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,12 @@ export async function POST() {
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
 
-  if ((session.user as any).role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const role = (session.user as any).role;
+  if (role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const rl = checkRoleAwareRateLimit(`backfill-tracking:${session.user.id}`, 3, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
   try {

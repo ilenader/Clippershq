@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -16,6 +17,11 @@ export async function DELETE(
 
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
+
+  // No admin multiplier — user managing their own accounts.
+  const role = (session.user as any).role;
+  const rl = checkRoleAwareRateLimit(`account-edit:${session.user.id}`, 20, 60 * 60_000, role, 1);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   const { id } = await params;
 

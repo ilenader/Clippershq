@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,9 @@ export async function POST(req: NextRequest) {
 
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
+
+  const rl = checkRateLimit(`user-timezone:${session.user.id}`, 10, 60_000);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 

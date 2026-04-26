@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,9 @@ export async function POST() {
 
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
+
+  const rl = checkRoleAwareRateLimit(`fix-tracking:${session.user.id}`, 10, 60 * 60_000, role, 3);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 

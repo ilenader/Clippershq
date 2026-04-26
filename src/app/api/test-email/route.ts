@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/get-session";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,11 @@ export async function GET() {
   const banCheck = checkBanStatus(session);
   if (banCheck) return banCheck;
 
-  if ((session.user as any).role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const role = (session.user as any).role;
+  if (role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const rl = checkRoleAwareRateLimit(`test-email:${session.user.id}`, 5, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   const apiKey = process.env.EMAIL_API_KEY || "";
   const from = process.env.EMAIL_FROM || "Clippers HQ <onboarding@resend.dev>";

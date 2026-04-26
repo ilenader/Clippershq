@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 // Only these fields can be modified via pending edit approval
@@ -26,6 +27,9 @@ export async function PATCH(
   if (role !== "OWNER") {
     return NextResponse.json({ error: "Only owners can review edits" }, { status: 403 });
   }
+
+  const rl = checkRoleAwareRateLimit(`pending-edit-review:${session.user.id}`, 10, 60 * 60_000, role, 3);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   const { id } = await params;
   let body: any;

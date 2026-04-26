@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { detectPlatform, fetchClipStats } from "@/lib/apify";
 import { recalculateClipEarningsBreakdown, calculateOwnerEarnings, getStreakBonusPercent } from "@/lib/earnings-calc";
 import { loadConfig, updateStreak } from "@/lib/gamification";
@@ -23,6 +24,9 @@ export async function POST(req: NextRequest) {
   if (role !== "OWNER") {
     return NextResponse.json({ error: "Owner only." }, { status: 403 });
   }
+
+  const rl = checkRoleAwareRateLimit(`owner-submit:${session.user.id}`, 60, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   if (!db) return NextResponse.json({ error: "Database unavailable." }, { status: 500 });
 

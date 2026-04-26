@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/earnings-calc";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,9 @@ export async function POST() {
 
   const role = (session.user as any).role;
   if (role !== "OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const rl = checkRoleAwareRateLimit(`fix-earnings:${session.user.id}`, 10, 60 * 60_000, role, 3);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 500 });
 

@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { checkBanStatus } from "@/lib/check-ban";
+import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { sendCampaignAlertEmail } from "@/lib/email";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -24,6 +25,9 @@ export async function POST(
   }
 
   const { id } = await params;
+
+  const rl = checkRoleAwareRateLimit(`campaign-notify:${session.user.id}:${id}`, 5, 60 * 60_000, role);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
 
   if (!db) return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
 
