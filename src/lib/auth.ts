@@ -3,6 +3,7 @@ import Discord from "next-auth/providers/discord";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
+import { withDbRetry } from "@/lib/db-retry";
 
 // The owner email — this account is always OWNER (must be set via env, no fallback)
 const OWNER_EMAIL = process.env.AUTH_OWNER_EMAIL;
@@ -42,6 +43,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     })] : []),
   ],
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60,
+    updateAge: 5 * 60,
+  },
   callbacks: {
     async signIn({ user, account, profile }) {
       // Google login: only allow for pre-existing CLIENT users
@@ -178,61 +184,152 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       return true;
     },
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
-
-        // Always try to get role from DB
+    async jwt({ token, user }) {
+      // First sign-in (`user` provided by adapter). Run a fresh DB read so the
+      // token starts populated with role/status/discordId — events.createUser
+      // fires before this callback but its mutations are NOT reflected in the
+      // `user` object passed in, so a direct lookup is required.
+      if (user) {
+        token.sub = user.id;
         if (db) {
           try {
-            const dbUser = await db.user.findUnique({
-              where: { id: user.id },
-              select: { role: true, status: true, discordId: true, username: true, email: true, isDeleted: true },
-            });
-            if (dbUser?.isDeleted) {
-              // Soft-deleted users (e.g. swept by /admin/reset-data) get no
-              // active session. Returning null here effectively force-logs
-              // them out; their next request sees an unauthenticated state.
-              console.log(`[AUTH] Soft-deleted user ${user.id} attempted to load session — rejecting.`);
-              return null as any;
-            }
+            const dbUser: any = await withDbRetry(
+              () => db.user.findUnique({
+                where: { id: user.id! },
+                select: {
+                  role: true,
+                  status: true,
+                  discordId: true,
+                  email: true,
+                  username: true,
+                  isDeleted: true,
+                },
+              }),
+              "auth.jwt-firstsignin",
+            );
             if (dbUser) {
-              // Auto-promote owner if email matches and role isn't OWNER yet
               if (OWNER_EMAIL && dbUser.email === OWNER_EMAIL && dbUser.role !== "OWNER") {
-                await db.user.update({
-                  where: { id: user.id },
-                  data: { role: "OWNER" },
-                });
-                (session.user as any).role = "OWNER";
+                await withDbRetry(
+                  () => db.user.update({
+                    where: { id: user.id! },
+                    data: { role: "OWNER" },
+                  }),
+                  "auth.owner-promote",
+                );
+                (token as any).role = "OWNER";
               } else {
-                (session.user as any).role = dbUser.role;
+                (token as any).role = dbUser.role || "CLIPPER";
               }
-              (session.user as any).status = dbUser.status;
-              (session.user as any).discordId = dbUser.discordId || "";
-              // Ensure email is always set from DB (provider may not include it)
-              if (dbUser.email) session.user.email = dbUser.email;
-              if (dbUser.username && dbUser.username !== "user") {
-                session.user.name = dbUser.username;
-              }
+              (token as any).status = dbUser.status || "ACTIVE";
+              (token as any).discordId = dbUser.discordId;
+              (token as any).email = dbUser.email;
+              (token as any).name = dbUser.username && dbUser.username !== "user"
+                ? dbUser.username
+                : user.name;
             } else {
-              // User not found in DB — shouldn't happen with PrismaAdapter, but handle safely
-              console.warn("Session callback: user not found in DB for id:", user.id);
-              (session.user as any).role = "CLIPPER";
-              (session.user as any).status = "ACTIVE";
-              (session.user as any).discordId = "";
+              (token as any).role = (user as any).role || "CLIPPER";
+              (token as any).status = (user as any).status || "ACTIVE";
+              (token as any).discordId = (user as any).discordId;
+              (token as any).email = user.email;
+              (token as any).name = user.name;
             }
-          } catch (err) {
-            console.error("Session callback DB error (user will get CLIPPER role):", err);
-            (session.user as any).role = "CLIPPER";
-            (session.user as any).status = "ACTIVE";
-            (session.user as any).discordId = "";
+          } catch (err: any) {
+            console.warn("[AUTH-JWT-FIRSTSIGNIN-FAIL]", err?.message || err);
+            (token as any).role = (user as any).role || "CLIPPER";
+            (token as any).status = (user as any).status || "ACTIVE";
+            (token as any).discordId = (user as any).discordId;
+            (token as any).email = user.email;
+            (token as any).name = user.name;
           }
         } else {
-          // No DB — default to CLIPPER
-          (session.user as any).role = "CLIPPER";
-          (session.user as any).status = "ACTIVE";
-          (session.user as any).discordId = "";
+          (token as any).role = (user as any).role || "CLIPPER";
+          (token as any).status = (user as any).status || "ACTIVE";
+          (token as any).discordId = (user as any).discordId;
+          (token as any).email = user.email;
+          (token as any).name = user.name;
         }
+        (token as any).lastRefreshAt = Math.floor(Date.now() / 1000);
+        return token;
+      }
+
+      // Subsequent requests: refresh from DB at most every 5 min. Between
+      // refreshes the cached token serves auth — so a brief Supabase blip no
+      // longer cascades into a logout for every user (the resilience win
+      // over the database session strategy this replaces).
+      const REFRESH_INTERVAL_SEC = 5 * 60;
+      const nowSec = Math.floor(Date.now() / 1000);
+      const lastRefreshAt = (token as any).lastRefreshAt as number | undefined;
+
+      if (
+        token.sub &&
+        db &&
+        (!lastRefreshAt || nowSec - lastRefreshAt >= REFRESH_INTERVAL_SEC)
+      ) {
+        try {
+          const dbUser: any = await withDbRetry(
+            () => db.user.findUnique({
+              where: { id: token.sub as string },
+              select: {
+                role: true,
+                status: true,
+                discordId: true,
+                email: true,
+                username: true,
+                isDeleted: true,
+              },
+            }),
+            "auth.jwt-refresh",
+          );
+
+          if (!dbUser) {
+            // User row deleted entirely — invalidate token.
+            return null as any;
+          }
+          if (dbUser.isDeleted) {
+            // Soft-deleted by /admin/reset-data — propagates within
+            // REFRESH_INTERVAL_SEC of the deletion.
+            console.log(`[AUTH] Soft-deleted user ${token.sub} — invalidating token.`);
+            return null as any;
+          }
+
+          if (OWNER_EMAIL && dbUser.email === OWNER_EMAIL && dbUser.role !== "OWNER") {
+            await withDbRetry(
+              () => db.user.update({
+                where: { id: token.sub as string },
+                data: { role: "OWNER" },
+              }),
+              "auth.owner-promote-refresh",
+            );
+            (token as any).role = "OWNER";
+          } else {
+            (token as any).role = dbUser.role;
+          }
+          (token as any).status = dbUser.status;
+          (token as any).discordId = dbUser.discordId;
+          if (dbUser.email) (token as any).email = dbUser.email;
+          if (dbUser.username && dbUser.username !== "user") {
+            (token as any).name = dbUser.username;
+          }
+          (token as any).lastRefreshAt = nowSec;
+        } catch (err: any) {
+          // DB blip mid-refresh: keep stale-but-valid token. Don't bump
+          // lastRefreshAt — retry on next request rather than wait 5 min.
+          console.warn("[AUTH-JWT-REFRESH-FAIL]", err?.message || err);
+        }
+      }
+
+      return token;
+    },
+    async session({ session, token }) {
+      // Pure transformation from token → session.user. NO DB calls — refresh
+      // logic lives in the jwt callback above.
+      if (token && session.user) {
+        (session.user as any).id = token.sub;
+        (session.user as any).role = (token as any).role || "CLIPPER";
+        (session.user as any).status = (token as any).status || "ACTIVE";
+        (session.user as any).discordId = (token as any).discordId;
+        if ((token as any).email) session.user.email = (token as any).email;
+        if ((token as any).name) session.user.name = (token as any).name;
       }
       return session;
     },

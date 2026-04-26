@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
+import { encode } from "next-auth/jwt";
 
 export const dynamic = "force-dynamic";
 
@@ -73,29 +74,43 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Create a session by setting a cookie that the auth system will pick up
-    // For NextAuth, we need to create a session record directly
-    const sessionToken = crypto.randomUUID();
-    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    // Mint a NextAuth-compatible JWT cookie. Salt MUST equal the cookie name
+    // (per @auth/core/jwt.js HKDF derivation) so the next request's auth()
+    // call can decrypt this token. encode() handles iat/exp internally via
+    // the maxAge param.
+    const secureCookie = process.env.NODE_ENV === "production";
+    const cookieName = secureCookie
+      ? "__Secure-authjs.session-token"
+      : "authjs.session-token";
+    const maxAgeSec = 30 * 24 * 60 * 60;
+    const nowSec = Math.floor(Date.now() / 1000);
 
-    await db.session.create({
-      data: {
-        sessionToken,
-        userId: user.id,
-        expires,
-      },
+    const tokenPayload = {
+      sub: user.id,
+      email: user.email,
+      name: user.username && user.username !== "user" ? user.username : null,
+      role: user.role,
+      status: user.status,
+      discordId: user.discordId,
+      // Set on issuance so auth.ts jwt callback's 5-min refresh cadence works
+      // correctly from the first request after this redirect.
+      lastRefreshAt: nowSec,
+    };
+
+    const encoded = await encode({
+      token: tokenPayload,
+      secret: process.env.AUTH_SECRET!,
+      salt: cookieName,
+      maxAge: maxAgeSec,
     });
 
-    // Set the session cookie
     const response = redirectTo("/client");
-    const secureCookie = process.env.NODE_ENV === "production";
-    const cookieName = secureCookie ? "__Secure-authjs.session-token" : "authjs.session-token";
-    response.cookies.set(cookieName, sessionToken, {
+    response.cookies.set(cookieName, encoded, {
       httpOnly: true,
       secure: secureCookie,
       sameSite: "lax",
       path: "/",
-      expires,
+      maxAge: maxAgeSec,
     });
 
     return response;
