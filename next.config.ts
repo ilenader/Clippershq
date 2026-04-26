@@ -31,12 +31,6 @@ export default withSentryConfig(nextConfig, {
   // Tunnel Sentry requests through your own server to bypass ad blockers.
   tunnelRoute: "/monitoring",
 
-  // Quiet down Sentry's own logger.
-  disableLogger: true,
-
-  // We're on Railway, not Vercel.
-  automaticVercelMonitors: false,
-
   // Capture more client sources for richer stack traces.
   widenClientFileUpload: true,
 });
