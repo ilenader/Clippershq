@@ -54,7 +54,7 @@ export default async function MarketplacePage() {
         where: { userId, status: "APPROVED", deletedByUser: false },
         orderBy: { username: "asc" },
         take: 200,
-        select: { id: true, username: true, platform: true },
+        select: { id: true, username: true, platform: true, profileLink: true },
       }),
       "marketplace.page.clipAccounts",
     );

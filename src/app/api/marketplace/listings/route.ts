@@ -57,14 +57,24 @@ export async function POST(req: NextRequest) {
   if (!campaignId || typeof campaignId !== "string") {
     return NextResponse.json({ error: "campaignId is required." }, { status: 400 });
   }
-  if (typeof niche !== "string" || niche.trim().length === 0 || niche.length > MAX_NICHE) {
-    return NextResponse.json({ error: `niche is required and must be 1-${MAX_NICHE} characters.` }, { status: 400 });
+  // niche is now optional in the request body — when omitted, the server fills
+  // it in from ClipAccount.contentNiche below. If the client DOES send a value,
+  // validate it as before so external callers (or a future UI revival) get the
+  // same length cap behavior.
+  if (niche !== undefined && niche !== null) {
+    if (typeof niche !== "string" || niche.length > MAX_NICHE) {
+      return NextResponse.json({ error: `niche must be a string up to ${MAX_NICHE} characters.` }, { status: 400 });
+    }
   }
   if (typeof audienceDescription !== "string" || audienceDescription.trim().length === 0 || audienceDescription.length > MAX_AUDIENCE) {
     return NextResponse.json({ error: `audienceDescription is required and must be 1-${MAX_AUDIENCE} characters.` }, { status: 400 });
   }
-  if (typeof followerCount !== "number" || !Number.isInteger(followerCount) || followerCount < 0 || followerCount > MAX_FOLLOWERS) {
-    return NextResponse.json({ error: "followerCount must be an integer between 0 and 1,000,000,000." }, { status: 400 });
+  // followerCount is now optional — when omitted, the server fills it from
+  // ClipAccount.followerCount below. If the client DOES send a value, validate.
+  if (followerCount !== undefined && followerCount !== null) {
+    if (typeof followerCount !== "number" || !Number.isInteger(followerCount) || followerCount < 0 || followerCount > MAX_FOLLOWERS) {
+      return NextResponse.json({ error: "followerCount must be an integer between 0 and 1,000,000,000." }, { status: 400 });
+    }
   }
   if (country !== undefined && country !== null && (typeof country !== "string" || country.length > MAX_COUNTRY)) {
     return NextResponse.json({ error: `country must be a string up to ${MAX_COUNTRY} characters.` }, { status: 400 });
@@ -78,10 +88,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify clipAccount: owned by session user, APPROVED, not deleted.
+  // Also fetch contentNiche + followerCount so we can derive listing fields the
+  // modal no longer asks the user for (modal cleanup).
   const clipAccount: any = await withDbRetry(
     () => db!.clipAccount.findFirst({
       where: { id: clipAccountId, userId: session.user.id, status: "APPROVED", deletedByUser: false },
-      select: { id: true },
+      select: { id: true, contentNiche: true, followerCount: true },
     }),
     "marketplace.listing.findClipAccount",
   );
@@ -157,6 +169,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "You already have a listing for this account on this campaign." }, { status: 409 });
   }
 
+  // Derive niche + followerCount when the client omitted them. The modal stopped
+  // asking for these inputs since they duplicate properties already on ClipAccount.
+  // External callers may still pass them, in which case they win (already validated above).
+  const finalNiche =
+    typeof niche === "string" && niche.trim().length > 0
+      ? niche.trim()
+      : (clipAccount.contentNiche ?? "");
+  const finalFollowerCount =
+    typeof followerCount === "number"
+      ? followerCount
+      : (clipAccount.followerCount ?? 0);
+
   try {
     const listing = await withDbRetry(
       () => db!.marketplacePosterListing.create({
@@ -164,9 +188,9 @@ export async function POST(req: NextRequest) {
           userId: session.user.id,
           clipAccountId,
           campaignId,
-          niche: niche.trim(),
+          niche: finalNiche,
           audienceDescription: audienceDescription.trim(),
-          followerCount,
+          followerCount: finalFollowerCount,
           country: country ?? null,
           timezone: timezone ?? null,
           dailySlotCount: slot,

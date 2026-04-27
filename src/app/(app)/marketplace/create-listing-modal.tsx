@@ -8,11 +8,9 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 
-const MAX_NICHE = 100;
 const MAX_AUDIENCE = 2000;
 const MAX_COUNTRY = 100;
 const MAX_TIMEZONE = 100;
-const MAX_FOLLOWERS = 1_000_000_000;
 
 interface CampaignOption {
   id: string;
@@ -22,6 +20,7 @@ interface ClipAccountOption {
   id: string;
   username: string;
   platform: string;
+  profileLink: string;
 }
 
 interface CreateListingModalProps {
@@ -37,9 +36,7 @@ interface CreateListingModalProps {
 interface FormState {
   campaignId: string;
   clipAccountId: string;
-  niche: string;
   audienceDescription: string;
-  followerCount: string;
   dailySlotCount: string;
   country: string;
   timezone: string;
@@ -48,9 +45,7 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   campaignId: "",
   clipAccountId: "",
-  niche: "",
   audienceDescription: "",
-  followerCount: "",
   dailySlotCount: "5",
   country: "",
   timezone: "",
@@ -102,16 +97,9 @@ export function CreateListingModal({
   function getValidationError(): string | null {
     if (!form.campaignId) return "Campaign is required.";
     if (!form.clipAccountId) return "Clip account is required.";
-    const niche = form.niche.trim();
-    if (niche.length === 0) return "Niche is required.";
-    if (niche.length > MAX_NICHE) return `Niche must be ${MAX_NICHE} characters or fewer.`;
     const audience = form.audienceDescription.trim();
     if (audience.length === 0) return "Audience description is required.";
     if (audience.length > MAX_AUDIENCE) return `Audience description must be ${MAX_AUDIENCE} characters or fewer.`;
-    const fc = Number(form.followerCount);
-    if (!Number.isInteger(fc) || fc < 0 || fc > MAX_FOLLOWERS) {
-      return "Follower count must be a whole number between 0 and 1,000,000,000.";
-    }
     const slot = Number(form.dailySlotCount);
     if (!Number.isInteger(slot) || slot < 1 || slot > 10) {
       return "Daily slot count must be between 1 and 10.";
@@ -129,15 +117,15 @@ export function CreateListingModal({
     if (!canSubmit) return;
     setSubmitting(true);
     try {
+      // niche + followerCount intentionally omitted — server derives them from
+      // the underlying ClipAccount (contentNiche, followerCount).
       const res = await fetch("/api/marketplace/listings", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           campaignId: form.campaignId,
           clipAccountId: form.clipAccountId,
-          niche: form.niche.trim(),
           audienceDescription: form.audienceDescription.trim(),
-          followerCount: Number(form.followerCount),
           dailySlotCount: Number(form.dailySlotCount),
           country: form.country.trim() || null,
           timezone: form.timezone.trim() || null,
@@ -234,16 +222,23 @@ export function CreateListingModal({
           {accountDisabled ? (
             <p className="text-xs text-[var(--text-muted)]">Pick a campaign first.</p>
           ) : null}
+          {form.clipAccountId
+            ? (() => {
+                const sel = clipAccounts.find((a) => a.id === form.clipAccountId);
+                if (!sel?.profileLink) return null;
+                return (
+                  <a
+                    href={sel.profileLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                  >
+                    View profile ↗
+                  </a>
+                );
+              })()
+            : null}
         </div>
-
-        <Input
-          id="mkt-niche"
-          label="Niche *"
-          placeholder="e.g. gaming, beauty, finance"
-          value={form.niche}
-          onChange={(e) => update("niche", e.target.value)}
-          maxLength={MAX_NICHE}
-        />
 
         <Textarea
           id="mkt-audience"
@@ -255,29 +250,16 @@ export function CreateListingModal({
           rows={4}
         />
 
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            id="mkt-followers"
-            label="Follower count *"
-            type="number"
-            min={0}
-            max={MAX_FOLLOWERS}
-            step={1}
-            placeholder="e.g. 50000"
-            value={form.followerCount}
-            onChange={(e) => update("followerCount", e.target.value)}
-          />
-          <Input
-            id="mkt-slots"
-            label="Daily slot count (1-10) *"
-            type="number"
-            min={1}
-            max={10}
-            step={1}
-            value={form.dailySlotCount}
-            onChange={(e) => update("dailySlotCount", e.target.value)}
-          />
-        </div>
+        <Input
+          id="mkt-slots"
+          label="Daily slot count (1-10) *"
+          type="number"
+          min={1}
+          max={10}
+          step={1}
+          value={form.dailySlotCount}
+          onChange={(e) => update("dailySlotCount", e.target.value)}
+        />
 
         <div className="grid grid-cols-2 gap-3">
           <Input
@@ -298,17 +280,18 @@ export function CreateListingModal({
           />
         </div>
 
-        {validationError ? (
-          <p className="text-xs text-[var(--text-muted)]">{validationError}</p>
-        ) : null}
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
-            Cancel
-          </Button>
-          <Button type="submit" loading={submitting} disabled={!canSubmit}>
-            Create listing
-          </Button>
+        <div className="sticky bottom-0 bg-[var(--bg-card)] pt-3 pb-1 border-t border-[var(--border-color)] -mx-6 px-6 -mb-6">
+          {validationError ? (
+            <p className="mb-2 text-xs text-[var(--text-muted)]">{validationError}</p>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={submitting} disabled={!canSubmit}>
+              Create listing
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>

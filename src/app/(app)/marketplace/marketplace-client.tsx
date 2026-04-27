@@ -15,7 +15,7 @@ interface MarketplaceClientProps {
   currentUser: { id: string; role: string };
   hiddenMode: boolean;
   campaigns: { id: string; name: string }[];
-  clipAccounts: { id: string; username: string; platform: string }[];
+  clipAccounts: { id: string; username: string; platform: string; profileLink: string }[];
   accountCampaignAccess: Record<string, string[]>;
 }
 
