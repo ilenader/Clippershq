@@ -1,16 +1,22 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ShoppingBag, Plus, Pause, Play, Pencil, Trash2 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { CreateListingModal } from "./create-listing-modal";
 
 interface MarketplaceClientProps {
   listings: any[];
   currentUser: { id: string; role: string };
   hiddenMode: boolean;
+  campaigns: { id: string; name: string }[];
+  clipAccounts: { id: string; username: string; platform: string }[];
+  accountCampaignAccess: Record<string, string[]>;
 }
 
 type StatusVariant =
@@ -36,7 +42,25 @@ function comingSoon() {
   toast.info("Coming in next phase.");
 }
 
-export function MarketplaceClient({ listings, hiddenMode }: MarketplaceClientProps) {
+export function MarketplaceClient({
+  listings,
+  hiddenMode,
+  campaigns,
+  clipAccounts,
+  accountCampaignAccess,
+}: MarketplaceClientProps) {
+  const router = useRouter();
+  const [createOpen, setCreateOpen] = useState(false);
+
+  function openCreate() {
+    setCreateOpen(true);
+  }
+
+  function handleCreateSuccess() {
+    setCreateOpen(false);
+    router.refresh();
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
@@ -59,7 +83,7 @@ export function MarketplaceClient({ listings, hiddenMode }: MarketplaceClientPro
             </p>
           </div>
         </div>
-        <Button onClick={comingSoon} icon={<Plus className="h-4 w-4" />}>
+        <Button onClick={openCreate} icon={<Plus className="h-4 w-4" />}>
           Create new listing
         </Button>
       </div>
@@ -71,7 +95,7 @@ export function MarketplaceClient({ listings, hiddenMode }: MarketplaceClientPro
           title="You haven't listed any accounts yet"
           description="Create your first listing to get started."
           action={
-            <Button onClick={comingSoon} icon={<Plus className="h-4 w-4" />}>
+            <Button onClick={openCreate} icon={<Plus className="h-4 w-4" />}>
               Create new listing
             </Button>
           }
@@ -83,6 +107,15 @@ export function MarketplaceClient({ listings, hiddenMode }: MarketplaceClientPro
           ))}
         </div>
       )}
+
+      <CreateListingModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={handleCreateSuccess}
+        campaigns={campaigns}
+        clipAccounts={clipAccounts}
+        accountCampaignAccess={accountCampaignAccess}
+      />
     </div>
   );
 }

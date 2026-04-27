@@ -16,12 +16,17 @@ export default async function MarketplacePage() {
   }
 
   // Server-side direct fetch (not /api roundtrip) — already authenticated above.
-  // Same shape as GET /api/marketplace/listings, scoped to session user.
   let listings: any[] = [];
+  let campaigns: any[] = [];
+  let clipAccounts: any[] = [];
+  let accountCampaignAccess: Record<string, string[]> = {};
+
   if (db && user?.id) {
+    const userId = user.id;
+
     listings = await withDbRetry(
       () => db!.marketplacePosterListing.findMany({
-        where: { userId: user.id! },
+        where: { userId },
         orderBy: { createdAt: "desc" },
         take: 200,
         include: {
@@ -31,6 +36,46 @@ export default async function MarketplacePage() {
       }),
       "marketplace.page.listMine",
     );
+
+    // ACTIVE non-archived campaigns for the create-listing dropdown.
+    campaigns = await withDbRetry(
+      () => db!.campaign.findMany({
+        where: { status: "ACTIVE", isArchived: false },
+        orderBy: { name: "asc" },
+        take: 200,
+        select: { id: true, name: true },
+      }),
+      "marketplace.page.campaigns",
+    );
+
+    // APPROVED non-deleted ClipAccounts owned by the user.
+    clipAccounts = await withDbRetry(
+      () => db!.clipAccount.findMany({
+        where: { userId, status: "APPROVED", deletedByUser: false },
+        orderBy: { username: "asc" },
+        take: 200,
+        select: { id: true, username: true, platform: true },
+      }),
+      "marketplace.page.clipAccounts",
+    );
+
+    // Map of clipAccountId -> campaignIds the account is approved for.
+    if (clipAccounts.length > 0) {
+      const accountIds = clipAccounts.map((a) => a.id);
+      const accessRows: any[] = await withDbRetry(
+        () => db!.campaignAccount.findMany({
+          where: { clipAccountId: { in: accountIds } },
+          select: { clipAccountId: true, campaignId: true },
+        }),
+        "marketplace.page.campaignAccess",
+      );
+      for (const row of accessRows) {
+        if (!accountCampaignAccess[row.clipAccountId]) {
+          accountCampaignAccess[row.clipAccountId] = [];
+        }
+        accountCampaignAccess[row.clipAccountId].push(row.campaignId);
+      }
+    }
   }
 
   const flagOn = process.env.MARKETPLACE_ENABLED === "true";
@@ -41,6 +86,9 @@ export default async function MarketplacePage() {
       listings={listings}
       currentUser={{ id: user?.id ?? "", role: user?.role ?? "" }}
       hiddenMode={isOwner && !flagOn}
+      campaigns={campaigns}
+      clipAccounts={clipAccounts}
+      accountCampaignAccess={accountCampaignAccess}
     />
   );
 }
