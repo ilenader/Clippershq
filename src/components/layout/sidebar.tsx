@@ -27,6 +27,7 @@ import {
   BookOpen,
   Gauge,
   Handshake,
+  ShoppingBag,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useInstallPrompt } from "@/hooks/use-pwa";
@@ -57,6 +58,15 @@ const clipperNavTop: NavItem[] = [
   { label: "Clips", href: "/clips", icon: <Film className="h-[18px] w-[18px]" /> },
 ];
 
+// Marketplace (Phase 2) — hidden until launch. Inserted client-side only when
+// role === "OWNER"; the server-only MARKETPLACE_ENABLED flag is enforced at
+// the page level (src/app/(app)/marketplace/page.tsx via assertMarketplaceVisible).
+const marketplaceNavItem: NavItem = {
+  label: "Marketplace",
+  href: "/marketplace",
+  icon: <ShoppingBag className="h-[18px] w-[18px]" />,
+};
+
 const clipperNavBottom: NavItem[] = [
   { label: "Accounts", href: "/accounts", icon: <UserCircle className="h-[18px] w-[18px]" /> },
   { label: "Earnings", href: "/earnings", icon: <DollarSign className="h-[18px] w-[18px]" /> },
@@ -66,9 +76,12 @@ const clipperNavBottom: NavItem[] = [
   { label: "Help", href: "/help", icon: <HelpCircle className="h-[18px] w-[18px]" /> },
 ];
 
-const clipperNav: NavSection[] = [
-  { items: [...clipperNavTop, ...clipperNavBottom] },
-];
+function buildClipperNav(showMarketplace: boolean): NavSection[] {
+  const items = showMarketplace
+    ? [...clipperNavTop, marketplaceNavItem, ...clipperNavBottom]
+    : [...clipperNavTop, ...clipperNavBottom];
+  return [{ items }];
+}
 
 // Admin sees only: Dashboard, Campaigns, Clips (for their assigned campaigns)
 const adminNav: NavSection[] = [
@@ -127,7 +140,30 @@ export function Sidebar({ role }: SidebarProps) {
   const isAdmin = role === "ADMIN" || role === "OWNER";
   const isClient = role === "CLIENT";
 
-  let sections = isClient ? clientNav : isAdmin ? [...adminNav] : clipperNav;
+  // Marketplace is hidden until launch; client-side this means OWNER-only.
+  // The MARKETPLACE_ENABLED env flag is server-only and is enforced at the
+  // page level for the eventual public flip.
+  // - For CLIPPER (post-launch): Marketplace inserted between Clips and Accounts.
+  // - For OWNER (preview now): Marketplace inserted into the admin Manage
+  //   section right after Clips so OWNER can preview without leaving their nav.
+  const showMarketplace = role === "OWNER";
+  let sections: NavSection[];
+  if (isClient) {
+    sections = clientNav;
+  } else if (isAdmin) {
+    sections = adminNav.map((section) => {
+      if (showMarketplace && section.title === "Manage") {
+        const items = [...section.items];
+        const clipsIdx = items.findIndex((i) => i.href === "/admin/clips");
+        const insertAt = clipsIdx >= 0 ? clipsIdx + 1 : items.length;
+        items.splice(insertAt, 0, marketplaceNavItem);
+        return { ...section, items };
+      }
+      return { ...section, items: [...section.items] };
+    });
+  } else {
+    sections = buildClipperNav(showMarketplace);
+  }
   if (role === "OWNER") {
     sections = [...sections, ownerManageNav, ownerExtraNav];
   }
