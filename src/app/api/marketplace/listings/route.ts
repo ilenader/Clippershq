@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { withDbRetry } from "@/lib/db-retry";
 import { checkBanStatus } from "@/lib/check-ban";
 import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -112,7 +113,36 @@ export async function POST(req: NextRequest) {
     "marketplace.listing.findCampaignAccount",
   );
   if (!ca) {
-    return NextResponse.json({ error: "This account is not approved for this campaign yet. Submit it via the normal account flow first." }, { status: 400 });
+    if (role !== "OWNER") {
+      return NextResponse.json({ error: "This account is not approved for this campaign yet. Submit it via the normal account flow first." }, { status: 400 });
+    }
+    // OWNER bypass: auto-create the missing CampaignAccount row so the OWNER
+    // can preview the marketplace without having to manually join the campaign
+    // through the normal account flow first. Mirrors the existing owner-override
+    // pattern in /api/clips/owner-submit, which also bypasses the join.
+    // Audit-logged so this never happens silently.
+    let newCampaignAccount: any = null;
+    try {
+      newCampaignAccount = await withDbRetry(
+        () => db!.campaignAccount.create({
+          data: { clipAccountId, campaignId },
+        }),
+        "marketplace.listing.autoJoinCampaign",
+      );
+    } catch (err: any) {
+      // P2002 = a parallel request just created the same row. The unique
+      // constraint guarantees the row exists now, so treat as success.
+      if (err?.code !== "P2002") throw err;
+    }
+    if (newCampaignAccount) {
+      await logAudit({
+        userId: session.user.id,
+        action: "MARKETPLACE_OWNER_AUTO_JOIN_CAMPAIGN",
+        targetType: "campaign_account",
+        targetId: newCampaignAccount.id,
+        details: { clipAccountId, campaignId, reason: "owner-marketplace-listing" },
+      });
+    }
   }
 
   // Friendly pre-check for duplicate before relying on the unique constraint.
