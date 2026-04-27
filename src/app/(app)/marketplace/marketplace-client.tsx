@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ShoppingBag, Plus, Pause, Play, Pencil, Trash2, ShieldCheck } from "lucide-react";
+import { ShoppingBag, Plus, Pause, Play, Pencil, Trash2, ShieldCheck, Compass } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { CreateListingModal } from "./create-listing-modal";
 
@@ -86,6 +86,13 @@ export function MarketplaceClient({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {currentUser.role === "OWNER" ? (
+            <Link href="/marketplace/browse">
+              <Button variant="secondary" icon={<Compass className="h-4 w-4" />}>
+                Browse marketplace
+              </Button>
+            </Link>
+          ) : null}
           {currentUser.role === "OWNER" ? (
             <Link href="/marketplace/admin">
               <Button variant="secondary" icon={<ShieldCheck className="h-4 w-4" />}>
