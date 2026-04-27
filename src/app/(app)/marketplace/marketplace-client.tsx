@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ShoppingBag, Plus, Pause, Play, Pencil, Trash2, ShieldCheck, Compass } from "lucide-react";
+import { ShoppingBag, Plus, Pause, Play, Pencil, Trash2, ShieldCheck, Compass, Inbox } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { CreateListingModal } from "./create-listing-modal";
 
@@ -90,6 +90,13 @@ export function MarketplaceClient({
             <Link href="/marketplace/browse">
               <Button variant="secondary" icon={<Compass className="h-4 w-4" />}>
                 Browse marketplace
+              </Button>
+            </Link>
+          ) : null}
+          {currentUser.role === "OWNER" ? (
+            <Link href="/marketplace/my-submissions">
+              <Button variant="secondary" icon={<Inbox className="h-4 w-4" />}>
+                My submissions
               </Button>
             </Link>
           ) : null}

@@ -7,6 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Compass, Star, X } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { SubmitClipModal } from "./submit-clip-modal";
+
+interface SubmitTarget {
+  id: string;
+  posterUsername: string;
+  accountUsername: string;
+  accountPlatform: string;
+  campaignName: string;
+}
 
 interface BrowseClientProps {
   campaigns: { id: string; name: string }[];
@@ -20,6 +29,7 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [submitTarget, setSubmitTarget] = useState<SubmitTarget | null>(null);
 
   // Track the latest fetch so out-of-order responses don't clobber state.
   const fetchSeqRef = useRef(0);
@@ -88,8 +98,14 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
     setCampaignFilter("");
   }
 
-  function onSubmitClip() {
-    toast.info("Coming in next phase.");
+  function onSubmitClip(listing: any) {
+    setSubmitTarget({
+      id: listing.id,
+      posterUsername: listing.user?.username ?? "(unknown)",
+      accountUsername: listing.clipAccount?.username ?? "(unknown)",
+      accountPlatform: listing.clipAccount?.platform ?? "",
+      campaignName: listing.campaign?.name ?? "(unknown campaign)",
+    });
   }
 
   const campaignOptions = campaigns.map((c) => ({ value: c.id, label: c.name }));
@@ -145,7 +161,7 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {listings.map((l) => (
-            <BrowseListingCard key={l.id} listing={l} onSubmit={onSubmitClip} />
+            <BrowseListingCard key={l.id} listing={l} onSubmit={() => onSubmitClip(l)} />
           ))}
         </div>
       )}
@@ -157,6 +173,23 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
           </Button>
         </div>
       ) : null}
+
+      <SubmitClipModal
+        open={!!submitTarget}
+        onClose={() => setSubmitTarget(null)}
+        onSuccess={() => setSubmitTarget(null)}
+        listingId={submitTarget?.id ?? ""}
+        listingDisplay={
+          submitTarget
+            ? {
+                posterUsername: submitTarget.posterUsername,
+                accountUsername: submitTarget.accountUsername,
+                accountPlatform: submitTarget.accountPlatform,
+                campaignName: submitTarget.campaignName,
+              }
+            : null
+        }
+      />
     </div>
   );
 }

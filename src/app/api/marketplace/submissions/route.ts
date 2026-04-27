@@ -228,6 +228,7 @@ export async function GET(req: NextRequest) {
           select: {
             id: true,
             userId: true,
+            user: { select: { username: true } },
             clipAccount: { select: { id: true, username: true, platform: true, profileLink: true } },
             campaign: { select: { id: true, name: true } },
           },
