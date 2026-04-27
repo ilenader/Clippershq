@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
         user: { select: { id: true, username: true, email: true } },
-        clipAccount: { select: { id: true, username: true, platform: true } },
+        clipAccount: { select: { id: true, username: true, platform: true, profileLink: true } },
         campaign: { select: { id: true, name: true, status: true } },
         _count: { select: { submissions: true } },
       },

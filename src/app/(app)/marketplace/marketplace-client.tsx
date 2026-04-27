@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ShoppingBag, Plus, Pause, Play, Pencil, Trash2 } from "lucide-react";
+import { ShoppingBag, Plus, Pause, Play, Pencil, Trash2, ShieldCheck } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { CreateListingModal } from "./create-listing-modal";
 
@@ -84,9 +85,18 @@ export function MarketplaceClient({
             </p>
           </div>
         </div>
-        <Button onClick={openCreate} icon={<Plus className="h-4 w-4" />}>
-          Create new listing
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {currentUser.role === "OWNER" ? (
+            <Link href="/marketplace/admin">
+              <Button variant="secondary" icon={<ShieldCheck className="h-4 w-4" />}>
+                Admin queue
+              </Button>
+            </Link>
+          ) : null}
+          <Button onClick={openCreate} icon={<Plus className="h-4 w-4" />}>
+            Create new listing
+          </Button>
+        </div>
       </div>
 
       {/* Listings */}
