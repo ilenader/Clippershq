@@ -136,6 +136,13 @@ model User {
   scheduledVoiceCalls     ScheduledVoiceCall[]
   messageReactions        MessageReaction[]
   ownedCampaigns          Campaign[]          @relation("CampaignOwner")
+  // Marketplace (Phase 1) — hidden feature, OWNER-only until launch flag flips.
+  marketplaceListings        MarketplacePosterListing[] @relation("MarketplaceListings")
+  marketplaceCreatorSubs     MarketplaceSubmission[]    @relation("MarketplaceCreatorSubmissions")
+  marketplaceRatingsGiven    MarketplaceRating[]        @relation("MarketplaceRatingsGiven")
+  marketplaceRatingsReceived MarketplaceRating[]        @relation("MarketplaceRatingsReceived")
+  marketplaceMessages        MarketplaceMessage[]       @relation("MarketplaceMessages")
+  marketplaceStrikes         MarketplaceStrike[]        @relation("MarketplaceStrikes")
 
   @@index([role])
   @@index([referredById])
@@ -273,6 +280,7 @@ model Campaign {
   channels             Channel[]
   communityTickets     CampaignTicket[]
   scheduledVoiceCalls  ScheduledVoiceCall[]
+  marketplaceListings  MarketplacePosterListing[] @relation("MarketplaceListings")
 
   @@index([status])
   @@index([isArchived])
@@ -311,6 +319,7 @@ model ClipAccount {
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   clips            Clip[]
   campaignAccounts CampaignAccount[]
+  marketplaceListings MarketplacePosterListing[] @relation("MarketplaceListings")
 
   @@index([userId])
   @@map("clip_accounts")
@@ -373,6 +382,11 @@ model Clip {
   videoUnavailable     Boolean    @default(false)
   videoUnavailableSince DateTime?
   savedEarnings        Float?
+  // Marketplace (Phase 1) — denormalized FK + flag. The flag is what tells
+  // earnings calc (Phase 6) to do 60/30/10 split instead of normal CPM flow.
+  // Null/false for all non-marketplace clips.
+  marketplaceSubmissionId String?
+  isMarketplaceClip       Boolean  @default(false)
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
@@ -382,6 +396,7 @@ model Clip {
   stats          ClipStat[]
   trackingJob    TrackingJob?
   agencyEarning  AgencyEarning?
+  marketplaceOriginPost MarketplaceClipPost? @relation("MarketplaceOriginPost")
 
   @@unique([clipUrl, campaignId])
   @@index([userId])
@@ -903,4 +918,168 @@ model CommunityActivity {
 
   @@index([campaignId, createdAt])
   @@map("community_activity")
+}
+
+// ─── Marketplace (Phase 1) ──────────────────────────────────
+// Hidden behind feature flag MARKETPLACE_ENABLED + OWNER role check until launch.
+// Posters list verified ClipAccounts per campaign; Creators submit Drive links;
+// earnings split 60/30/10 (creator/poster/platform) at view-tracking time.
+// See MARKETPLACE_SPEC.md for full design.
+
+enum MarketplaceListingStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  PAUSED
+  DELETION_REQUESTED
+  DELETED
+  REJECTED
+  BANNED
+}
+
+enum MarketplaceSubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  POSTED
+  POST_EXPIRED
+}
+
+model MarketplacePosterListing {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation("MarketplaceListings", fields: [userId], references: [id], onDelete: Cascade)
+  clipAccountId       String
+  clipAccount         ClipAccount @relation("MarketplaceListings", fields: [clipAccountId], references: [id], onDelete: Cascade)
+  campaignId          String
+  campaign            Campaign @relation("MarketplaceListings", fields: [campaignId], references: [id], onDelete: Cascade)
+  niche               String
+  audienceDescription String   @db.Text
+  followerCount       Int
+  followerOverride    Int?
+  country             String?
+  timezone            String?
+  dailySlotCount      Int      @default(5)
+  status              MarketplaceListingStatus @default(PENDING_APPROVAL)
+  pausedAt            DateTime?
+  deletionRequestedAt DateTime?
+  approvedAt          DateTime?
+  approvedBy          String?
+  rejectionReason     String?
+  averageRating       Float?
+  totalSubmissions    Int      @default(0)
+  totalApproved       Int      @default(0)
+  totalPosted         Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  submissions         MarketplaceSubmission[]
+
+  @@unique([userId, clipAccountId, campaignId])
+  @@index([campaignId, status])
+  @@index([userId])
+  @@map("marketplace_poster_listings")
+}
+
+model MarketplaceSubmission {
+  id              String   @id @default(cuid())
+  creatorId       String
+  creator         User     @relation("MarketplaceCreatorSubmissions", fields: [creatorId], references: [id], onDelete: Cascade)
+  listingId       String
+  listing         MarketplacePosterListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  driveUrl        String   @db.Text
+  videoHash       String?
+  platforms       String[]
+  notes           String?  @db.Text
+  status          MarketplaceSubmissionStatus @default(PENDING)
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?  @db.Text
+  improvementNote String?  @db.Text
+  expiresAt       DateTime
+  postDeadline    DateTime?
+  postedAt        DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  posts           MarketplaceClipPost[]
+  messages        MarketplaceMessage[]
+  rating          MarketplaceRating?
+
+  @@index([listingId, status])
+  @@index([creatorId, status])
+  @@index([videoHash])
+  @@index([expiresAt])
+  @@index([postDeadline])
+  @@map("marketplace_submissions")
+}
+
+model MarketplaceClipPost {
+  id           String   @id @default(cuid())
+  submissionId String
+  submission   MarketplaceSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  clipId       String   @unique
+  clip         Clip     @relation("MarketplaceOriginPost", fields: [clipId], references: [id], onDelete: Cascade)
+  platform     String
+  postedAt     DateTime @default(now())
+
+  @@index([submissionId])
+  @@map("marketplace_clip_posts")
+}
+
+model MarketplaceRating {
+  id           String   @id @default(cuid())
+  submissionId String   @unique
+  submission   MarketplaceSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  posterId     String
+  poster       User     @relation("MarketplaceRatingsGiven", fields: [posterId], references: [id], onDelete: Cascade)
+  creatorId    String
+  creator      User     @relation("MarketplaceRatingsReceived", fields: [creatorId], references: [id], onDelete: Cascade)
+  score        Int
+  note         String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  @@index([creatorId])
+  @@index([posterId])
+  @@map("marketplace_ratings")
+}
+
+model MarketplaceMessage {
+  id           String   @id @default(cuid())
+  submissionId String
+  submission   MarketplaceSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  senderId     String
+  sender       User     @relation("MarketplaceMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  content      String   @db.Text
+  readAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([submissionId, createdAt])
+  @@index([senderId])
+  @@map("marketplace_messages")
+}
+
+model MarketplaceStrike {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation("MarketplaceStrikes", fields: [userId], references: [id], onDelete: Cascade)
+  reason       String
+  submissionId String?
+  bannedUntil  DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@map("marketplace_strikes")
+}
+
+model MarketplaceVideoHash {
+  id                    String   @id @default(cuid())
+  hash                  String   @unique
+  firstSeenSubmissionId String
+  rejectionCount        Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([hash])
+  @@map("marketplace_video_hashes")
 }
