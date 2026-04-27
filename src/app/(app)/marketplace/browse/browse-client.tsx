@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Compass, Search, Star, X } from "lucide-react";
+import { Compass, Star, X } from "lucide-react";
 import { toast } from "@/lib/toast";
 
 interface BrowseClientProps {
@@ -14,23 +13,13 @@ interface BrowseClientProps {
   currentUserId: string;
 }
 
-const SEARCH_DEBOUNCE_MS = 300;
-
 export function BrowseClient({ campaigns, currentUserId: _currentUserId }: BrowseClientProps) {
   const [campaignFilter, setCampaignFilter] = useState<string>("");
-  const [searchInput, setSearchInput] = useState<string>("");
-  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
 
   const [listings, setListings] = useState<any[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-
-  // Debounce search input → debouncedSearch (which actually triggers fetch).
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(t);
-  }, [searchInput]);
 
   // Track the latest fetch so out-of-order responses don't clobber state.
   const fetchSeqRef = useRef(0);
@@ -38,7 +27,6 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
   function buildUrl(cursor?: string | null): string {
     const params = new URLSearchParams();
     if (campaignFilter) params.set("campaignId", campaignFilter);
-    if (debouncedSearch) params.set("search", debouncedSearch);
     params.set("limit", "50");
     if (cursor) params.set("cursor", cursor);
     params.set("_t", String(Date.now()));
@@ -88,18 +76,16 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
     }
   }
 
-  // Refetch on filter change (campaign + debounced search).
+  // Refetch on filter change.
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaignFilter, debouncedSearch]);
+  }, [campaignFilter]);
 
-  const filtersActive = campaignFilter !== "" || debouncedSearch !== "";
+  const filtersActive = campaignFilter !== "";
 
   function clearFilters() {
     setCampaignFilter("");
-    setSearchInput("");
-    setDebouncedSearch("");
   }
 
   function onSubmitClip() {
@@ -122,22 +108,14 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
       </div>
 
       {/* Filter bar */}
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_2fr_auto]">
-        <Select
-          id="browse-campaign"
-          placeholder="All campaigns"
-          value={campaignFilter}
-          onChange={(e) => setCampaignFilter(e.target.value)}
-          options={campaignOptions}
-        />
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-          <Input
-            id="browse-search"
-            placeholder="Search by account username"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9"
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="sm:flex-1">
+          <Select
+            id="browse-campaign"
+            placeholder="All campaigns"
+            value={campaignFilter}
+            onChange={(e) => setCampaignFilter(e.target.value)}
+            options={campaignOptions}
           />
         </div>
         {filtersActive ? (
@@ -148,9 +126,7 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
           >
             Clear
           </Button>
-        ) : (
-          <div />
-        )}
+        ) : null}
       </div>
 
       {/* Body */}

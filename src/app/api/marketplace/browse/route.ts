@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_TAKE = 50;
 const MAX_TAKE = 200;
-const MAX_SEARCH = 100;
 
 /**
  * GET /api/marketplace/browse
@@ -43,7 +42,6 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
 
   const campaignId = searchParams.get("campaignId");
-  const searchRaw = searchParams.get("search");
   const cursor = searchParams.get("cursor");
   const limitRaw = searchParams.get("limit");
 
@@ -59,28 +57,11 @@ export async function GET(req: NextRequest) {
     take = parsed;
   }
 
-  let search: string | null = null;
-  if (searchRaw !== null) {
-    if (typeof searchRaw !== "string" || searchRaw.length > MAX_SEARCH) {
-      return NextResponse.json(
-        { error: `search must be a string up to ${MAX_SEARCH} characters.` },
-        { status: 400 },
-      );
-    }
-    const trimmed = searchRaw.trim();
-    if (trimmed.length > 0) search = trimmed;
-  }
-
   const where: Record<string, any> = {
     status: "ACTIVE",
     userId: { not: session.user.id },
   };
   if (campaignId) where.campaignId = campaignId;
-  if (search) {
-    where.clipAccount = {
-      is: { username: { contains: search, mode: "insensitive" } },
-    };
-  }
 
   const rows: any[] = await withDbRetry(
     () => db!.marketplacePosterListing.findMany({
