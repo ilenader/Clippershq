@@ -44,6 +44,7 @@ function comingSoon() {
 
 export function MarketplaceClient({
   listings,
+  currentUser,
   hiddenMode,
   campaigns,
   clipAccounts,
@@ -115,6 +116,7 @@ export function MarketplaceClient({
         campaigns={campaigns}
         clipAccounts={clipAccounts}
         accountCampaignAccess={accountCampaignAccess}
+        role={currentUser.role}
       />
     </div>
   );

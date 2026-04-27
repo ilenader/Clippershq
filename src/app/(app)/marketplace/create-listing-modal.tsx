@@ -31,6 +31,7 @@ interface CreateListingModalProps {
   campaigns: CampaignOption[];
   clipAccounts: ClipAccountOption[];
   accountCampaignAccess: Record<string, string[]>;
+  role: string;
 }
 
 interface FormState {
@@ -62,9 +63,15 @@ export function CreateListingModal({
   campaigns,
   clipAccounts,
   accountCampaignAccess,
+  role,
 }: CreateListingModalProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
+  // OWNER bypass mirrors the server-side auto-join in POST /api/marketplace/listings:
+  // OWNER can list any APPROVED account on any active campaign without first
+  // having a CampaignAccount row. The API auto-creates the missing row +
+  // audit-logs it on submit. This client gate just stops the UI from blocking.
+  const ownerBypass = role === "OWNER";
 
   // Reset form whenever the modal is opened. Avoids stale state on re-open.
   useEffect(() => {
@@ -80,7 +87,8 @@ export function CreateListingModal({
     setForm((prev) => {
       const stillValid =
         prev.clipAccountId &&
-        (accountCampaignAccess[prev.clipAccountId] ?? []).includes(campaignId);
+        (ownerBypass ||
+          (accountCampaignAccess[prev.clipAccountId] ?? []).includes(campaignId));
       return {
         ...prev,
         campaignId,
@@ -176,9 +184,11 @@ export function CreateListingModal({
   const accountDisabled = !form.campaignId;
   const allowedIds = form.campaignId
     ? new Set(
-        clipAccounts
-          .map((a) => a.id)
-          .filter((id) => (accountCampaignAccess[id] ?? []).includes(form.campaignId)),
+        ownerBypass
+          ? clipAccounts.map((a) => a.id)
+          : clipAccounts
+              .map((a) => a.id)
+              .filter((id) => (accountCampaignAccess[id] ?? []).includes(form.campaignId)),
       )
     : new Set<string>();
 
