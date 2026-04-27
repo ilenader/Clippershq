@@ -158,15 +158,36 @@ export async function POST(req: NextRequest) {
   }
 
   // Friendly pre-check for duplicate before relying on the unique constraint.
+  // REJECTED and DELETED listings are not permanent — replace them so the user
+  // can fix issues and resubmit. Anything else (ACTIVE / PENDING_APPROVAL /
+  // PAUSED / DELETION_REQUESTED / BANNED) blocks with 409.
   const existing: any = await withDbRetry(
     () => db!.marketplacePosterListing.findUnique({
       where: { userId_clipAccountId_campaignId: { userId: session.user.id, clipAccountId, campaignId } },
-      select: { id: true },
+      select: { id: true, status: true, rejectionReason: true },
     }),
     "marketplace.listing.findExisting",
   );
   if (existing) {
-    return NextResponse.json({ error: "You already have a listing for this account on this campaign." }, { status: 409 });
+    if (existing.status === "REJECTED" || existing.status === "DELETED") {
+      await logAudit({
+        userId: session.user.id,
+        action: "MARKETPLACE_LISTING_RESUBMIT_AFTER_REJECT",
+        targetType: "marketplace_listing",
+        targetId: existing.id,
+        details: {
+          previousStatus: existing.status,
+          rejectionReason: existing.rejectionReason ?? null,
+        },
+      });
+      await withDbRetry(
+        () => db!.marketplacePosterListing.delete({ where: { id: existing.id } }),
+        "marketplace.listing.deleteForResubmit",
+      );
+      // fall through to create
+    } else {
+      return NextResponse.json({ error: "You already have a listing for this account on this campaign." }, { status: 409 });
+    }
   }
 
   // Derive niche + followerCount when the client omitted them. The modal stopped
