@@ -203,6 +203,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   email: true,
                   username: true,
                   isDeleted: true,
+                  // Phase: JWT role propagation — sessionVersion check
+                  sessionVersion: true,
                 },
               }),
               "auth.jwt-firstsignin",
@@ -230,12 +232,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               (token as any).name = dbUser.username && dbUser.username !== "user"
                 ? dbUser.username
                 : user.name;
+              // Phase: JWT role propagation — sessionVersion check
+              (token as any).sessionVersion = dbUser.sessionVersion ?? 0;
             } else {
               (token as any).role = (user as any).role || "CLIPPER";
               (token as any).status = (user as any).status || "ACTIVE";
               (token as any).discordId = (user as any).discordId;
               (token as any).email = user.email;
               (token as any).name = user.name;
+              (token as any).sessionVersion = (user as any).sessionVersion ?? 0;
             }
           } catch (err: any) {
             console.warn("[AUTH-JWT-FIRSTSIGNIN-FAIL]", err?.message || err);
@@ -244,6 +249,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             (token as any).discordId = (user as any).discordId;
             (token as any).email = user.email;
             (token as any).name = user.name;
+            (token as any).sessionVersion = (user as any).sessionVersion ?? 0;
           }
         } else {
           (token as any).role = (user as any).role || "CLIPPER";
@@ -251,8 +257,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           (token as any).discordId = (user as any).discordId;
           (token as any).email = user.email;
           (token as any).name = user.name;
+          (token as any).sessionVersion = (user as any).sessionVersion ?? 0;
         }
-        (token as any).lastRefreshAt = Math.floor(Date.now() / 1000);
+        const nowSecInit = Math.floor(Date.now() / 1000);
+        (token as any).lastRefreshAt = nowSecInit;
+        // Phase: JWT role propagation — sessionVersion check
+        (token as any).lastVersionCheckAt = nowSecInit;
         return token;
       }
 
@@ -261,14 +271,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // longer cascades into a logout for every user (the resilience win
       // over the database session strategy this replaces).
       const REFRESH_INTERVAL_SEC = 5 * 60;
+      // Phase: JWT role propagation — sessionVersion check. A 30s lightweight
+      // single-column lookup catches role changes (which atomically bump
+      // User.sessionVersion in /api/admin/users/[id] PATCH) within ~30s
+      // instead of waiting on the 5-min full-refresh floor.
+      const VERSION_CHECK_INTERVAL_SEC = 30;
       const nowSec = Math.floor(Date.now() / 1000);
       const lastRefreshAt = (token as any).lastRefreshAt as number | undefined;
+      const lastVersionCheckAt = (token as any).lastVersionCheckAt as number | undefined;
 
-      if (
+      const fullRefreshDue =
         token.sub &&
         db &&
-        (!lastRefreshAt || nowSec - lastRefreshAt >= REFRESH_INTERVAL_SEC)
-      ) {
+        (!lastRefreshAt || nowSec - lastRefreshAt >= REFRESH_INTERVAL_SEC);
+
+      // Helper: do the full-fetch refresh. Used by the 5-min floor AND by
+      // version-mismatch escalation. Returns the special sentinel "INVALIDATE"
+      // when the token must be killed (deleted/banned/missing user).
+      const doFullRefresh = async (): Promise<"OK" | "INVALIDATE" | "FAIL"> => {
         try {
           const dbUser: any = await withDbRetry(
             () => db.user.findUnique({
@@ -280,6 +300,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 email: true,
                 username: true,
                 isDeleted: true,
+                // Phase: JWT role propagation — sessionVersion check
+                sessionVersion: true,
               },
             }),
             "auth.jwt-refresh",
@@ -287,13 +309,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           if (!dbUser) {
             // User row deleted entirely — invalidate token.
-            return null as any;
+            return "INVALIDATE";
           }
           if (dbUser.isDeleted) {
             // Soft-deleted by /admin/reset-data — propagates within
             // REFRESH_INTERVAL_SEC of the deletion.
             console.log(`[AUTH] Soft-deleted user ${token.sub} — invalidating token.`);
-            return null as any;
+            return "INVALIDATE";
           }
           if (dbUser.status === "BANNED") {
             // Banned post-sign-in — propagates within REFRESH_INTERVAL_SEC.
@@ -301,7 +323,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             // closes the existing-session gap so a banned user can't keep
             // hitting authenticated routes for up to 5 min after the ban.
             console.log(`[AUTH] Banned user ${token.sub} — invalidating token.`);
-            return null as any;
+            return "INVALIDATE";
           }
 
           if (OWNER_EMAIL && dbUser.email === OWNER_EMAIL && dbUser.role !== "OWNER") {
@@ -322,11 +344,60 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (dbUser.username && dbUser.username !== "user") {
             (token as any).name = dbUser.username;
           }
+          (token as any).sessionVersion = dbUser.sessionVersion ?? 0;
           (token as any).lastRefreshAt = nowSec;
+          (token as any).lastVersionCheckAt = nowSec;
+          return "OK";
         } catch (err: any) {
           // DB blip mid-refresh: keep stale-but-valid token. Don't bump
           // lastRefreshAt — retry on next request rather than wait 5 min.
           console.warn("[AUTH-JWT-REFRESH-FAIL]", err?.message || err);
+          return "FAIL";
+        }
+      };
+
+      if (fullRefreshDue) {
+        const res = await doFullRefresh();
+        if (res === "INVALIDATE") return null as any;
+        // OK / FAIL: fall through, return token (stale-but-valid on FAIL).
+      } else if (
+        token.sub &&
+        db &&
+        (!lastVersionCheckAt || nowSec - lastVersionCheckAt >= VERSION_CHECK_INTERVAL_SEC)
+      ) {
+        // Phase: JWT role propagation — sessionVersion check.
+        // Lightweight single-column lookup. If versions match, just bump
+        // lastVersionCheckAt and keep the cached token. If they diverge, the
+        // role (or other JWT-cached field) changed under us — escalate to a
+        // full refresh.
+        try {
+          const versionRow: any = await withDbRetry(
+            () => db.user.findUnique({
+              where: { id: token.sub as string },
+              select: { sessionVersion: true },
+            }),
+            "auth.jwt-version-check",
+          );
+
+          if (versionRow) {
+            const dbVersion = (versionRow.sessionVersion ?? 0) as number;
+            const tokenVersion = ((token as any).sessionVersion ?? 0) as number;
+            if (dbVersion !== tokenVersion) {
+              const res = await doFullRefresh();
+              if (res === "INVALIDATE") return null as any;
+              // OK / FAIL: token already updated (OK) or kept stale (FAIL).
+            } else {
+              (token as any).lastVersionCheckAt = nowSec;
+            }
+          }
+          // versionRow null is treated as a transient miss — keep stale
+          // token, retry next request. The 5-min full refresh will catch a
+          // truly-deleted user.
+        } catch (err: any) {
+          // DB blip on the lightweight check: same resilience pattern as
+          // the full refresh — keep stale-but-valid token, do NOT bump
+          // lastVersionCheckAt so the next request retries.
+          console.warn("[AUTH-JWT-VERSION-CHECK-FAIL]", err?.message || err);
         }
       }
 

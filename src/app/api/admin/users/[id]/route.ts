@@ -160,14 +160,23 @@ export async function PATCH(
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
+  // Phase: bumping sessionVersion forces affected user's JWT to refresh
+  // within 30s. Only bump when role is actually changing — other field
+  // updates (status, streak, bonus override) don't need to invalidate the
+  // target's cached JWT, so they keep their existing token.
+  const isRoleChange = updateData.role !== undefined;
+  const writeData: any = isRoleChange
+    ? { ...updateData, sessionVersion: { increment: 1 } }
+    : updateData;
+
   try {
-    const updated = await db.user.update({
+    const updated = await (db.user.update as any)({
       where: { id },
-      data: updateData,
+      data: writeData,
       select: { id: true, username: true, email: true, role: true, status: true, level: true, currentStreak: true, longestStreak: true, manualBonusOverride: true, bonusPercentage: true, totalEarnings: true, referralCode: true, referredById: true },
     });
     // Invalidate caches that depend on this user's role/membership.
-    if (updateData.role !== undefined) {
+    if (isRoleChange) {
       invalidateCache(`user.role.${id}`);
       invalidateCachePrefix(`community.campaigns.${id}.`);
     }

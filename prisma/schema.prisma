@@ -110,6 +110,13 @@ model User {
   aiMessageCount Int       @default(0)
   aiQuotaResetAt DateTime?
 
+  // JWT session-version counter. Bumped atomically by /api/admin/users/[id]
+  // PATCH whenever the user's role changes. The auth.ts JWT callback compares
+  // the token's cached version against this column on a 30s lightweight
+  // window — mismatch forces a full token refresh so role changes propagate
+  // within ~30s instead of waiting for the 5-min resilience-floor refresh.
+  sessionVersion Int       @default(0)
+
   // Relations
   referredBy       User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals        User[]    @relation("Referrals")
