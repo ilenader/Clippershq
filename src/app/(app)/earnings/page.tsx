@@ -169,6 +169,25 @@ export default function EarningsPage() {
           <p className="text-lg lg:text-3xl font-bold text-accent tabular-nums">{formatCurrency(summary.paidOut)}</p>
         </div>
       </div>
+      {/* Phase 6e — marketplace creator earnings sub-row. Only renders when
+          the user has creator income (60% share from clips other clippers
+          posted from their marketplace listings). Already folded into the
+          headline available balance — this card just makes the source of
+          funds visible to the user. */}
+      {(earnings?.marketplaceCreatorEarnings ?? 0) > 0 && (
+        <div className="rounded-xl bg-accent/5 border border-accent/20 p-3 lg:p-5">
+          <p className="text-[11px] lg:text-xs font-semibold uppercase tracking-[0.15em] text-[var(--text-muted)] mb-1">
+            Marketplace Creator Earnings
+          </p>
+          <p className="text-lg lg:text-3xl font-bold text-accent tabular-nums">
+            {formatCurrency(earnings.marketplaceCreatorEarnings)}
+          </p>
+          <p className="text-[11px] lg:text-xs text-[var(--text-muted)] mt-1">
+            From clips other clippers posted on your behalf from marketplace listings.
+          </p>
+        </div>
+      )}
+
       {(summary.pendingEarnings > 0 || summary.lockedInPayouts > 0) && (
         <div className="flex flex-wrap gap-2">
           {summary.pendingEarnings > 0 && (
@@ -193,7 +212,12 @@ export default function EarningsPage() {
             <EarningsFilters values={earningsFilters} onChange={setEarningsFilters} />
           </div>
         </div>
-        <EarningsChart clips={timeFilteredClips} filters={earningsFilters} days={timeframeDays} />
+        <EarningsChart
+          clips={timeFilteredClips}
+          filters={earningsFilters}
+          days={timeframeDays}
+          hasMarketplaceCreatorEarnings={(earnings?.marketplaceCreatorEarnings ?? 0) > 0}
+        />
       </div>
 
     </div>
