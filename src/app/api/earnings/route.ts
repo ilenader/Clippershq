@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     ),
   );
   if (currentUser?.role !== "CLIPPER") {
-    return NextResponse.json({ totalEarned: 0, approvedEarnings: 0, pendingEarnings: 0, paidOut: 0, lockedInPayouts: 0, available: 0, campaignBalances: [], clipEarnings: [] });
+    return NextResponse.json({ totalEarned: 0, approvedEarnings: 0, pendingEarnings: 0, paidOut: 0, lockedInPayouts: 0, available: 0, campaignBalances: [], clipEarnings: [], marketplaceCreatorEarnings: 0 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -49,7 +49,21 @@ export async function GET(request: Request) {
       payoutWhere.campaignId = { in: filterCampaignIds };
     }
 
-    const [clips, payouts] = await Promise.all([
+    // Phase 6d — creator's 60% share from marketplace clips lives in a
+    // separate table keyed by creatorId (not in Clip.earnings, which holds
+    // the poster's 30%). Without this query, a creator who is NOT the
+    // poster would see $0 earnings on /earnings even though they're owed
+    // money. Combined into the headline available balance, also returned
+    // as a separate field so the UI (Phase 6e) can surface it as a sub-row.
+    // Self-listing (creator === poster on same clip) is mathematically safe:
+    // the two rows live in separate tables — no double-count.
+    const creatorEarningsWhere: any = {
+      creatorId: session.user.id,
+      clip: { isDeleted: false, status: "APPROVED", videoUnavailable: false },
+    };
+    if (filterCampaignIds.length > 0) creatorEarningsWhere.campaignId = { in: filterCampaignIds };
+
+    const [clips, payouts, marketplaceCreatorEarnings] = await Promise.all([
       withDbRetry<any[]>(
         () => db.clip.findMany({
           where: clipWhere,
@@ -66,10 +80,21 @@ export async function GET(request: Request) {
         }),
         "earnings.payouts",
       ),
+      withDbRetry<any[]>(
+        () => db.marketplaceCreatorEarning.findMany({
+          where: creatorEarningsWhere,
+          select: { amount: true, campaignId: true },
+          take: 5000,
+        }),
+        "earnings.creatorEarnings",
+      ),
     ]);
 
-    const balance = computeBalance({ clips, payouts });
-    const campaignBalances = computeCampaignBalances({ clips, payouts });
+    const balance = computeBalance({ clips, payouts, marketplaceCreatorEarnings });
+    const campaignBalances = computeCampaignBalances({ clips, payouts, marketplaceCreatorEarnings });
+    const marketplaceCreatorEarningsTotal = Math.round(
+      marketplaceCreatorEarnings.reduce((s: number, c: any) => s + (c.amount || 0), 0) * 100,
+    ) / 100;
 
     // Get campaign names
     const campaignIds = campaignBalances.map((b) => b.campaignId);
@@ -104,8 +129,12 @@ export async function GET(request: Request) {
       ...balance,
       campaignBalances: enrichedBalances,
       clipEarnings,
+      // Phase 6d — exposed as a separate field so Phase 6e UI can show it
+      // as a "Marketplace creator earnings" sub-row under the headline.
+      // Already folded into balance.totalEarned / approvedEarnings / available.
+      marketplaceCreatorEarnings: marketplaceCreatorEarningsTotal,
     });
   } catch {
-    return NextResponse.json({ totalEarned: 0, available: 0, campaignBalances: [] });
+    return NextResponse.json({ totalEarned: 0, available: 0, campaignBalances: [], marketplaceCreatorEarnings: 0 });
   }
 }

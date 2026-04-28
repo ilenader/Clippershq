@@ -80,7 +80,22 @@ export async function POST(
         },
         select: { earnings: true },
       });
-      const campaignEarned = campaignClips.reduce((s: number, c: any) => s + (c.earnings || 0), 0);
+
+      // Phase 6d — fold marketplace creator earnings (60% share) into the
+      // owner-side validation. Without this, approving a creator-only payout
+      // would fail with "campaign earnings less than total payouts" because
+      // the creator's actual earnings (in MarketplaceCreatorEarning, NOT
+      // Clip.earnings) would be invisible to the math here. Clip.earnings on
+      // marketplace clips only holds the poster's 30%.
+      const creatorAgg = await db.marketplaceCreatorEarning.aggregate({
+        where: {
+          creatorId: existing.userId,
+          campaignId: existing.campaignId,
+          clip: { isDeleted: false, status: "APPROVED", videoUnavailable: false },
+        },
+        _sum: { amount: true },
+      });
+      const campaignEarned = campaignClips.reduce((s: number, c: any) => s + (c.earnings || 0), 0) + (creatorAgg._sum.amount ?? 0);
 
       const campaignPayouts = await db.payoutRequest.findMany({
         where: {

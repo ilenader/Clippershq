@@ -37,7 +37,14 @@ export async function GET(req: NextRequest) {
       payouts.map(async (payout: any) => {
         if (!payout.campaignId) return { ...payout, campaignAvailable: null };
 
-        const [clipAgg, payoutAgg] = await Promise.all([
+        // Phase 6d — owner sees true campaignAvailable for marketplace creators.
+        // A creator's 60% share lives in MarketplaceCreatorEarning, NOT in
+        // Clip.earnings (which holds the poster's 30%). Without this aggregate,
+        // owner review would see $0 available for a creator-only payout
+        // request and incorrectly flag it as "exceeds balance."
+        // Self-listing (creator === poster on same clip) is mathematically
+        // safe: separate rows in separate tables, no double-count.
+        const [clipAgg, payoutAgg, creatorAgg] = await Promise.all([
           db!.clip.aggregate({
             where: {
               userId: payout.userId,
@@ -58,9 +65,17 @@ export async function GET(req: NextRequest) {
             select: { amount: true },
             take: 500,
           }),
+          db!.marketplaceCreatorEarning.aggregate({
+            where: {
+              creatorId: payout.userId,
+              campaignId: payout.campaignId,
+              clip: { isDeleted: false, status: "APPROVED", videoUnavailable: false },
+            },
+            _sum: { amount: true },
+          }),
         ]);
 
-        const earned = clipAgg._sum.earnings ?? 0;
+        const earned = (clipAgg._sum.earnings ?? 0) + (creatorAgg._sum.amount ?? 0);
         const paidAndLocked = payoutAgg.reduce((s: number, p: any) => s + (p.amount || 0), 0);
         const campaignAvailable = Math.round(Math.max(earned - paidAndLocked, 0) * 100) / 100;
 
@@ -170,10 +185,30 @@ export async function POST(req: NextRequest) {
         select: { amount: true, status: true, campaignId: true },
       });
 
+      // Phase 6d — creator's 60% share from marketplace clips lives in
+      // MarketplaceCreatorEarning, NOT Clip.earnings (which holds the
+      // poster's 30%). Without this aggregate, a creator-only payout would
+      // be rejected as "exceeds balance" because their entire creator
+      // income would be invisible to the validator.
+      // Combined into a single available balance per spec — Q2.
+      // Self-listing (creator === poster on same clip) is mathematically
+      // safe: Clip.earnings holds 30%, MarketplaceCreatorEarning.amount
+      // holds 60% — separate rows, no double-count. Sum = 90% gross
+      // (platform's 10% stays hidden in MarketplacePlatformEarning).
+      const creatorAgg = await tx.marketplaceCreatorEarning.aggregate({
+        where: {
+          creatorId: userId,
+          campaignId,
+          clip: { isDeleted: false, status: "APPROVED", videoUnavailable: false },
+        },
+        _sum: { amount: true },
+      });
+      const creatorEarned = creatorAgg._sum.amount ?? 0;
+
       // Compute campaign-scoped available balance
       const earned = clips
         .filter((c: any) => c.campaignId === campaignId)
-        .reduce((s: number, c: any) => s + (c.earnings || 0), 0);
+        .reduce((s: number, c: any) => s + (c.earnings || 0), 0) + creatorEarned;
       const paidOut = payouts
         .filter((p: any) => p.campaignId === campaignId && p.status === "PAID")
         .reduce((s: number, p: any) => s + (p.amount || 0), 0);

@@ -232,7 +232,25 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    platformRevenue = Math.round((cpmSplitRevenue + agencyFeeRevenue) * 100) / 100;
+    // Phase 6d — marketplace platform's 10% cut counts toward platform
+    // revenue. Date-scope by underlying clip.reviewedAt to match feeClips
+    // semantics (revenue recognized when the clip was approved, not when
+    // the cron tick wrote the latest amount). MarketplacePlatformEarning is
+    // never exposed to clippers — owner/admin aggregates only.
+    const marketplacePlatformAgg = await db.marketplacePlatformEarning.aggregate({
+      where: {
+        clip: {
+          status: "APPROVED",
+          isDeleted: false,
+          videoUnavailable: false,
+          reviewedAt: { gte: from, lte: to },
+        },
+      },
+      _sum: { amount: true },
+    });
+    const marketplacePlatformRevenue = marketplacePlatformAgg._sum.amount ?? 0;
+
+    platformRevenue = Math.round((cpmSplitRevenue + agencyFeeRevenue + marketplacePlatformRevenue) * 100) / 100;
   } catch {}
 
   // Total GMV — money brands put into campaigns CREATED in the date range.
@@ -258,7 +276,24 @@ export async function GET(req: NextRequest) {
       },
       _sum: { earnings: true },
     });
-    totalPaidToClippers = Math.round((agg._sum.earnings ?? 0) * 100) / 100;
+    // Phase 6d — for marketplace clips, Clip.earnings only holds the poster's
+    // 30%. Creator's 60% lives in MarketplaceCreatorEarning. Without this
+    // aggregate, "Paid to clippers" would silently undercount marketplace
+    // payouts by ~67% per affected clip.
+    const creatorEarningsAgg = await db.marketplaceCreatorEarning.aggregate({
+      where: {
+        clip: {
+          status: "APPROVED",
+          isDeleted: false,
+          videoUnavailable: false,
+          reviewedAt: { gte: from, lte: to },
+        },
+      },
+      _sum: { amount: true },
+    });
+    totalPaidToClippers = Math.round(
+      ((agg._sum.earnings ?? 0) + (creatorEarningsAgg._sum.amount ?? 0)) * 100
+    ) / 100;
   } catch {}
 
   // Unspent campaign budget — POINT-IN-TIME snapshot across all ACTIVE campaigns.
