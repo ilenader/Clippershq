@@ -143,6 +143,7 @@ model User {
   marketplaceRatingsReceived MarketplaceRating[]        @relation("MarketplaceRatingsReceived")
   marketplaceMessages        MarketplaceMessage[]       @relation("MarketplaceMessages")
   marketplaceStrikes         MarketplaceStrike[]        @relation("MarketplaceStrikes")
+  marketplaceCreatorEarnings MarketplaceCreatorEarning[] @relation("MarketplaceCreatorEarnings")
 
   @@index([role])
   @@index([referredById])
@@ -281,6 +282,8 @@ model Campaign {
   communityTickets     CampaignTicket[]
   scheduledVoiceCalls  ScheduledVoiceCall[]
   marketplaceListings  MarketplacePosterListing[] @relation("MarketplaceListings")
+  marketplaceCreatorEarnings  MarketplaceCreatorEarning[]  @relation("MarketplaceCreatorEarnings")
+  marketplacePlatformEarnings MarketplacePlatformEarning[] @relation("MarketplacePlatformEarnings")
 
   @@index([status])
   @@index([isArchived])
@@ -397,6 +400,8 @@ model Clip {
   trackingJob    TrackingJob?
   agencyEarning  AgencyEarning?
   marketplaceOriginPost MarketplaceClipPost? @relation("MarketplaceOriginPost")
+  marketplaceCreatorEarning  MarketplaceCreatorEarning?  @relation("MarketplaceCreatorEarning")
+  marketplacePlatformEarning MarketplacePlatformEarning? @relation("MarketplacePlatformEarning")
 
   @@unique([clipUrl, campaignId])
   @@index([userId])
@@ -1082,4 +1087,53 @@ model MarketplaceVideoHash {
 
   @@index([hash])
   @@map("marketplace_video_hashes")
+}
+
+// ─── Marketplace Phase 6 — 60/30/10 earnings split ──────────
+// Marketplace clips split CPM gross 3 ways: 60% creator, 30% poster, 10% platform.
+// Clip.earnings holds the poster's 30% (so existing payout/balance flows are unchanged).
+// Creator's 60% lives here, joined to the user via creatorId. Platform's 10% lives in
+// MarketplacePlatformEarning and is never returned in user-facing API responses.
+
+model MarketplaceCreatorEarning {
+  id                            String   @id @default(cuid())
+  clipId                        String   @unique
+  creatorId                     String
+  campaignId                    String
+  amount                        Float    @default(0)
+  baseAmount                    Float    @default(0)
+  bonusPercent                  Float    @default(0)
+  bonusAmount                   Float    @default(0)
+  streakBonusPercentAtApproval  Float?
+  savedAmount                   Float?
+  views                         Int      @default(0)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  clip     Clip     @relation("MarketplaceCreatorEarning", fields: [clipId], references: [id], onDelete: Cascade)
+  creator  User     @relation("MarketplaceCreatorEarnings", fields: [creatorId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation("MarketplaceCreatorEarnings", fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([clipId])
+  @@index([creatorId])
+  @@index([campaignId])
+  @@map("marketplace_creator_earnings")
+}
+
+model MarketplacePlatformEarning {
+  id          String   @id @default(cuid())
+  clipId      String   @unique
+  campaignId  String
+  amount      Float    @default(0)
+  savedAmount Float?
+  views       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clip     Clip     @relation("MarketplacePlatformEarning", fields: [clipId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation("MarketplacePlatformEarnings", fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([clipId])
+  @@index([campaignId])
+  @@map("marketplace_platform_earnings")
 }
