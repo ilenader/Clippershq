@@ -4,6 +4,7 @@ import { withDbRetry } from "@/lib/db-retry";
 import { checkBanStatus } from "@/lib/check-ban";
 import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { isUserMarketplaceBanned } from "@/lib/marketplace-ban";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,21 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const role = (session.user as any).role;
   if (role !== "OWNER") {
     return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  }
+
+  // Marketplace-specific ban check — OWNER bypasses for testing/admin.
+  // Activates for non-OWNER roles when Phase 11 widens the role gate above.
+  if (role !== "OWNER") {
+    const mktBan = await isUserMarketplaceBanned(session.user.id);
+    if (mktBan.banned && mktBan.until) {
+      return NextResponse.json(
+        {
+          error: `You are temporarily banned from the marketplace until ${mktBan.until.toISOString()}.`,
+          bannedUntil: mktBan.until.toISOString(),
+        },
+        { status: 403 },
+      );
+    }
   }
 
   const rl = checkRoleAwareRateLimit(`mkt-submission-action:${session.user.id}`, 60, 60 * 60_000, role);

@@ -41,6 +41,7 @@ import { recalculateClipEarningsBreakdown, calculateOwnerEarnings } from "@/lib/
 import { computeFraudLevel } from "@/lib/fraud";
 import { publishToUser, publishToUsers } from "@/lib/ably";
 import { logCampaignEvent } from "@/lib/campaign-events";
+import { processMarketplaceTimers } from "@/lib/marketplace-timers";
 
 /**
  * Determine the next check interval based on view bracket and growth per hour.
@@ -742,7 +743,7 @@ async function releaseTrackingLock(): Promise<void> {
   }
 }
 
-export async function runDueTrackingJobs(options?: { campaignIds?: string[]; source?: "cron" | "manual"; includeInactive?: boolean }): Promise<{ processed: number; errors: number; details: string[] }> {
+export async function runDueTrackingJobs(options?: { campaignIds?: string[]; source?: "cron" | "manual"; includeInactive?: boolean }): Promise<{ processed: number; errors: number; details: string[]; marketplaceProcessed?: number; marketplaceErrors?: number }> {
   if (!db) return { processed: 0, errors: 0, details: ["DB unavailable"] };
 
   const source = options?.source || "cron";
@@ -967,6 +968,24 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     console.error(`[BUDGET] Sweep error:`, sweepErr.message);
   }
 
+  // ───── Marketplace timer pass — Phase 5 ─────
+  // Runs INSIDE the existing lock, after tracking work, before the manual
+  // broadcast. Same single-writer guarantee, separate counters so existing
+  // tracking dashboards stay clean. Errors here never poison tracking.
+  let marketplaceProcessed = 0;
+  let marketplaceErrors = 0;
+  try {
+    const mktResult = await processMarketplaceTimers(trackingDeadlineAt);
+    marketplaceProcessed = mktResult.processed;
+    marketplaceErrors = mktResult.errors;
+    if (mktResult.details.length > 0) details.push(...mktResult.details);
+    console.log(`[MARKETPLACE-TIMERS] Completed: ${marketplaceProcessed} processed, ${marketplaceErrors} errors`);
+  } catch (err: any) {
+    console.error("[MARKETPLACE-TIMERS] Fatal:", err?.message);
+    details.push(`[MARKETPLACE-TIMERS] Fatal: ${err?.message}`);
+    marketplaceErrors++;
+  }
+
   // Broadcast completion to owners for manual checks
   if (source === "manual" && ownerIds.length > 0) {
     publishToUsers(ownerIds, "tracking_progress", { status: "completed", total: progressCounter, processed: progressCounter, errors }).catch(() => {});
@@ -981,7 +1000,7 @@ export async function runDueTrackingJobs(options?: { campaignIds?: string[]; sou
     const due = (details.find((d) => d.startsWith("Found")) || "").match(/(\d+)/)?.[1] || "?";
     console.log(`[TRACKING] Manual check summary: ${processed}/${due} processed, ${errors} errors, elapsed=${Math.round((Date.now() - startTime) / 1000)}s`);
   }
-  return { processed, errors, details };
+  return { processed, errors, details, marketplaceProcessed, marketplaceErrors };
   } finally {
     // Always release so the next run can acquire even if this one threw.
     await releaseTrackingLock();
