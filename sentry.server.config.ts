@@ -3,8 +3,9 @@ import * as Sentry from "@sentry/nextjs";
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  // Performance monitoring — sample 10% in production to stay within free tier.
-  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+  // Performance monitoring — sample 5% in production to keep perf-txn quota
+  // headroom during launch traffic spikes. Errors are unaffected by this knob.
+  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.05 : 1.0,
 
   // Don't send errors during local dev unless explicitly testing.
   enabled:
