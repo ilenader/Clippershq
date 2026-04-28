@@ -7,11 +7,18 @@ import type { SessionUser } from "@/lib/auth-types";
 import {
   Activity, AlertTriangle, Clock, DollarSign, Film, Flag,
   Gauge, HelpCircle, Megaphone, Target, TrendingUp, Users, Zap,
+  // Phase 8 — marketplace section icons
+  Store, RefreshCw, CheckCircle2, XCircle, Send, Ban, Star,
+  Trash2, RotateCcw, Settings, ShoppingBag,
 } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
+// Phase 8 — reuse existing chart primitives (no new chart components)
+import { DonutChart } from "@/components/ui/donut-chart";
+import { SimpleBarChart } from "@/components/ui/simple-chart";
+import { AreaGradientChart } from "@/components/ui/area-gradient-chart";
 
 // ─── Date-range presets ────────────────────────────────────
 
@@ -99,6 +106,14 @@ export default function CommandCenterPage() {
   const [realtime, setRealtime] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Phase 8 — tick counter for marketplace section's "Refreshed Xs ago"
+  // indicator. Bumps every 5s so the relative timestamp drifts without
+  // forcing a refetch — purely cosmetic. Skipped on initial render.
+  const [nowTick, setNowTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setNowTick((n) => n + 1), 5000);
+    return () => clearInterval(t);
+  }, []);
 
   const range = useMemo(
     () => computeRange(preset, { from: customFrom, to: customTo }),
@@ -478,6 +493,16 @@ export default function CommandCenterPage() {
         </div>
       </div>
 
+      {/* Phase 8 — Marketplace section. Lives between Campaigns and
+          Activity+Fraud so the visual hierarchy flows
+          top-of-funnel → operations → marketplace deep dive → fraud. */}
+      <MarketplaceSection
+        marketplace={data.marketplace}
+        lastUpdated={data.lastUpdated}
+        nowTick={nowTick}
+        onRefresh={() => fetchData(false)}
+      />
+
       {/* Activity + Fraud */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
@@ -598,5 +623,377 @@ function TooltipIcon({ text }: { text: string }) {
     >
       <HelpCircle className="h-3 w-3" />
     </span>
+  );
+}
+
+// ─── Phase 8: Marketplace section ─────────────────────────────
+
+// Donut palette — matches spec. PENDING/REJECTED/POST_EXPIRED intentionally
+// share warm hues since they all represent "not done / not approved" states;
+// the donut legend keeps them distinguishable by label.
+const MARKETPLACE_STATUS_COLORS: Record<string, string> = {
+  PENDING: "#fbbf24",       // amber-400
+  APPROVED: "#34d399",      // emerald-400
+  POSTED: "#2596be",        // brand accent
+  REJECTED: "#fb7185",      // rose-400
+  EXPIRED: "#94a3b8",       // slate-400
+  POST_EXPIRED: "#f43f5e",  // rose-500 — slightly darker to differ from REJECTED
+};
+
+function activityIconAndColor(action: string): { Icon: any; color: string } {
+  switch (action) {
+    case "MARKETPLACE_LISTING_APPROVE":
+    case "MARKETPLACE_SUBMISSION_APPROVE":
+    case "MARKETPLACE_USER_BAN_LIFTED":
+    case "MARKETPLACE_LISTING_DELETE_REQUEST_CANCEL":
+      return { Icon: CheckCircle2, color: "text-emerald-400" };
+    case "MARKETPLACE_LISTING_REJECT":
+    case "MARKETPLACE_SUBMISSION_REJECT":
+      return { Icon: XCircle, color: "text-rose-400" };
+    case "MARKETPLACE_SUBMISSION_POSTED":
+      return { Icon: Send, color: "text-accent" };
+    case "MARKETPLACE_USER_BANNED":
+      return { Icon: Ban, color: "text-rose-400" };
+    case "MARKETPLACE_STRIKE_ISSUED":
+      return { Icon: AlertTriangle, color: "text-amber-400" };
+    case "MARKETPLACE_RATING_CREATED":
+      return { Icon: Star, color: "text-yellow-400" };
+    case "MARKETPLACE_LISTING_DELETE_REQUEST":
+      return { Icon: Trash2, color: "text-rose-400" };
+    case "MARKETPLACE_LISTING_OVERRIDE":
+      return { Icon: Settings, color: "text-[var(--text-muted)]" };
+    default:
+      return { Icon: Activity, color: "text-[var(--text-muted)]" };
+  }
+}
+
+function relativeTime(input: string | Date | null | undefined): string {
+  if (!input) return "—";
+  const t = typeof input === "string" ? new Date(input).getTime() : input.getTime();
+  const diffSec = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  return `${Math.floor(diffSec / 86400)}d ago`;
+}
+
+interface MarketplaceSectionProps {
+  marketplace: any | null;
+  lastUpdated: string | null | undefined;
+  nowTick: number;
+  onRefresh: () => void;
+}
+
+function MarketplaceSection({ marketplace, lastUpdated, onRefresh }: MarketplaceSectionProps) {
+  // Phase 8 — empty-state when API returned null (computation failed).
+  // Match the existing campaigns-empty-card pattern.
+  if (!marketplace) {
+    return (
+      <>
+        <SectionTitle icon={<ShoppingBag className="h-4 w-4 text-accent" />} title="Marketplace" />
+        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 mb-6">
+          <p className="text-sm text-[var(--text-muted)]">Marketplace metrics unavailable. Check server logs.</p>
+        </div>
+      </>
+    );
+  }
+
+  const lifetime = marketplace.lifetime || {};
+  const range = marketplace.range_metrics || {};
+  const strikes = marketplace.strikes || {};
+  const topPosters: any[] = marketplace.topPosters || [];
+  const topCreators: any[] = marketplace.topCreators || [];
+  const recentActivity: any[] = marketplace.recentActivity || [];
+
+  const submissionsByStatus: any[] = range.submissionsByStatus || [];
+  const donutSegments = submissionsByStatus
+    .filter((s) => s.count > 0)
+    .map((s) => ({
+      label: s.status,
+      value: s.count,
+      color: MARKETPLACE_STATUS_COLORS[s.status] || "#888",
+    }));
+
+  // Bar chart — top posters by earnings (range-scoped). Empty list = empty
+  // state; SimpleBarChart handles zero-data with a built-in fallback only
+  // for the line variant, so guard explicitly.
+  const posterBarData = topPosters.map((p) => ({
+    label: `@${p.username}`,
+    value: p.earnings,
+  }));
+
+  // Daily series — area charts expect {label, value}. Date "MM-DD" slice
+  // matches the rest of the dashboard's compact axis labels.
+  const dailySubsForChart = (range.dailySubmissions || []).map((d: any) => ({
+    label: typeof d.date === "string" ? d.date.slice(5) : "",
+    value: d.count ?? 0,
+  }));
+  const dailyRevForChart = (range.dailyRevenue || []).map((d: any) => ({
+    label: typeof d.date === "string" ? d.date.slice(5) : "",
+    value: d.revenue ?? 0,
+  }));
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <ShoppingBag className="h-4 w-4 text-accent" />
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-[var(--text-secondary)]">
+            Marketplace
+          </h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--text-muted)]">
+            Refreshed {relativeTime(lastUpdated)}
+          </span>
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] active:scale-[0.97] transition-all"
+            aria-label="Refresh marketplace data"
+          >
+            <RefreshCw className="h-3 w-3" />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Row 1 — 4-card stat cluster */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <StatCard
+          big
+          title="Marketplace GMV (range)"
+          value={formatCurrency(range.marketplaceGmv ?? 0)}
+          sub={`Creator + Poster + Platform splits`}
+          tooltip="Total marketplace gross merchandise value in the date range. Sum of creator's 60% + poster's 30% + platform's 10% on clips approved within the window."
+        />
+        <StatCard
+          big
+          title="Platform 10% revenue"
+          value={formatCurrency(range.platformRevenue ?? 0)}
+          sub="Marketplace platform cut in range"
+          tooltip="Sum of MarketplacePlatformEarning.amount on clips with reviewedAt in range. This is the marketplace's pure-platform slice (separate from agency fees and CPM splits in the global money block)."
+        />
+        <StatCard
+          big
+          title="Submissions in range"
+          value={formatNumber(range.submissionsTotal ?? 0)}
+          sub={`${formatNumber(range.posted ?? 0)} posted in range`}
+          tooltip="Count of MarketplaceSubmission rows created within the date range. The 'posted in range' sub-stat counts submissions whose postedAt timestamp falls in the window."
+        />
+        <StatCard
+          big
+          title="Active listings"
+          value={formatNumber(lifetime.activeListings ?? 0)}
+          sub="As of now"
+          tooltip="Count of MarketplacePosterListing rows in ACTIVE status right now. Ignores the date picker — point-in-time."
+        />
+      </div>
+
+      {/* Row 2 — Donut + Bar */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 lg:p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="h-4 w-4 text-accent" />
+            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">
+              Submissions by status
+            </h3>
+            <TooltipIcon text="Distribution of MarketplaceSubmission statuses for submissions created in the date range. PENDING/REJECTED/POST_EXPIRED share warm tones; POSTED is the brand accent (the success state)." />
+          </div>
+          {donutSegments.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No submissions in this period.</p>
+          ) : (
+            <DonutChart segments={donutSegments} />
+          )}
+        </div>
+
+        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 lg:p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <DollarSign className="h-4 w-4 text-accent" />
+            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">
+              Top posters (range earnings)
+            </h3>
+            <TooltipIcon text="Top 10 posters by their 30% cut on marketplace clips approved in the date range. Earnings = sum of Clip.earnings for clips that have a matching MarketplaceClipPost." />
+          </div>
+          {posterBarData.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No poster earnings in this period.</p>
+          ) : (
+            <SimpleBarChart
+              data={posterBarData}
+              title=""
+              valuePrefix="$"
+              height={220}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Row 3 — Area + Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 lg:p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Film className="h-4 w-4 text-accent" />
+            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">
+              Submissions per day
+            </h3>
+          </div>
+          <AreaGradientChart data={dailySubsForChart} label="Submissions" height={220} />
+        </div>
+
+        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 lg:p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="h-4 w-4 text-accent" />
+            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">
+              Marketplace revenue per day
+            </h3>
+          </div>
+          <AreaGradientChart
+            data={dailyRevForChart}
+            label="Revenue"
+            valuePrefix="$"
+            height={220}
+          />
+        </div>
+      </div>
+
+      {/* Row 4 — Top creators list + Activity feed */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 lg:p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="h-4 w-4 text-accent" />
+            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">
+              Top creators (range earnings)
+            </h3>
+            <TooltipIcon text="Top 10 creators by their 60% cut on marketplace clips approved in the date range. Submission count is total submissions in range — useful for spotting creators with high volume but low conversion." />
+          </div>
+          {topCreators.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No creator earnings in this period.</p>
+          ) : (
+            <ol className="space-y-2">
+              {topCreators.map((c: any, i: number) => (
+                <li
+                  key={c.userId}
+                  className="flex items-center gap-2 rounded-lg p-2 text-sm hover:bg-[var(--bg-card-hover)] transition-colors"
+                >
+                  <span className="w-5 text-[var(--text-muted)] tabular-nums">{i + 1}.</span>
+                  {c.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.image}
+                      alt=""
+                      className="h-6 w-6 rounded-full flex-shrink-0 bg-[var(--bg-input)]"
+                    />
+                  ) : (
+                    <div className="h-6 w-6 rounded-full bg-[var(--bg-input)] flex-shrink-0" />
+                  )}
+                  <span className="flex-1 truncate text-[var(--text-primary)]">@{c.username}</span>
+                  {c.ratingAvg != null && (
+                    <span className="inline-flex items-center gap-0.5 text-xs text-yellow-400 tabular-nums flex-shrink-0">
+                      <Star className="h-3 w-3 fill-yellow-400" />
+                      {Number(c.ratingAvg).toFixed(1)}
+                    </span>
+                  )}
+                  <span className="text-xs text-[var(--text-muted)] tabular-nums flex-shrink-0">
+                    {c.submissionsCount} subs
+                  </span>
+                  <span className="tabular-nums text-accent font-semibold flex-shrink-0">
+                    {formatCurrency(c.earnings)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 lg:p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="h-4 w-4 text-accent" />
+            <h3 className="text-xs uppercase tracking-widest text-[var(--text-muted)]">
+              Recent marketplace activity
+            </h3>
+            <TooltipIcon text="Last 20 high-signal marketplace audit events: approvals, rejections, posts, bans, strikes, ratings, and deletion-requests. Cosmetic edits and housekeeping events are filtered out." />
+          </div>
+          {recentActivity.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No marketplace activity yet.</p>
+          ) : (
+            <ul className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+              {recentActivity.map((a: any) => {
+                const { Icon, color } = activityIconAndColor(a.action);
+                const isListing = a.targetType === "marketplace_listing";
+                return (
+                  <li
+                    key={a.id}
+                    className="flex items-start gap-2 text-sm border-l-2 border-[var(--border-color)] pl-3"
+                  >
+                    <Icon className={`h-4 w-4 mt-0.5 flex-shrink-0 ${color}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="text-[var(--text-primary)]">{a.summary}</span>
+                        <span className="text-xs text-[var(--text-muted)]">
+                          @{a.username}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                        <span>{relativeTime(a.createdAt)}</span>
+                        {isListing && a.targetId && (
+                          <a
+                            href="/marketplace/admin"
+                            className="text-accent hover:underline truncate"
+                            title={a.targetId}
+                          >
+                            listing
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* Row 5 — strike tiers + global avg rating (point-in-time) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <StatCard
+          title="1-strike users"
+          value={formatNumber(strikes.oneStrike ?? 0)}
+          sub="As of now (last 30 days)"
+          tooltip="Users with exactly 1 marketplace strike in the trailing 30-day window. Strikes accumulate from missed post deadlines (Phase 5)."
+        />
+        <StatCard
+          title="2-strike users"
+          value={formatNumber(strikes.twoStrike ?? 0)}
+          sub="As of now (last 30 days)"
+          tone={(strikes.twoStrike ?? 0) > 0 ? "amber" : undefined}
+          tooltip="Users with exactly 2 marketplace strikes in the trailing 30-day window. One more = 48-hour ban."
+        />
+        <StatCard
+          title="3+ strike users"
+          value={formatNumber(strikes.threeOrMore ?? 0)}
+          sub="As of now (last 30 days)"
+          tone={(strikes.threeOrMore ?? 0) > 0 ? "red" : undefined}
+          tooltip="Users with 3 or more strikes in the trailing 30-day window. These users have triggered the auto-ban (48h)."
+        />
+        <StatCard
+          title="Currently banned"
+          value={formatNumber(strikes.currentlyBanned ?? 0)}
+          sub="As of now"
+          tone={(strikes.currentlyBanned ?? 0) > 0 ? "red" : undefined}
+          tooltip="Distinct users with at least one MarketplaceStrike row whose bannedUntil is still in the future. Their listings are auto-paused for the duration."
+        />
+        <StatCard
+          title="Global avg rating"
+          value={
+            lifetime.globalAvgRating != null
+              ? `${Number(lifetime.globalAvgRating).toFixed(2)}`
+              : "—"
+          }
+          sub={`${formatNumber(lifetime.globalRatingCount ?? 0)} ratings · As of now`}
+          tooltip="Average score across every marketplace rating ever submitted (both directions). Scale is 1-5; 4.5+ is healthy, below 3.5 indicates a quality problem."
+        />
+      </div>
+    </>
   );
 }

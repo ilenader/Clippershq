@@ -607,6 +607,343 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => a.date.localeCompare(b.date));
   } catch {}
 
+  // ── PHASE 8: MARKETPLACE ANALYTICS ─────────────────────────
+  // Phase 8 — uncached aggregates. Live compute every poll.
+  //   Phase 12 hardening candidate: if any marketplace table > 100k rows,
+  //   wrap this block in a 60s server-side cache keyed by (from, to).
+  // Top-level try/catch mirrors the money block pattern: a single failing
+  // sub-query never 500s the whole route — it leaves marketplace = null
+  // and the client renders an empty-state for the section.
+  let marketplace: any = null;
+  try {
+    const SUBMISSION_STATUSES = ["PENDING", "APPROVED", "REJECTED", "EXPIRED", "POSTED", "POST_EXPIRED"];
+    const ACTIVITY_WHITELIST = [
+      "MARKETPLACE_LISTING_APPROVE",
+      "MARKETPLACE_LISTING_REJECT",
+      "MARKETPLACE_SUBMISSION_APPROVE",
+      "MARKETPLACE_SUBMISSION_REJECT",
+      "MARKETPLACE_SUBMISSION_POSTED",
+      "MARKETPLACE_USER_BANNED",
+      "MARKETPLACE_USER_BAN_LIFTED",
+      "MARKETPLACE_STRIKE_ISSUED",
+      "MARKETPLACE_RATING_CREATED",
+      "MARKETPLACE_LISTING_DELETE_REQUEST",
+      "MARKETPLACE_LISTING_DELETE_REQUEST_CANCEL",
+      "MARKETPLACE_LISTING_OVERRIDE",
+    ];
+
+    // ─── Lifetime / point-in-time counts ────────────────────────
+    // Phase 8 — point-in-time card values labeled "As of now" in UI.
+    // These ignore the date picker since they describe current state.
+    const [
+      activeListings,
+      pausedListings,
+      pendingApproval,
+      deletionRequested,
+      bannedListings,
+      ratingsAvgRow,
+      globalRatingCount,
+    ] = await Promise.all([
+      db.marketplacePosterListing.count({ where: { status: "ACTIVE" } }),
+      db.marketplacePosterListing.count({ where: { status: "PAUSED" } }),
+      db.marketplacePosterListing.count({ where: { status: "PENDING_APPROVAL" } }),
+      db.marketplacePosterListing.count({ where: { status: "DELETION_REQUESTED" } }),
+      db.marketplacePosterListing.count({ where: { status: "BANNED" } }),
+      db.marketplaceRating.aggregate({ _avg: { score: true } }),
+      db.marketplaceRating.count(),
+    ]);
+    const globalAvgRating = (ratingsAvgRow as any)?._avg?.score ?? null;
+
+    // ─── Range counts + status breakdown ────────────────────────
+    const submissionsTotal = await db.marketplaceSubmission.count({
+      where: { createdAt: { gte: from, lte: to } },
+    });
+    const subStatusGrouped: any[] = await db.marketplaceSubmission.groupBy({
+      by: ["status"],
+      where: { createdAt: { gte: from, lte: to } },
+      _count: { _all: true },
+    });
+    const submissionsByStatus = SUBMISSION_STATUSES.map((s) => {
+      const row = subStatusGrouped.find((r: any) => r.status === s);
+      return { status: s, count: row?._count?._all ?? 0 };
+    });
+    const postedRange = await db.marketplaceSubmission.count({
+      where: { postedAt: { not: null, gte: from, lte: to } },
+    });
+
+    // ─── Earnings split (60/30/10) — clip.reviewedAt-scoped ─────
+    // Phase 6d already wires creator/platform aggregates into the global
+    // money block. Repeated here scoped to date range so the marketplace
+    // section can show its own GMV breakdown without depending on the
+    // global block's mixed semantics.
+    const earningsClipFilter = {
+      clip: {
+        status: "APPROVED",
+        isDeleted: false,
+        videoUnavailable: false,
+        reviewedAt: { gte: from, lte: to },
+      },
+    } as any;
+    const [creatorAgg, platformAgg]: any[] = await Promise.all([
+      db.marketplaceCreatorEarning.aggregate({ where: earningsClipFilter, _sum: { amount: true } }),
+      db.marketplacePlatformEarning.aggregate({ where: earningsClipFilter, _sum: { amount: true } }),
+    ]);
+    const creatorPaid = Math.round(((creatorAgg?._sum?.amount ?? 0)) * 100) / 100;
+    const platformRevenueMkt = Math.round(((platformAgg?._sum?.amount ?? 0)) * 100) / 100;
+
+    // Poster's 30% lives on Clip.earnings — restrict to clips that have a
+    // matching MarketplaceClipPost (the Phase 6 marker for marketplace
+    // clips). Schema relation: Clip.marketplaceOriginPost (singular,
+    // optional). isNot:null is the canonical Prisma filter for "exists".
+    const posterAgg: any = await db.clip.aggregate({
+      where: {
+        status: "APPROVED",
+        isDeleted: false,
+        videoUnavailable: false,
+        reviewedAt: { gte: from, lte: to },
+        marketplaceOriginPost: { isNot: null },
+      } as any,
+      _sum: { earnings: true },
+    });
+    const posterPaid = Math.round(((posterAgg?._sum?.earnings ?? 0)) * 100) / 100;
+    const marketplaceGmv = Math.round((creatorPaid + platformRevenueMkt + posterPaid) * 100) / 100;
+
+    // ─── Daily series — submissions + revenue ───────────────────
+    const subsInRange: any[] = await db.marketplaceSubmission.findMany({
+      where: { createdAt: { gte: from, lte: to } },
+      select: { createdAt: true },
+      take: 20000,
+    });
+    const platformInRange: any[] = await db.marketplacePlatformEarning.findMany({
+      where: earningsClipFilter,
+      select: {
+        amount: true,
+        clip: { select: { reviewedAt: true } },
+      },
+      take: 20000,
+    });
+    const subBuckets = new Map<string, number>();
+    const revBuckets = new Map<string, number>();
+    const rangeDays = Math.max(
+      1,
+      Math.min(120, Math.ceil((to.getTime() - from.getTime()) / 86_400_000) + 1),
+    );
+    for (let i = 0; i < rangeDays; i++) {
+      const d = new Date(to.getTime() - i * 86_400_000);
+      const k = d.toISOString().slice(0, 10);
+      subBuckets.set(k, 0);
+      revBuckets.set(k, 0);
+    }
+    for (const s of subsInRange) {
+      const k = new Date(s.createdAt).toISOString().slice(0, 10);
+      if (subBuckets.has(k)) subBuckets.set(k, (subBuckets.get(k) || 0) + 1);
+    }
+    for (const p of platformInRange) {
+      const dt = (p as any).clip?.reviewedAt;
+      if (!dt) continue;
+      const k = new Date(dt).toISOString().slice(0, 10);
+      if (revBuckets.has(k)) revBuckets.set(k, (revBuckets.get(k) || 0) + (p.amount || 0));
+    }
+    const dailySubmissions = Array.from(subBuckets.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const dailyRevenue = Array.from(revBuckets.entries())
+      .map(([date, revenue]) => ({ date, revenue: Math.round(revenue * 100) / 100 }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // ─── Top posters ─ poster's 30% from Clip.earnings ──────────
+    const posterGroup: any[] = await db.clip.groupBy({
+      by: ["userId"],
+      where: {
+        status: "APPROVED",
+        isDeleted: false,
+        videoUnavailable: false,
+        reviewedAt: { gte: from, lte: to },
+        marketplaceOriginPost: { isNot: null },
+      } as any,
+      _sum: { earnings: true },
+      orderBy: { _sum: { earnings: "desc" } },
+      take: 10,
+    });
+    const posterUserIds: string[] = posterGroup.map((g: any) => g.userId);
+    const posterUserMap = new Map<string, any>();
+    const posterListingCounts = new Map<string, number>();
+    if (posterUserIds.length) {
+      const [pUsers, pListingCounts]: any[] = await Promise.all([
+        db.user.findMany({
+          where: { id: { in: posterUserIds } },
+          select: {
+            id: true, username: true, name: true, image: true,
+            // Phase 7a — reuse cached avg rating; never recompute on hot path
+            marketplaceAvgAsPoster: true,
+          } as any,
+        }),
+        db.marketplacePosterListing.groupBy({
+          by: ["userId"],
+          where: { userId: { in: posterUserIds } },
+          _count: { _all: true },
+        }),
+      ]);
+      for (const u of pUsers) posterUserMap.set(u.id, u);
+      for (const lc of pListingCounts) posterListingCounts.set(lc.userId, lc._count?._all ?? 0);
+    }
+    const topPosters = posterGroup.map((g: any) => {
+      const u = posterUserMap.get(g.userId) || {};
+      return {
+        userId: g.userId,
+        username: u.username || u.name || "unknown",
+        image: u.image || null,
+        earnings: Math.round((g._sum?.earnings ?? 0) * 100) / 100,
+        listingCount: posterListingCounts.get(g.userId) ?? 0,
+        ratingAvg: u.marketplaceAvgAsPoster ?? null,
+      };
+    });
+
+    // ─── Top creators ─ 60% from MarketplaceCreatorEarning ──────
+    const creatorGroup: any[] = await db.marketplaceCreatorEarning.groupBy({
+      by: ["creatorId"],
+      where: earningsClipFilter,
+      _sum: { amount: true },
+      orderBy: { _sum: { amount: "desc" } },
+      take: 10,
+    });
+    const creatorUserIds: string[] = creatorGroup.map((g: any) => g.creatorId);
+    const creatorUserMap = new Map<string, any>();
+    const creatorSubCounts = new Map<string, number>();
+    if (creatorUserIds.length) {
+      const [cUsers, cSubCounts]: any[] = await Promise.all([
+        db.user.findMany({
+          where: { id: { in: creatorUserIds } },
+          select: {
+            id: true, username: true, name: true, image: true,
+            // Phase 7a — cached avg rating, never recomputed live
+            marketplaceAvgAsCreator: true,
+          } as any,
+        }),
+        db.marketplaceSubmission.groupBy({
+          by: ["creatorId"],
+          where: { creatorId: { in: creatorUserIds }, createdAt: { gte: from, lte: to } },
+          _count: { _all: true },
+        }),
+      ]);
+      for (const u of cUsers) creatorUserMap.set(u.id, u);
+      for (const c of cSubCounts) creatorSubCounts.set(c.creatorId, c._count?._all ?? 0);
+    }
+    const topCreators = creatorGroup.map((g: any) => {
+      const u = creatorUserMap.get(g.creatorId) || {};
+      return {
+        userId: g.creatorId,
+        username: u.username || u.name || "unknown",
+        image: u.image || null,
+        earnings: Math.round((g._sum?.amount ?? 0) * 100) / 100,
+        submissionsCount: creatorSubCounts.get(g.creatorId) ?? 0,
+        ratingAvg: u.marketplaceAvgAsCreator ?? null,
+      };
+    });
+
+    // ─── Strike tiers (last 30d window) + currently banned ──────
+    // Strike "tier" = strikes accumulated by a user within the trailing
+    // 30-day window. 3+ is the trigger for a 48h ban (Phase 5).
+    const cutoff30d = new Date(Date.now() - 30 * 86_400_000);
+    const strikesByUser: any[] = await db.marketplaceStrike.groupBy({
+      by: ["userId"],
+      where: { createdAt: { gt: cutoff30d } },
+      _count: { _all: true },
+    });
+    let oneStrike = 0;
+    let twoStrike = 0;
+    let threeOrMore = 0;
+    for (const r of strikesByUser) {
+      const c = r._count?._all ?? 0;
+      if (c === 1) oneStrike++;
+      else if (c === 2) twoStrike++;
+      else if (c >= 3) threeOrMore++;
+    }
+    // Currently banned = distinct userIds with at least one strike row whose
+    // bannedUntil is still in the future. groupBy avoids loading every row.
+    const bannedNow: any[] = await db.marketplaceStrike.groupBy({
+      by: ["userId"],
+      where: { bannedUntil: { gt: new Date() } },
+    });
+    const currentlyBanned = bannedNow.length;
+
+    // ─── Recent activity feed (12 high-signal action types) ─────
+    const recentRows: any[] = await db.auditLog.findMany({
+      where: { action: { in: ACTIVITY_WHITELIST } },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        action: true,
+        targetType: true,
+        targetId: true,
+        userId: true,
+        createdAt: true,
+        user: { select: { username: true, name: true } },
+      },
+    });
+    function actionSummary(action: string): string {
+      switch (action) {
+        case "MARKETPLACE_LISTING_APPROVE": return "Listing approved";
+        case "MARKETPLACE_LISTING_REJECT": return "Listing rejected";
+        case "MARKETPLACE_SUBMISSION_APPROVE": return "Submission approved";
+        case "MARKETPLACE_SUBMISSION_REJECT": return "Submission rejected";
+        case "MARKETPLACE_SUBMISSION_POSTED": return "Submission posted";
+        case "MARKETPLACE_USER_BANNED": return "User banned (3 strikes)";
+        case "MARKETPLACE_USER_BAN_LIFTED": return "Marketplace ban lifted";
+        case "MARKETPLACE_STRIKE_ISSUED": return "Strike issued";
+        case "MARKETPLACE_RATING_CREATED": return "Rating submitted";
+        case "MARKETPLACE_LISTING_DELETE_REQUEST": return "Listing deletion requested";
+        case "MARKETPLACE_LISTING_DELETE_REQUEST_CANCEL": return "Deletion request canceled";
+        case "MARKETPLACE_LISTING_OVERRIDE": return "Listing overridden by admin";
+        default: return action;
+      }
+    }
+    const recentActivity = recentRows.map((r: any) => ({
+      id: r.id,
+      action: r.action,
+      targetType: r.targetType,
+      targetId: r.targetId,
+      userId: r.userId,
+      username: r.user?.username || r.user?.name || "system",
+      createdAt: r.createdAt,
+      summary: actionSummary(r.action),
+    }));
+
+    marketplace = {
+      range: { from: from.toISOString(), to: to.toISOString() },
+      lifetime: {
+        activeListings,
+        pausedListings,
+        pendingApproval,
+        deletionRequested,
+        bannedListings,
+        globalAvgRating,
+        globalRatingCount,
+      },
+      range_metrics: {
+        submissionsTotal,
+        submissionsByStatus,
+        posted: postedRange,
+        marketplaceGmv,
+        platformRevenue: platformRevenueMkt,
+        creatorPaid,
+        posterPaid,
+        dailySubmissions,
+        dailyRevenue,
+      },
+      topPosters,
+      topCreators,
+      strikes: { oneStrike, twoStrike, threeOrMore, currentlyBanned },
+      recentActivity,
+    };
+  } catch (err: any) {
+    // Phase 8 — single failing sub-query must never 500 the whole route.
+    // Log to console (Sentry will pick this up via existing error handler)
+    // and let the client render the marketplace section's empty state.
+    console.error("[COMMAND-CENTER] marketplace block failed:", err?.message);
+  }
+
   return NextResponse.json({
     range: { from: from.toISOString(), to: to.toISOString() },
     lastUpdated: new Date().toISOString(),
@@ -654,5 +991,8 @@ export async function GET(req: NextRequest) {
       clipsPerDay,
       revenuePerDay,
     },
+    // Phase 8 — marketplace analytics block. Null when computation failed
+    // (parent try/catch above). Client renders an empty-state when null.
+    marketplace,
   });
 }
