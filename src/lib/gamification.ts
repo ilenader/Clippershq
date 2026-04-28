@@ -633,9 +633,12 @@ export async function recalculateUnpaidEarnings(userId: string): Promise<{ clips
   });
   const paidCampaignIds = new Set(paidPayouts.map((p: any) => p.campaignId).filter(Boolean));
 
-  // Get all APPROVED clips
+  // Get all APPROVED clips. Marketplace clips are excluded — the 60/30/10 split
+  // is owned by tracking.ts and would be miscalculated by this CPM-only path.
+  // Phase 6d revisits this if marketplace bonus-recalc on level/streak changes
+  // becomes a user-visible problem.
   const clips = await db.clip.findMany({
-    where: { userId, status: "APPROVED", isDeleted: false, videoUnavailable: false },
+    where: { userId, status: "APPROVED", isDeleted: false, videoUnavailable: false, isMarketplaceClip: false },
     include: {
       stats: { orderBy: { checkedAt: "desc" }, take: 1 },
       campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true, lastBudgetPauseAt: true } },

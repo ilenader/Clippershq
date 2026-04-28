@@ -367,3 +367,113 @@ export function calculateOwnerEarnings(
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+// ─── Marketplace split (Phase 6c) ───────────────────────────
+// 60/30/10 across creator / poster / platform. Cap applies to GROSS first
+// (matching existing maxPayoutPerClip behavior), then split. Each party's
+// bonus (level + streak + PWA) is computed against THEIR own profile and
+// added on top of THEIR share. Platform's 10% gets no bonus.
+
+export const MARKETPLACE_CREATOR_SHARE = 0.6;
+export const MARKETPLACE_POSTER_SHARE = 0.3;
+export const MARKETPLACE_PLATFORM_SHARE = 0.1;
+
+export interface MarketplacePartyInput {
+  level: number;
+  streak: number;
+  isPWAUser: boolean;
+  isReferred: boolean;
+  manualBonusOverride?: number | null;
+  streakBonusPercentAtApproval?: number | null;
+  levelBonuses?: Record<number, number>;
+  streakBonuses?: { days: number; bonusPercent: number }[];
+  maxBonusCap?: number;
+}
+
+export interface MarketplaceEarningsBreakdown {
+  base: { gross: number; creatorBase: number; posterBase: number; platformBase: number };
+  creator: { base: number; bonusPercent: number; bonusAmount: number; total: number };
+  poster: { base: number; bonusPercent: number; bonusAmount: number; total: number };
+  platform: { amount: number };
+}
+
+function computePartyBonusPercent(party: MarketplacePartyInput): number {
+  const levelBonuses = party.levelBonuses ?? DEFAULT_LEVEL_BONUSES;
+  const streakBonuses = party.streakBonuses ?? DEFAULT_STREAK_BONUSES;
+  const maxBonusCap = party.maxBonusCap ?? MAX_BONUS_CAP;
+
+  if (party.manualBonusOverride != null) {
+    return Math.min(party.manualBonusOverride, MANUAL_OVERRIDE_CEILING);
+  }
+
+  const levelBonus = levelBonuses[party.level] || 0;
+  let streakBonus = 0;
+  if (party.streakBonusPercentAtApproval != null) {
+    streakBonus = Math.max(0, party.streakBonusPercentAtApproval);
+  } else {
+    for (const tier of [...streakBonuses].sort((a, b) => b.days - a.days)) {
+      if (party.streak >= tier.days) { streakBonus = tier.bonusPercent; break; }
+    }
+  }
+  const pwaBonus = party.isPWAUser ? PWA_BONUS_PERCENT : 0;
+  return Math.min(levelBonus + streakBonus + pwaBonus, maxBonusCap);
+}
+
+export function calculateMarketplaceEarnings(input: {
+  views: number;
+  campaignCpm: number | null;
+  campaignMinViews: number | null;
+  campaignMaxPayoutPerClip: number | null;
+  creator: MarketplacePartyInput;
+  poster: MarketplacePartyInput;
+}): MarketplaceEarningsBreakdown {
+  const empty: MarketplaceEarningsBreakdown = {
+    base: { gross: 0, creatorBase: 0, posterBase: 0, platformBase: 0 },
+    creator: { base: 0, bonusPercent: 0, bonusAmount: 0, total: 0 },
+    poster: { base: 0, bonusPercent: 0, bonusAmount: 0, total: 0 },
+    platform: { amount: 0 },
+  };
+
+  if (!input.views || input.views <= 0) return empty;
+  if (input.campaignMinViews && input.views < input.campaignMinViews) return empty;
+  const cpm = input.campaignCpm || 0;
+  if (cpm <= 0) return empty;
+
+  // Cap GROSS first, then split. Bonuses on each share added on top
+  // (same per-clip cap behavior as the standard CPM path: bonus may exceed cap).
+  let gross = (input.views / 1000) * cpm;
+  if (input.campaignMaxPayoutPerClip && input.campaignMaxPayoutPerClip > 0) {
+    gross = Math.min(gross, input.campaignMaxPayoutPerClip);
+  }
+
+  const creatorBase = round2(gross * MARKETPLACE_CREATOR_SHARE);
+  const posterBase = round2(gross * MARKETPLACE_POSTER_SHARE);
+  const platformBase = round2(gross * MARKETPLACE_PLATFORM_SHARE);
+
+  const creatorBonusPct = computePartyBonusPercent(input.creator);
+  const posterBonusPct = computePartyBonusPercent(input.poster);
+  const creatorBonusAmount = round2(creatorBase * (creatorBonusPct / 100));
+  const posterBonusAmount = round2(posterBase * (posterBonusPct / 100));
+
+  return {
+    base: {
+      gross: round2(gross),
+      creatorBase,
+      posterBase,
+      platformBase,
+    },
+    creator: {
+      base: creatorBase,
+      bonusPercent: creatorBonusPct,
+      bonusAmount: creatorBonusAmount,
+      total: round2(creatorBase + creatorBonusAmount),
+    },
+    poster: {
+      base: posterBase,
+      bonusPercent: posterBonusPct,
+      bonusAmount: posterBonusAmount,
+      total: round2(posterBase + posterBonusAmount),
+    },
+    platform: { amount: platformBase },
+  };
+}

@@ -28,7 +28,9 @@ export async function POST() {
   console.log("[FIX-EARNINGS] Starting migration...");
 
   const clips = await db.clip.findMany({
-    where: { status: "APPROVED", isDeleted: false, videoUnavailable: false },
+    // Marketplace clips have a 60/30/10 split that this admin tool doesn't know about.
+    // Cron's tracking pass handles them on every tick, so excluding them here is safe.
+    where: { status: "APPROVED", isDeleted: false, videoUnavailable: false, isMarketplaceClip: false },
     include: {
       stats: { orderBy: { checkedAt: "desc" }, take: 1 },
       campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, ownerCpm: true, pricingModel: true } },

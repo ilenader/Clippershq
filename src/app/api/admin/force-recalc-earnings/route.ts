@@ -59,10 +59,13 @@ export async function POST(req: NextRequest) {
 
   // Build the target filter. APPROVED + not-deleted + not-videoUnavailable — the
   // same subset tracking recalculates (avoids awakening rejected/deleted clips).
+  // Exclude marketplace clips: their 60/30/10 split is owned by the cron path
+  // (tracking.ts), and this tool would write the gross to Clip.earnings only.
   const where: any = {
     status: "APPROVED",
     isDeleted: false,
     videoUnavailable: false,
+    isMarketplaceClip: false,
   };
   if (clipId) where.id = clipId;
   else if (campaignId) where.campaignId = campaignId;

@@ -2,7 +2,7 @@ import { getSession } from "@/lib/get-session";
 import { db } from "@/lib/db";
 import { getUserCampaignIds } from "@/lib/campaign-access";
 import { logAudit } from "@/lib/audit";
-import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwnerEarnings, getStreakBonusPercent } from "@/lib/earnings-calc";
+import { recalculateClipEarnings, recalculateClipEarningsBreakdown, calculateOwnerEarnings, calculateMarketplaceEarnings, getStreakBonusPercent } from "@/lib/earnings-calc";
 import { getCampaignBudgetStatus } from "@/lib/balance";
 import { createNotification } from "@/lib/notifications";
 import { sendClipApproved, sendClipRejected, sendStreakRejectionWarning, sendConsecutiveRejectionWarning } from "@/lib/email";
@@ -108,11 +108,30 @@ export async function POST(
           stats: { orderBy: { checkedAt: "desc" }, take: 1 },
           campaign: { select: { minViews: true, cpmRate: true, maxPayoutPerClip: true, clipperCpm: true, pricingModel: true, ownerCpm: true, budget: true } },
           user: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true } },
+          // Marketplace (Phase 6c) — pre-fetch creator profile + existing earning rows
+          // so the marketplace fork can compute the 60/30/10 split atomically.
+          marketplaceCreatorEarning: { select: { amount: true, streakBonusPercentAtApproval: true } },
+          marketplaceOriginPost: {
+            select: {
+              submission: {
+                select: {
+                  creatorId: true,
+                  creator: { select: { level: true, currentStreak: true, referredById: true, isPWAUser: true } },
+                },
+              },
+            },
+          },
         },
       });
 
       let finalClipperEarnings = 0;
       let finalOwnerAmt = 0;
+      let finalCreatorAmt = 0;
+      let finalPlatformAmt = 0;
+      const isMarketplaceClip = !!(clipWithData as any)?.isMarketplaceClip;
+      const mktSubmission = (clipWithData as any)?.marketplaceOriginPost?.submission || null;
+      const creatorId: string | null = mktSubmission?.creatorId ?? null;
+      const creatorProfile: any = mktSubmission?.creator || null;
 
       if (clipWithData?.campaign && clipWithData.stats.length > 0) {
         // Snapshot the streak bonus % at approval. On re-approval of an already-
@@ -130,18 +149,66 @@ export async function POST(
           );
         }
 
-        const breakdown = recalculateClipEarningsBreakdown({
-          stats: clipWithData.stats,
-          campaign: clipWithData.campaign,
-          user: clipWithData.user || undefined,
-          streakBonusPercentAtApproval: lockedStreakPct,
-        });
+        // Marketplace creator's streak snapshot — preserve prior if it exists.
+        let creatorStreakLocked: number | null = null;
+        if (isMarketplaceClip) {
+          if (!creatorId || !creatorProfile) {
+            console.error(`[REVIEW-MKT] Clip ${id}: marketplace flag set but submission/creator missing`);
+            return NextResponse.json({ error: "Marketplace metadata missing on clip" }, { status: 500 });
+          }
+          const priorCreatorLocked = (clipWithData as any).marketplaceCreatorEarning?.streakBonusPercentAtApproval;
+          if (priorCreatorLocked != null) {
+            creatorStreakLocked = priorCreatorLocked;
+          } else {
+            const cfg2 = await loadConfig();
+            creatorStreakLocked = getStreakBonusPercent(
+              creatorProfile.currentStreak ?? 0,
+              cfg2.streakBonuses,
+            );
+          }
+        }
 
-        finalClipperEarnings = breakdown.clipperEarnings;
+        let breakdown: any = null;
+        let mktBreakdown: any = null;
+
+        if (isMarketplaceClip) {
+          const cpmForCalc = (clipWithData.campaign as any).clipperCpm ?? (clipWithData.campaign as any).cpmRate ?? null;
+          mktBreakdown = calculateMarketplaceEarnings({
+            views: clipWithData.stats[0].views,
+            campaignCpm: cpmForCalc,
+            campaignMinViews: (clipWithData.campaign as any).minViews ?? null,
+            campaignMaxPayoutPerClip: (clipWithData.campaign as any).maxPayoutPerClip ?? null,
+            creator: {
+              level: creatorProfile.level ?? 0,
+              streak: creatorProfile.currentStreak ?? 0,
+              isPWAUser: !!creatorProfile.isPWAUser,
+              isReferred: !!creatorProfile.referredById,
+              streakBonusPercentAtApproval: creatorStreakLocked,
+            },
+            poster: {
+              level: clipWithData.user?.level ?? 0,
+              streak: clipWithData.user?.currentStreak ?? 0,
+              isPWAUser: !!clipWithData.user?.isPWAUser,
+              isReferred: !!clipWithData.user?.referredById,
+              streakBonusPercentAtApproval: lockedStreakPct,
+            },
+          });
+          finalClipperEarnings = mktBreakdown.poster.total;
+          finalCreatorAmt = mktBreakdown.creator.total;
+          finalPlatformAmt = mktBreakdown.platform.amount;
+        } else {
+          breakdown = recalculateClipEarningsBreakdown({
+            stats: clipWithData.stats,
+            campaign: clipWithData.campaign,
+            user: clipWithData.user || undefined,
+            streakBonusPercentAtApproval: lockedStreakPct,
+          });
+          finalClipperEarnings = breakdown.clipperEarnings;
+        }
 
         const pm = (clipWithData.campaign as any).pricingModel;
         const oCpm = (clipWithData.campaign as any).ownerCpm;
-        const isCpmSplit = pm === "CPM_SPLIT" && oCpm;
+        const isCpmSplit = !isMarketplaceClip && pm === "CPM_SPLIT" && oCpm;
 
         if (isCpmSplit) {
           const views = clipWithData.stats[0].views;
@@ -167,6 +234,17 @@ export async function POST(
                 });
                 spent = Math.round((spent + (ownerAgg._sum.amount ?? 0)) * 100) / 100;
               }
+              // Marketplace earnings always contribute to the campaign budget — include them
+              // unconditionally so non-marketplace clips also see them in the spent total.
+              const creatorAgg = await tx.marketplaceCreatorEarning.aggregate({
+                where: { campaignId: clip.campaignId, clip: { isDeleted: false, status: "APPROVED", videoUnavailable: false } },
+                _sum: { amount: true },
+              });
+              const platformAgg = await tx.marketplacePlatformEarning.aggregate({
+                where: { campaignId: clip.campaignId, clip: { isDeleted: false, status: "APPROVED", videoUnavailable: false } },
+                _sum: { amount: true },
+              });
+              spent = Math.round((spent + (creatorAgg._sum.amount ?? 0) + (platformAgg._sum.amount ?? 0)) * 100) / 100;
 
               // If re-approval, subtract this clip's current contribution from spent
               let thisClipInSpent = 0;
@@ -176,28 +254,50 @@ export async function POST(
                   const existingAe = await tx.agencyEarning.findUnique({ where: { clipId: id } });
                   thisClipInSpent += existingAe?.amount || 0;
                 }
+                if (isMarketplaceClip) {
+                  const existingCreatorRow = await tx.marketplaceCreatorEarning.findUnique({ where: { clipId: id }, select: { amount: true } });
+                  thisClipInSpent += existingCreatorRow?.amount || 0;
+                  const existingPlatformRow = await tx.marketplacePlatformEarning.findUnique({ where: { clipId: id }, select: { amount: true } });
+                  thisClipInSpent += existingPlatformRow?.amount || 0;
+                }
               }
 
               const otherSpent = spent - thisClipInSpent;
               const remaining = Math.max(campaignBudget - otherSpent, 0);
-              const totalForThisClip = finalClipperEarnings + finalOwnerAmt;
+              const totalForThisClip = isMarketplaceClip
+                ? (finalClipperEarnings + finalCreatorAmt + finalPlatformAmt)
+                : (finalClipperEarnings + finalOwnerAmt);
 
               console.log(`[BUDGET] Clip ${id}: budget=$${campaignBudget}, otherSpent=$${otherSpent.toFixed(2)}, remaining=$${remaining.toFixed(2)}, thisClip=$${totalForThisClip.toFixed(2)}`);
 
               if (remaining <= 0) {
                 finalClipperEarnings = 0;
                 finalOwnerAmt = 0;
+                finalCreatorAmt = 0;
+                finalPlatformAmt = 0;
               } else if (totalForThisClip > remaining) {
                 const scaleFactor = remaining / totalForThisClip;
-                finalClipperEarnings = Math.floor(finalClipperEarnings * scaleFactor * 100) / 100;
-                finalOwnerAmt = Math.floor(finalOwnerAmt * scaleFactor * 100) / 100;
-                if (finalClipperEarnings + finalOwnerAmt > remaining) {
-                  finalClipperEarnings = Math.floor((remaining - finalOwnerAmt) * 100) / 100;
+                if (isMarketplaceClip) {
+                  finalClipperEarnings = Math.floor(finalClipperEarnings * scaleFactor * 100) / 100;
+                  finalCreatorAmt = Math.floor(finalCreatorAmt * scaleFactor * 100) / 100;
+                  finalPlatformAmt = Math.floor(finalPlatformAmt * scaleFactor * 100) / 100;
+                  if (finalClipperEarnings + finalCreatorAmt + finalPlatformAmt > remaining) {
+                    finalPlatformAmt = Math.floor((remaining - finalClipperEarnings - finalCreatorAmt) * 100) / 100;
+                    if (finalPlatformAmt < 0) finalPlatformAmt = 0;
+                  }
+                } else {
+                  finalClipperEarnings = Math.floor(finalClipperEarnings * scaleFactor * 100) / 100;
+                  finalOwnerAmt = Math.floor(finalOwnerAmt * scaleFactor * 100) / 100;
+                  if (finalClipperEarnings + finalOwnerAmt > remaining) {
+                    finalClipperEarnings = Math.floor((remaining - finalOwnerAmt) * 100) / 100;
+                  }
                 }
               }
 
               // Auto-pause
-              const newTotalSpent = otherSpent + finalClipperEarnings + finalOwnerAmt;
+              const newTotalSpent = isMarketplaceClip
+                ? (otherSpent + finalClipperEarnings + finalCreatorAmt + finalPlatformAmt)
+                : (otherSpent + finalClipperEarnings + finalOwnerAmt);
               if (newTotalSpent >= campaignBudget - 0.01) {
                 await tx.campaign.update({
                   where: { id: clip.campaignId },
@@ -209,34 +309,129 @@ export async function POST(
 
             // Save status + earnings atomically
             const isReferred = !!clipWithData.user?.referredById;
-            await tx.clip.update({
-              where: { id },
-              data: {
-                status: action,
-                rejectionReason: null,
-                reviewedById: session.user.id,
-                reviewedAt: new Date(),
-                earnings: finalClipperEarnings,
-                baseEarnings: breakdown.baseEarnings,
-                bonusPercent: breakdown.bonusPercent,
-                bonusAmount: breakdown.bonusAmount,
-                feePercentAtApproval: isReferred ? 4 : 9,
-                streakBonusPercentAtApproval: lockedStreakPct,
-                streakDayLocked: true,
-                streakDayLockedAt: new Date(),
-              },
-            });
-
-            // Save agency earnings
-            if (isCpmSplit) {
-              if (finalOwnerAmt > 0) {
-                await tx.agencyEarning.upsert({
+            if (isMarketplaceClip) {
+              await tx.clip.update({
+                where: { id },
+                data: {
+                  status: action,
+                  rejectionReason: null,
+                  reviewedById: session.user.id,
+                  reviewedAt: new Date(),
+                  earnings: finalClipperEarnings,
+                  baseEarnings: mktBreakdown.poster.base,
+                  bonusPercent: mktBreakdown.poster.bonusPercent,
+                  bonusAmount: mktBreakdown.poster.bonusAmount,
+                  feePercentAtApproval: isReferred ? 4 : 9,
+                  streakBonusPercentAtApproval: lockedStreakPct,
+                  streakDayLocked: true,
+                  streakDayLockedAt: new Date(),
+                },
+              });
+              // Creator earning — upsert with creator's streak snapshot.
+              if (finalCreatorAmt > 0) {
+                await tx.marketplaceCreatorEarning.upsert({
                   where: { clipId: id },
-                  create: { campaignId: clip.campaignId, clipId: id, amount: finalOwnerAmt, views: clipWithData.stats[0].views },
-                  update: { amount: finalOwnerAmt, views: clipWithData.stats[0].views },
+                  create: {
+                    clipId: id,
+                    creatorId: creatorId!,
+                    campaignId: clip.campaignId,
+                    amount: finalCreatorAmt,
+                    baseAmount: mktBreakdown.creator.base,
+                    bonusPercent: mktBreakdown.creator.bonusPercent,
+                    bonusAmount: mktBreakdown.creator.bonusAmount,
+                    streakBonusPercentAtApproval: creatorStreakLocked,
+                    views: clipWithData.stats[0].views,
+                  },
+                  update: {
+                    amount: finalCreatorAmt,
+                    baseAmount: mktBreakdown.creator.base,
+                    bonusPercent: mktBreakdown.creator.bonusPercent,
+                    bonusAmount: mktBreakdown.creator.bonusAmount,
+                    views: clipWithData.stats[0].views,
+                  },
                 });
               } else {
-                try { await tx.agencyEarning.delete({ where: { clipId: id } }); } catch {}
+                // Zero amount — still create/preserve the row so the creator's streak
+                // snapshot survives until first non-zero tick (Phase 6 Q7 decision).
+                await tx.marketplaceCreatorEarning.upsert({
+                  where: { clipId: id },
+                  create: {
+                    clipId: id,
+                    creatorId: creatorId!,
+                    campaignId: clip.campaignId,
+                    amount: 0,
+                    baseAmount: 0,
+                    bonusPercent: 0,
+                    bonusAmount: 0,
+                    streakBonusPercentAtApproval: creatorStreakLocked,
+                    views: clipWithData.stats[0].views,
+                  },
+                  update: {
+                    amount: 0,
+                    baseAmount: 0,
+                    bonusPercent: 0,
+                    bonusAmount: 0,
+                    views: clipWithData.stats[0].views,
+                  },
+                });
+              }
+              if (finalPlatformAmt > 0) {
+                await tx.marketplacePlatformEarning.upsert({
+                  where: { clipId: id },
+                  create: {
+                    clipId: id,
+                    campaignId: clip.campaignId,
+                    amount: finalPlatformAmt,
+                    views: clipWithData.stats[0].views,
+                  },
+                  update: {
+                    amount: finalPlatformAmt,
+                    views: clipWithData.stats[0].views,
+                  },
+                });
+              } else {
+                // Same zero-row preservation rationale as creator above.
+                await tx.marketplacePlatformEarning.upsert({
+                  where: { clipId: id },
+                  create: {
+                    clipId: id,
+                    campaignId: clip.campaignId,
+                    amount: 0,
+                    views: clipWithData.stats[0].views,
+                  },
+                  update: { amount: 0, views: clipWithData.stats[0].views },
+                });
+              }
+            } else {
+              await tx.clip.update({
+                where: { id },
+                data: {
+                  status: action,
+                  rejectionReason: null,
+                  reviewedById: session.user.id,
+                  reviewedAt: new Date(),
+                  earnings: finalClipperEarnings,
+                  baseEarnings: breakdown.baseEarnings,
+                  bonusPercent: breakdown.bonusPercent,
+                  bonusAmount: breakdown.bonusAmount,
+                  feePercentAtApproval: isReferred ? 4 : 9,
+                  streakBonusPercentAtApproval: lockedStreakPct,
+                  streakDayLocked: true,
+                  streakDayLockedAt: new Date(),
+                },
+              });
+
+              // Save agency earnings
+              if (isCpmSplit) {
+                if (finalOwnerAmt > 0) {
+                  await tx.agencyEarning.upsert({
+                    where: { clipId: id },
+                    create: { campaignId: clip.campaignId, clipId: id, amount: finalOwnerAmt, views: clipWithData.stats[0].views },
+                    update: { amount: finalOwnerAmt, views: clipWithData.stats[0].views },
+                  });
+                } else {
+                  try { await tx.agencyEarning.delete({ where: { clipId: id } }); } catch {}
+                }
               }
             }
           }, { isolationLevel: "Serializable" as any });
@@ -253,6 +448,7 @@ export async function POST(
         // once tracking starts producing views, the first earnings calc uses the
         // approval-time streak rather than whatever the user's streak is then.
         let lockedStreakPctNoStats: number | null = null;
+        let creatorStreakLockedNoStats: number | null = null;
         if (action === "APPROVED") {
           const priorLocked = (clipWithData as any)?.streakBonusPercentAtApproval;
           if (priorLocked != null) {
@@ -263,6 +459,20 @@ export async function POST(
               clipWithData?.user?.currentStreak ?? 0,
               cfg.streakBonuses,
             );
+          }
+          // Marketplace: snapshot creator's streak too so the first non-zero
+          // cron tick uses the approval-time creator streak (Phase 6 Q7).
+          if (isMarketplaceClip && creatorProfile) {
+            const priorCreatorLocked = (clipWithData as any).marketplaceCreatorEarning?.streakBonusPercentAtApproval;
+            if (priorCreatorLocked != null) {
+              creatorStreakLockedNoStats = priorCreatorLocked;
+            } else {
+              const cfg3 = await loadConfig();
+              creatorStreakLockedNoStats = getStreakBonusPercent(
+                creatorProfile.currentStreak ?? 0,
+                cfg3.streakBonuses,
+              );
+            }
           }
         }
         await db.clip.update({
@@ -281,6 +491,43 @@ export async function POST(
               : {}),
           },
         });
+        // Marketplace zero-row creation for streak snapshot persistence.
+        if (action === "APPROVED" && isMarketplaceClip && creatorId && creatorProfile) {
+          try {
+            await db.marketplaceCreatorEarning.upsert({
+              where: { clipId: id },
+              create: {
+                clipId: id,
+                creatorId: creatorId,
+                campaignId: clip.campaignId,
+                amount: 0,
+                baseAmount: 0,
+                bonusPercent: 0,
+                bonusAmount: 0,
+                streakBonusPercentAtApproval: creatorStreakLockedNoStats,
+                views: 0,
+              },
+              update: {
+                // Don't overwrite the snapshot on re-approval if it already exists.
+                ...(((clipWithData as any).marketplaceCreatorEarning?.streakBonusPercentAtApproval == null)
+                  ? { streakBonusPercentAtApproval: creatorStreakLockedNoStats }
+                  : {}),
+              },
+            });
+            await db.marketplacePlatformEarning.upsert({
+              where: { clipId: id },
+              create: {
+                clipId: id,
+                campaignId: clip.campaignId,
+                amount: 0,
+                views: 0,
+              },
+              update: {},
+            });
+          } catch (mktErr: any) {
+            console.error(`[REVIEW-MKT] Zero-row upsert failed for clip ${id}:`, mktErr?.message);
+          }
+        }
       }
 
       // Broadcast IMMEDIATELY after save — before slow operations (email, stats sync)
@@ -338,6 +585,10 @@ export async function POST(
       });
       // Delete agency earnings for this clip (CPM_SPLIT campaigns)
       try { await db.agencyEarning.delete({ where: { clipId: id } }); } catch {}
+      // Delete marketplace earnings — rejection/un-approval zeroes all 3 shares.
+      // Cron's next tick will recreate them only if the clip is re-approved.
+      try { await db.marketplaceCreatorEarning.delete({ where: { clipId: id } }); } catch {}
+      try { await db.marketplacePlatformEarning.delete({ where: { clipId: id } }); } catch {}
       // Broadcast immediately
       try {
         publishToUser(clip.userId, "clip_updated", { clipId: id, status: action, earnings: 0 }).catch(() => {});
@@ -449,6 +700,17 @@ export async function POST(
             const oAgg = await db.agencyEarning.aggregate({ where: { campaignId: clip.campaignId }, _sum: { amount: true } });
             spent = Math.round((spent + (oAgg._sum.amount ?? 0)) * 100) / 100;
           }
+          // Marketplace earnings always count toward campaign budget — include them
+          // unconditionally (Phase 6c) so auto-resume reflects true remaining budget.
+          const cAgg = await db.marketplaceCreatorEarning.aggregate({
+            where: { campaignId: clip.campaignId, clip: { isDeleted: false, status: "APPROVED", videoUnavailable: false } },
+            _sum: { amount: true },
+          });
+          const pAgg = await db.marketplacePlatformEarning.aggregate({
+            where: { campaignId: clip.campaignId, clip: { isDeleted: false, status: "APPROVED", videoUnavailable: false } },
+            _sum: { amount: true },
+          });
+          spent = Math.round((spent + (cAgg._sum.amount ?? 0) + (pAgg._sum.amount ?? 0)) * 100) / 100;
           if (spent < undoCampaign.budget) {
             await db.campaign.update({ where: { id: clip.campaignId }, data: { status: "ACTIVE", lastBudgetPauseAt: null } });
             await db.trackingJob.updateMany({ where: { campaignId: clip.campaignId, isActive: false }, data: { isActive: true } });
