@@ -117,6 +117,16 @@ model User {
   // within ~30s instead of waiting for the 5-min resilience-floor refresh.
   sessionVersion Int       @default(0)
 
+  // Phase 7a — cached marketplace reputation. Updated atomically in same TX
+  // as rating insert. Two pairs because poster-rep and creator-rep are
+  // distinct reputations — a user who's a great poster may be a mediocre
+  // creator and vice versa. Aggregated card displays read these directly to
+  // avoid an N+1 GROUP BY per listing card.
+  marketplaceAvgAsPoster    Float?
+  marketplaceCountAsPoster  Int    @default(0)
+  marketplaceAvgAsCreator   Float?
+  marketplaceCountAsCreator Int    @default(0)
+
   // Relations
   referredBy       User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals        User[]    @relation("Referrals")
@@ -957,6 +967,16 @@ enum MarketplaceSubmissionStatus {
   POST_EXPIRED
 }
 
+// Phase 7a — bidirectional rating direction. POSTER_RATES_CREATOR is the
+// poster scoring the creator's clip quality + cooperation; CREATOR_RATES_POSTER
+// is the creator scoring the poster's communication + payout reliability.
+// Two directions max per submission via composite unique on
+// (submissionId, direction).
+enum MarketplaceRatingDirection {
+  POSTER_RATES_CREATOR
+  CREATOR_RATES_POSTER
+}
+
 model MarketplacePosterListing {
   id                  String   @id @default(cuid())
   userId              String
@@ -979,6 +999,9 @@ model MarketplacePosterListing {
   approvedBy          String?
   rejectionReason     String?
   averageRating       Float?
+  // Phase 7a — total ratings count cached for "★ 4.7 (12)" display.
+  // Updated atomically with averageRating in same TX as rating insert.
+  ratingCount         Int      @default(0)
   totalSubmissions    Int      @default(0)
   totalApproved       Int      @default(0)
   totalPosted         Int      @default(0)
@@ -1016,7 +1039,10 @@ model MarketplaceSubmission {
 
   posts           MarketplaceClipPost[]
   messages        MarketplaceMessage[]
-  rating          MarketplaceRating?
+  // Phase 7a — bidirectional ratings (max 2 per submission, one per direction).
+  // Composite unique on (submissionId, direction) on MarketplaceRating
+  // enforces the cap.
+  ratings         MarketplaceRating[]
 
   @@index([listingId, status])
   @@index([creatorId, status])
@@ -1041,16 +1067,30 @@ model MarketplaceClipPost {
 
 model MarketplaceRating {
   id           String   @id @default(cuid())
-  submissionId String   @unique
+  submissionId String
   submission   MarketplaceSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  // Phase 7a — posterId/creatorId are ROLE identifiers tied to the underlying
+  // submission's poster (listing-owner) and creator (submitter), NOT the
+  // rater/ratee. The rater is determined by `direction`:
+  //   POSTER_RATES_CREATOR → poster (= posterId) is rater, creator is ratee
+  //   CREATOR_RATES_POSTER → creator (= creatorId) is rater, poster is ratee
+  // Keeping the role names stable across both directions makes JOIN logic and
+  // privacy filters trivial — the role pair is fixed per submission, only the
+  // arrow flips.
   posterId     String
   poster       User     @relation("MarketplaceRatingsGiven", fields: [posterId], references: [id], onDelete: Cascade)
   creatorId    String
   creator      User     @relation("MarketplaceRatingsReceived", fields: [creatorId], references: [id], onDelete: Cascade)
+  // Phase 7a — direction enum unlocks the bidirectional rating model.
+  direction    MarketplaceRatingDirection
+  // Score validation (1..5) lives at the API layer — no DB check constraint.
   score        Int
   note         String?  @db.Text
   createdAt    DateTime @default(now())
 
+  // Phase 7a — composite unique replaces the previous @unique on submissionId.
+  // Lets a single submission carry up to two ratings (one per direction).
+  @@unique([submissionId, direction])
   @@index([creatorId])
   @@index([posterId])
   @@map("marketplace_ratings")
