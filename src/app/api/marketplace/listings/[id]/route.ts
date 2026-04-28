@@ -142,6 +142,24 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     () => db!.marketplacePosterListing.update({ where: { id }, data: update }),
     "marketplace.listing.update",
   );
+
+  // Phase 3b-3 — backfill audit logging on listing edits. Wrapped so a
+  // logging failure never breaks the response.
+  try {
+    await logAudit({
+      userId: session.user.id,
+      action: "MARKETPLACE_LISTING_EDIT",
+      targetType: "marketplace_listing",
+      targetId: id,
+      details: {
+        listingId: id,
+        fieldsChanged: Object.keys(update),
+      },
+    });
+  } catch {
+    // swallow — audit drift is recoverable
+  }
+
   return NextResponse.json({ listing: updated });
 }
 
@@ -172,6 +190,30 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: `Listing already in status ${listing.status}.` }, { status: 400 });
   }
 
+  // Phase 3b-3 — in-flight guard. Block the deletion request when there are
+  // still PENDING or APPROVED submissions on this listing — creators with
+  // work in flight should not have the rug pulled out from under them. The
+  // poster can pause the listing immediately to stop new submissions, then
+  // request deletion once everything has resolved.
+  const inFlight: number = await withDbRetry(
+    () => db!.marketplaceSubmission.count({
+      where: {
+        listingId: id,
+        status: { in: ["PENDING", "APPROVED"] },
+      },
+    }),
+    "marketplace.listing.deleteInFlightCount",
+  );
+  if (inFlight > 0) {
+    return NextResponse.json(
+      {
+        error: `Cannot request deletion: ${inFlight} submission${inFlight === 1 ? "" : "s"} still in flight. Wait until they're posted, rejected, or expired.`,
+        inFlight,
+      },
+      { status: 400 },
+    );
+  }
+
   const updated = await withDbRetry(
     () => db!.marketplacePosterListing.update({
       where: { id },
@@ -180,13 +222,19 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     "marketplace.listing.deleteRequest",
   );
 
-  await logAudit({
-    userId: session.user.id,
-    action: "MARKETPLACE_LISTING_DELETE_REQUEST",
-    targetType: "marketplace_listing",
-    targetId: id,
-    details: { previousStatus: listing.status },
-  });
+  // Phase 3b-3 — wrap existing audit call in try/catch for consistency with
+  // the new audit calls added in this phase. Logging is best-effort.
+  try {
+    await logAudit({
+      userId: session.user.id,
+      action: "MARKETPLACE_LISTING_DELETE_REQUEST",
+      targetType: "marketplace_listing",
+      targetId: id,
+      details: { previousStatus: listing.status },
+    });
+  } catch {
+    // swallow — audit drift is recoverable
+  }
 
   return NextResponse.json({ listing: updated });
 }

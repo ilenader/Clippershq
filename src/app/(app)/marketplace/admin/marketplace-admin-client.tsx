@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
-import { ShieldCheck, Check, X, Inbox } from "lucide-react";
+import { ShieldCheck, Check, X, Inbox, Trash2, RotateCcw } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative } from "@/lib/utils";
 
@@ -136,6 +136,76 @@ export function MarketplaceAdminClient() {
     }
   }
 
+  // Phase 3b-3 — approve a poster's pending deletion. Calls the existing
+  // override endpoint with status: DELETED rather than introducing a
+  // dedicated finalize-delete route. Audit-logged as
+  // MARKETPLACE_LISTING_OVERRIDE by the override route already.
+  async function handleApproveDeletion(id: string) {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm(
+        "Permanently delete this listing? In-flight submissions will be left as-is — they're already past the in-flight guard.",
+      );
+      if (!ok) return;
+    }
+    setActioning(id);
+    try {
+      const res = await fetch(`/api/marketplace/admin/listings/${id}/override`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: "DELETED" }),
+      });
+      if (res.ok) {
+        toast.success("Listing deleted.");
+        await load();
+        return;
+      }
+      let msg = "Could not delete listing.";
+      try {
+        const data = await res.json();
+        if (data?.error && typeof data.error === "string") msg = data.error;
+      } catch {
+        // ignore
+      }
+      toast.error(msg);
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  // Phase 3b-3 — OWNER-side cancel of a pending deletion (mirrors the
+  // poster-side flow). Same /cancel-delete endpoint accepts OWNER role.
+  async function handleAdminCancelDeletion(id: string) {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm("Cancel this deletion request and reactivate the listing?");
+      if (!ok) return;
+    }
+    setActioning(id);
+    try {
+      const res = await fetch(`/api/marketplace/listings/${id}/cancel-delete`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        toast.success("Deletion request cancelled. Listing is active again.");
+        await load();
+        return;
+      }
+      let msg = "Could not cancel deletion.";
+      try {
+        const data = await res.json();
+        if (data?.error && typeof data.error === "string") msg = data.error;
+      } catch {
+        // ignore
+      }
+      toast.error(msg);
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setActioning(null);
+    }
+  }
+
   function openReject(listing: any) {
     setRejectListing(listing);
     setRejectReason("");
@@ -239,6 +309,8 @@ export function MarketplaceAdminClient() {
               actioning={actioning === l.id}
               onApprove={() => handleApprove(l.id)}
               onReject={() => openReject(l)}
+              onApproveDeletion={() => handleApproveDeletion(l.id)}
+              onCancelDeletion={() => handleAdminCancelDeletion(l.id)}
             />
           ))}
         </div>
@@ -318,16 +390,22 @@ function AdminListingCard({
   actioning,
   onApprove,
   onReject,
+  onApproveDeletion,
+  onCancelDeletion,
 }: {
   listing: any;
   actioning: boolean;
   onApprove: () => void;
   onReject: () => void;
+  onApproveDeletion: () => void;
+  onCancelDeletion: () => void;
 }) {
   const status: string = listing.status;
   const badge =
     STATUS_BADGE[status] ?? { variant: "archived" as StatusVariant, label: status };
   const isPending = status === "PENDING_APPROVAL";
+  // Phase 3b-3 — OWNER finalize/cancel for posters' deletion requests.
+  const isDeletionRequested = status === "DELETION_REQUESTED";
 
   const posterUsername: string = listing.user?.username ?? "(unknown user)";
   const posterEmail: string = listing.user?.email ?? "";
@@ -486,6 +564,30 @@ function AdminListingCard({
             icon={<X className="h-3.5 w-3.5" />}
           >
             Reject
+          </Button>
+        </div>
+      ) : isDeletionRequested ? (
+        // Phase 3b-3 — OWNER actions on a pending deletion request:
+        // finalize (status: DELETED via override) or cancel (restore ACTIVE).
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={onApproveDeletion}
+            loading={actioning}
+            disabled={actioning}
+            icon={<Trash2 className="h-3.5 w-3.5" />}
+          >
+            Approve deletion
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={onCancelDeletion}
+            disabled={actioning}
+            icon={<RotateCcw className="h-3.5 w-3.5" />}
+          >
+            Cancel deletion request
           </Button>
         </div>
       ) : (

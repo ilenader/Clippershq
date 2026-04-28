@@ -10,6 +10,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ShoppingBag, Plus, Pause, Play, Pencil, Trash2, ShieldCheck, Compass, Inbox } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { CreateListingModal } from "./create-listing-modal";
+// Phase 3b-3 — wire pause/edit/request-delete buttons.
+import { EditListingModal } from "./edit-listing-modal";
+import { RequestDeleteModal } from "./request-delete-modal";
 
 interface MarketplaceClientProps {
   listings: any[];
@@ -39,8 +42,25 @@ const STATUS_BADGE: Record<string, { variant: StatusVariant; label: string }> = 
   BANNED: { variant: "rejected", label: "Banned" },
 };
 
-function comingSoon() {
-  toast.info("Coming in next phase.");
+// Phase 3b-3 — payload for the edit modal. Mirrors EditListingModal's
+// ListingForEdit shape. Computed from a listing object when opening.
+interface EditingListing {
+  id: string;
+  niche: string | null;
+  audienceDescription: string;
+  dailySlotCount: number;
+  country: string | null;
+  timezone: string | null;
+  clipAccountUsername: string;
+  clipAccountPlatform: string;
+  campaignName: string;
+}
+
+interface DeletingListing {
+  id: string;
+  accountUsername: string;
+  accountPlatform: string;
+  campaignName: string;
 }
 
 export function MarketplaceClient({
@@ -53,6 +73,15 @@ export function MarketplaceClient({
 }: MarketplaceClientProps) {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
+  // Phase 3b-3 — modal-open state for edit + request-delete. Tracking which
+  // listing is being acted on, not just a boolean, lets the modals render
+  // listing-specific context (account/campaign labels, current values).
+  const [editingListing, setEditingListing] = useState<EditingListing | null>(null);
+  const [deletingListing, setDeletingListing] = useState<DeletingListing | null>(null);
+  // Phase 3b-3 — per-listing in-flight flag, so the action buttons disable
+  // while a fetch is mid-flight to prevent double-clicks against the same
+  // listing.
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
   function openCreate() {
     setCreateOpen(true);
@@ -60,6 +89,104 @@ export function MarketplaceClient({
 
   function handleCreateSuccess() {
     setCreateOpen(false);
+    router.refresh();
+  }
+
+  // Phase 3b-3 — pause/unpause toggle. Same endpoint flips ACTIVE ⇄ PAUSED.
+  async function handlePauseToggle(listing: any) {
+    if (actioningId) return;
+    const id: string = listing.id;
+    const wasActive = listing.status === "ACTIVE";
+    setActioningId(id);
+    try {
+      const res = await fetch(`/api/marketplace/listings/${id}/pause`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        toast.success(wasActive ? "Listing paused." : "Listing reactivated.");
+        router.refresh();
+        return;
+      }
+      let msg = wasActive ? "Could not pause listing." : "Could not unpause listing.";
+      try {
+        const data = await res.json();
+        if (data?.error && typeof data.error === "string") msg = data.error;
+      } catch {
+        // ignore
+      }
+      toast.error(msg);
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setActioningId(null);
+    }
+  }
+
+  function handleEdit(listing: any) {
+    setEditingListing({
+      id: listing.id,
+      niche: listing.niche ?? null,
+      audienceDescription: listing.audienceDescription ?? "",
+      dailySlotCount: listing.dailySlotCount ?? 5,
+      country: listing.country ?? null,
+      timezone: listing.timezone ?? null,
+      clipAccountUsername: listing.clipAccount?.username ?? "",
+      clipAccountPlatform: listing.clipAccount?.platform ?? "",
+      campaignName: listing.campaign?.name ?? "",
+    });
+  }
+
+  function handleRequestDelete(listing: any) {
+    setDeletingListing({
+      id: listing.id,
+      accountUsername: listing.clipAccount?.username ?? "(unknown)",
+      accountPlatform: listing.clipAccount?.platform ?? "",
+      campaignName: listing.campaign?.name ?? "(unknown campaign)",
+    });
+  }
+
+  // Phase 3b-3 — cancel a pending deletion. Lightweight confirmation via
+  // window.confirm (modal would be overkill — single endpoint, no extra
+  // input, fully reversible).
+  async function handleCancelDelete(listing: any) {
+    if (actioningId) return;
+    const id: string = listing.id;
+    if (typeof window !== "undefined") {
+      const ok = window.confirm("Cancel deletion request and reactivate this listing?");
+      if (!ok) return;
+    }
+    setActioningId(id);
+    try {
+      const res = await fetch(`/api/marketplace/listings/${id}/cancel-delete`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        toast.success("Deletion request cancelled. Listing is active again.");
+        router.refresh();
+        return;
+      }
+      let msg = "Could not cancel deletion.";
+      try {
+        const data = await res.json();
+        if (data?.error && typeof data.error === "string") msg = data.error;
+      } catch {
+        // ignore
+      }
+      toast.error(msg);
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setActioningId(null);
+    }
+  }
+
+  function handleEditSuccess() {
+    setEditingListing(null);
+    router.refresh();
+  }
+
+  function handleDeleteSuccess() {
+    setDeletingListing(null);
     router.refresh();
   }
 
@@ -140,7 +267,15 @@ export function MarketplaceClient({
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {listings.map((l) => (
-            <ListingCard key={l.id} listing={l} />
+            <ListingCard
+              key={l.id}
+              listing={l}
+              actioning={actioningId === l.id}
+              onPauseToggle={() => handlePauseToggle(l)}
+              onEdit={() => handleEdit(l)}
+              onRequestDelete={() => handleRequestDelete(l)}
+              onCancelDelete={() => handleCancelDelete(l)}
+            />
           ))}
         </div>
       )}
@@ -154,11 +289,49 @@ export function MarketplaceClient({
         accountCampaignAccess={accountCampaignAccess}
         role={currentUser.role}
       />
+
+      {/* Phase 3b-3 — Edit + Request-delete modals. Mounted once at parent
+          so opening for a different card doesn't unmount/remount their state. */}
+      <EditListingModal
+        open={editingListing !== null}
+        onClose={() => setEditingListing(null)}
+        onSuccess={handleEditSuccess}
+        listing={editingListing}
+      />
+      <RequestDeleteModal
+        open={deletingListing !== null}
+        onClose={() => setDeletingListing(null)}
+        onSuccess={handleDeleteSuccess}
+        listingId={deletingListing?.id ?? ""}
+        listingDisplay={
+          deletingListing
+            ? {
+                accountUsername: deletingListing.accountUsername,
+                accountPlatform: deletingListing.accountPlatform,
+                campaignName: deletingListing.campaignName,
+              }
+            : null
+        }
+      />
     </div>
   );
 }
 
-function ListingCard({ listing }: { listing: any }) {
+function ListingCard({
+  listing,
+  actioning,
+  onPauseToggle,
+  onEdit,
+  onRequestDelete,
+  onCancelDelete,
+}: {
+  listing: any;
+  actioning: boolean;
+  onPauseToggle: () => void;
+  onEdit: () => void;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+}) {
   const status: string = listing.status;
   const badge = STATUS_BADGE[status] ?? { variant: "archived" as StatusVariant, label: status };
   const muted = status === "DELETED" || status === "BANNED";
@@ -245,8 +418,15 @@ function ListingCard({ listing }: { listing: any }) {
         </div>
       ) : null}
 
-      {/* Actions row by status */}
-      <Actions status={status} />
+      {/* Actions row by status — Phase 3b-3 wires real handlers in. */}
+      <Actions
+        status={status}
+        actioning={actioning}
+        onPauseToggle={onPauseToggle}
+        onEdit={onEdit}
+        onRequestDelete={onRequestDelete}
+        onCancelDelete={onCancelDelete}
+      />
     </Card>
   );
 }
@@ -260,7 +440,21 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function Actions({ status }: { status: string }) {
+function Actions({
+  status,
+  actioning,
+  onPauseToggle,
+  onEdit,
+  onRequestDelete,
+  onCancelDelete,
+}: {
+  status: string;
+  actioning: boolean;
+  onPauseToggle: () => void;
+  onEdit: () => void;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+}) {
   if (status === "PENDING_APPROVAL") {
     return (
       <p className="text-xs italic text-[var(--text-muted)]">
@@ -271,13 +465,29 @@ function Actions({ status }: { status: string }) {
   if (status === "ACTIVE") {
     return (
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={comingSoon} icon={<Pause className="h-3.5 w-3.5" />}>
+        <Button
+          variant="secondary"
+          onClick={onPauseToggle}
+          loading={actioning}
+          disabled={actioning}
+          icon={<Pause className="h-3.5 w-3.5" />}
+        >
           Pause
         </Button>
-        <Button variant="secondary" onClick={comingSoon} icon={<Pencil className="h-3.5 w-3.5" />}>
+        <Button
+          variant="secondary"
+          onClick={onEdit}
+          disabled={actioning}
+          icon={<Pencil className="h-3.5 w-3.5" />}
+        >
           Edit
         </Button>
-        <Button variant="secondary" onClick={comingSoon} icon={<Trash2 className="h-3.5 w-3.5" />}>
+        <Button
+          variant="secondary"
+          onClick={onRequestDelete}
+          disabled={actioning}
+          icon={<Trash2 className="h-3.5 w-3.5" />}
+        >
           Request delete
         </Button>
       </div>
@@ -286,13 +496,29 @@ function Actions({ status }: { status: string }) {
   if (status === "PAUSED") {
     return (
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={comingSoon} icon={<Play className="h-3.5 w-3.5" />}>
+        <Button
+          variant="secondary"
+          onClick={onPauseToggle}
+          loading={actioning}
+          disabled={actioning}
+          icon={<Play className="h-3.5 w-3.5" />}
+        >
           Unpause
         </Button>
-        <Button variant="secondary" onClick={comingSoon} icon={<Pencil className="h-3.5 w-3.5" />}>
+        <Button
+          variant="secondary"
+          onClick={onEdit}
+          disabled={actioning}
+          icon={<Pencil className="h-3.5 w-3.5" />}
+        >
           Edit
         </Button>
-        <Button variant="secondary" onClick={comingSoon} icon={<Trash2 className="h-3.5 w-3.5" />}>
+        <Button
+          variant="secondary"
+          onClick={onRequestDelete}
+          disabled={actioning}
+          icon={<Trash2 className="h-3.5 w-3.5" />}
+        >
           Request delete
         </Button>
       </div>
@@ -307,7 +533,12 @@ function Actions({ status }: { status: string }) {
         <p className="text-xs italic text-[var(--text-muted)]">
           Awaiting owner approval to delete.
         </p>
-        <Button variant="secondary" onClick={comingSoon}>
+        <Button
+          variant="secondary"
+          onClick={onCancelDelete}
+          loading={actioning}
+          disabled={actioning}
+        >
           Cancel deletion request
         </Button>
       </div>
