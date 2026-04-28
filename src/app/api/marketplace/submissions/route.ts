@@ -249,6 +249,16 @@ export async function GET(req: NextRequest) {
             campaign: { select: { id: true, name: true } },
           },
         },
+        // Phase 6f — when a submission is POSTED, surface the live clip URL so
+        // the my-submissions card can render a "View posted clip" verification
+        // link. `posts` is the schema relation name (MarketplaceClipPost[]).
+        // A submission has at most one post in practice (created atomically
+        // in the post-route TX); take:1 + orderBy keeps the shape stable.
+        posts: {
+          select: { clip: { select: { clipUrl: true } } },
+          orderBy: { postedAt: "desc" },
+          take: 1,
+        },
       },
     }),
     "marketplace.submission.listMine",

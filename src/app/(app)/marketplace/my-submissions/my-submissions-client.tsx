@@ -7,6 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Inbox, ExternalLink } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative } from "@/lib/utils";
+import { PostClipModal } from "./post-clip-modal";
+
+// Phase 6f — payload passed from a SubmissionCard up to the parent so the
+// modal opens with the right submission + display context. Privacy contract:
+// only username-shaped data, never email/role/id.
+interface PostingTarget {
+  submissionId: string;
+  listingDisplay: {
+    posterUsername: string;
+    accountUsername: string;
+    accountPlatform: string;
+    campaignName: string;
+    postDeadline: string | null;
+  };
+}
 
 const FILTERS = [
   { value: "PENDING", label: "Pending" },
@@ -46,6 +61,10 @@ export function MySubmissionsClient() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Phase 6f — null means modal closed. When set, the modal opens for that
+  // specific submission. Refetching after success flips its status to POSTED
+  // in the list.
+  const [postingTarget, setPostingTarget] = useState<PostingTarget | null>(null);
 
   function buildUrl(cursor?: string | null): string {
     const params = new URLSearchParams();
@@ -150,7 +169,7 @@ export function MySubmissionsClient() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {submissions.map((s) => (
-            <SubmissionCard key={s.id} submission={s} />
+            <SubmissionCard key={s.id} submission={s} onMarkAsPosted={setPostingTarget} />
           ))}
         </div>
       )}
@@ -162,6 +181,19 @@ export function MySubmissionsClient() {
           </Button>
         </div>
       ) : null}
+
+      {/* Phase 6f — Mark-as-posted modal. Mounted once at the page level so
+          opening for a different card doesn't unmount/remount its state. */}
+      <PostClipModal
+        open={postingTarget !== null}
+        onClose={() => setPostingTarget(null)}
+        onSuccess={() => {
+          setPostingTarget(null);
+          load();
+        }}
+        submissionId={postingTarget?.submissionId ?? ""}
+        listingDisplay={postingTarget?.listingDisplay ?? null}
+      />
     </div>
   );
 }
@@ -179,7 +211,13 @@ function formatHoursLeft(hours: number): string {
   return `${Math.round(hours)}h remaining`;
 }
 
-function SubmissionCard({ submission }: { submission: any }) {
+function SubmissionCard({
+  submission,
+  onMarkAsPosted,
+}: {
+  submission: any;
+  onMarkAsPosted?: (target: PostingTarget) => void;
+}) {
   const status: string = submission.status;
   const badge =
     STATUS_BADGE[status] ?? { variant: "archived" as StatusVariant, label: status };
@@ -199,6 +237,10 @@ function SubmissionCard({ submission }: { submission: any }) {
   const postDeadline: string | null = submission.postDeadline ?? null;
   const rejectionReason: string | null = submission.rejectionReason ?? null;
   const improvementNote: string | null = submission.improvementNote ?? null;
+  // Phase 6f — when the submission is POSTED, the API returns the live clip
+  // URL via the `posts` relation (MarketplaceClipPost). At most one entry.
+  const postedClipUrl: string | null =
+    submission.posts?.[0]?.clip?.clipUrl ?? null;
 
   return (
     <Card>
@@ -280,15 +322,56 @@ function SubmissionCard({ submission }: { submission: any }) {
         (() => {
           const h = hoursLeftUntil(postDeadline);
           if (h === null) return null;
+          // Phase 6f — disable the Mark-as-posted button when the deadline
+          // has passed. Server will reject anyway; failing fast in the UI
+          // saves a round-trip.
+          const deadlinePassed = h <= 0;
           return (
-            <div className="mb-3 rounded-lg border border-accent/20 bg-accent/5 p-2 text-center">
-              <p className="text-[11px] uppercase tracking-widest text-accent">Post deadline</p>
-              <p className="mt-0.5 text-sm font-medium text-[var(--text-primary)]">
-                {formatHoursLeft(h)}
-              </p>
+            <div className="mb-3 space-y-2">
+              <div className="rounded-lg border border-accent/20 bg-accent/5 p-2 text-center">
+                <p className="text-[11px] uppercase tracking-widest text-accent">Post deadline</p>
+                <p className="mt-0.5 text-sm font-medium text-[var(--text-primary)]">
+                  {formatHoursLeft(h)}
+                </p>
+              </div>
+              {onMarkAsPosted ? (
+                <Button
+                  className="w-full"
+                  disabled={deadlinePassed}
+                  onClick={() =>
+                    onMarkAsPosted({
+                      submissionId: submission.id,
+                      listingDisplay: {
+                        posterUsername,
+                        accountUsername: acctUsername,
+                        accountPlatform: acctPlatform,
+                        campaignName,
+                        postDeadline,
+                      },
+                    })
+                  }
+                >
+                  Mark as posted
+                </Button>
+              ) : null}
             </div>
           );
         })()
+      ) : null}
+
+      {/* Phase 6f — POSTED submissions get a verification link to the live
+          clip. Server-side, MarketplaceClipPost is created in the same TX
+          that flips status → POSTED, so this link is always present here. */}
+      {status === "POSTED" && postedClipUrl ? (
+        <a
+          href={postedClipUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-3 inline-flex items-center gap-1 truncate text-xs text-accent hover:underline"
+        >
+          <ExternalLink className="h-3 w-3" />
+          View posted clip
+        </a>
       ) : null}
 
       {status === "REJECTED" && rejectionReason ? (
