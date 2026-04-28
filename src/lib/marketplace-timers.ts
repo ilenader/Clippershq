@@ -23,6 +23,15 @@ import { withDbRetry } from "@/lib/db-retry";
 import { createNotification } from "@/lib/notifications";
 import { logAudit } from "@/lib/audit";
 import { isUserMarketplaceBanned } from "@/lib/marketplace-ban";
+// Phase 9 — marketplace transactional emails. Each sender no-ops gracefully
+// when EMAIL_API_KEY is unset, returns boolean, and never throws — so wiring
+// these into the timer loop cannot block step processing.
+import {
+  sendMarketplacePostDeadlineReminder,
+  sendMarketplacePostDeadlineMissed,
+  sendMarketplaceBanned,
+  sendMarketplaceBanLifted,
+} from "@/lib/marketplace-email";
 
 const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
 const HOURS_48_MS = 48 * 60 * 60 * 1000;
@@ -109,7 +118,18 @@ export async function processMarketplaceTimers(deadlineMs?: number): Promise<{
             id: true,
             creatorId: true,
             listingId: true,
-            listing: { select: { id: true, userId: true } },
+            // Phase 9 — pull poster email/username + display fields so we
+            // can fire sendMarketplacePostDeadlineMissed without an extra
+            // round-trip per overdue row.
+            listing: {
+              select: {
+                id: true,
+                userId: true,
+                user: { select: { email: true, username: true } },
+                clipAccount: { select: { username: true } },
+                campaign: { select: { name: true } },
+              },
+            },
           },
           take: TAKE_LIMIT,
         }),
@@ -165,6 +185,31 @@ export async function processMarketplaceTimers(deadlineMs?: number): Promise<{
             "Your approved marketplace clip wasn't posted before the deadline and is now expired.",
             { submissionId: sub.id },
           );
+          // Phase 9 — email the poster about the strike. Counts the strike
+          // we just inserted (within the 30d window) so the email shows the
+          // current N/3 progression. Wrapped so any failure here can never
+          // break the post-expiry pipeline — the in-app notifications above
+          // are the universal source of truth.
+          if (sub.listing?.user?.email) {
+            try {
+              const cutoff30d = new Date(Date.now() - DAYS_30_MS);
+              const strikeCount: number = await withDbRetry(
+                () => db!.marketplaceStrike.count({
+                  where: { userId: posterId, createdAt: { gt: cutoff30d } },
+                }),
+                "marketplace.timers.countStrikesForEmail",
+              ) as number;
+              await sendMarketplacePostDeadlineMissed({
+                to: sub.listing.user.email,
+                posterUsername: sub.listing.user.username ?? "poster",
+                accountUsername: sub.listing.clipAccount?.username ?? "",
+                campaignName: sub.listing.campaign?.name ?? "",
+                strikeCount,
+              });
+            } catch {
+              // swallow — email failure never breaks the timer step
+            }
+          }
           processed++;
           details.push(`[MKT] Submission ${sub.id}: APPROVED → POST_EXPIRED, strike → ${posterId.slice(0, 8)}`);
         } catch (err: any) {
@@ -278,6 +323,28 @@ export async function processMarketplaceTimers(deadlineMs?: number): Promise<{
           { bannedUntil: newBannedUntil.toISOString(), strikeCount },
         );
 
+        // Phase 9 — email the banned poster. One extra user lookup per ban
+        // event, which is rare (max one row per cron tick per user). Wrapped
+        // so a Resend outage never blocks the ban-issuance flow.
+        try {
+          const poster: any = await withDbRetry(
+            () => db!.user.findUnique({
+              where: { id: posterId },
+              select: { email: true, username: true },
+            }),
+            "marketplace.timers.findPosterForBanEmail",
+          );
+          if (poster?.email) {
+            await sendMarketplaceBanned({
+              to: poster.email,
+              posterUsername: poster.username ?? "poster",
+              until: newBannedUntil.toISOString(),
+            });
+          }
+        } catch {
+          // swallow — email failure never breaks the ban-issuance step
+        }
+
         processed++;
         details.push(`[MKT] Poster ${posterId.slice(0, 8)}: BANNED until ${newBannedUntil.toISOString()}, ${listingsToBan.length} listings auto-banned`);
       } catch (err: any) {
@@ -336,6 +403,28 @@ export async function processMarketplaceTimers(deadlineMs?: number): Promise<{
             "Your marketplace ban has expired. Your listings are active again.",
             { listingsRestored: restored.length },
           );
+
+          // Phase 9 — email the now-unbanned poster. Same pattern as ban
+          // issuance: one user lookup per event (rare), email wrapped so a
+          // Resend outage cannot break the auto-restore flow.
+          try {
+            const poster: any = await withDbRetry(
+              () => db!.user.findUnique({
+                where: { id: userId },
+                select: { email: true, username: true },
+              }),
+              "marketplace.timers.findPosterForUnbanEmail",
+            );
+            if (poster?.email) {
+              await sendMarketplaceBanLifted({
+                to: poster.email,
+                posterUsername: poster.username ?? "poster",
+              });
+            }
+          } catch {
+            // swallow — email failure never breaks the ban-lift step
+          }
+
           processed++;
           details.push(`[MKT] Poster ${userId.slice(0, 8)}: ban lifted, ${restored.length} listings restored`);
         } catch (err: any) {
@@ -363,7 +452,17 @@ export async function processMarketplaceTimers(deadlineMs?: number): Promise<{
           select: {
             id: true,
             postDeadline: true,
-            listing: { select: { userId: true } },
+            // Phase 9 — pull poster email/username + display fields so the
+            // promoted reminder emit can fire the email inline without an
+            // extra round-trip per upcoming row.
+            listing: {
+              select: {
+                userId: true,
+                user: { select: { email: true, username: true } },
+                clipAccount: { select: { username: true } },
+                campaign: { select: { name: true } },
+              },
+            },
           },
           take: TAKE_LIMIT,
         }),
@@ -411,27 +510,80 @@ export async function processMarketplaceTimers(deadlineMs?: number): Promise<{
           const key = `${t.type}:${sub.id}`;
           if (existingKeys.has(key)) continue;
           try {
-            // Raw db.notification.create — NOT createNotification — so
-            // this insert does NOT publish an Ably refresh. The row is a
-            // dormant placeholder until Phase 9's email sender picks it up.
-            await db!.notification.create({
-              data: {
-                userId: posterId,
-                type: t.type,
-                title: "Post deadline reminder",
-                body: `You have a marketplace clip with about ${t.label} left until its post deadline. Make sure to post it on time.`,
-                metadata: JSON.stringify({
-                  scheduledFor: new Date(thresholdMs).toISOString(),
-                  submissionId: sub.id,
-                  deadline: new Date(deadlineTs).toISOString(),
-                  reminderType: t.type.replace("MKT_POST_DEADLINE_", ""),
-                }),
-                isRead: false,
+            // Phase 9 — promoted from raw insert to deliver Ably push + email.
+            // createNotification writes the row AND publishes the
+            // `notif_refresh` event, so the bell badge updates the moment
+            // the timer fires the reminder. emailedAt starts null and gets
+            // patched in below if Resend confirms delivery — that lets a
+            // future ops query `metadata.emailedAt IS NULL` to find rows
+            // that were in-app delivered but never emailed (e.g. recipient
+            // had no email, or Resend was down). Forward-only: the dedup
+            // Set in `existingKeys` still gates re-runs so we don't double-
+            // notify.
+            const reminderTypeShort = t.type.replace("MKT_POST_DEADLINE_", "") as "12H" | "6H" | "1H";
+            const hoursLeft = Math.round(t.offset / (60 * 60 * 1000));
+            await createNotification(
+              posterId,
+              t.type as any,
+              "Post deadline reminder",
+              `You have a marketplace clip with about ${t.label} left until its post deadline. Make sure to post it on time.`,
+              {
+                scheduledFor: new Date(thresholdMs).toISOString(),
+                submissionId: sub.id,
+                deadline: new Date(deadlineTs).toISOString(),
+                reminderType: reminderTypeShort,
+                emailedAt: null,
               },
-            });
+            );
             existingKeys.add(key);
             processed++;
             details.push(`[MKT] Reminder ${t.type} queued for sub ${sub.id}`);
+
+            // Email + emailedAt patch. Independent try/catch so an email
+            // failure never reverts the in-app delivery — the row already
+            // exists and the bell badge already incremented.
+            if (sub.listing?.user?.email) {
+              try {
+                const ok = await sendMarketplacePostDeadlineReminder({
+                  to: sub.listing.user.email,
+                  posterUsername: sub.listing.user.username ?? "poster",
+                  accountUsername: sub.listing.clipAccount?.username ?? "",
+                  campaignName: sub.listing.campaign?.name ?? "",
+                  hoursLeft,
+                  reminderType: reminderTypeShort,
+                });
+                if (ok) {
+                  // Locate the row we just wrote (most-recent matching
+                  // type+user) and patch metadata.emailedAt. SubmissionId
+                  // match guards against the rare case where two reminders
+                  // for the same poster could collide on the same tick.
+                  const just: any = await withDbRetry(
+                    () => db!.notification.findFirst({
+                      where: { userId: posterId, type: t.type },
+                      orderBy: { createdAt: "desc" },
+                      select: { id: true, metadata: true },
+                    }),
+                    "marketplace.timers.findReminderForEmailedAt",
+                  );
+                  if (just?.id) {
+                    let meta: any = {};
+                    try { meta = just.metadata ? JSON.parse(just.metadata) : {}; } catch {}
+                    if (meta.submissionId === sub.id) {
+                      meta.emailedAt = new Date().toISOString();
+                      await withDbRetry(
+                        () => db!.notification.update({
+                          where: { id: just.id },
+                          data: { metadata: JSON.stringify(meta) },
+                        }),
+                        "marketplace.timers.patchEmailedAt",
+                      );
+                    }
+                  }
+                }
+              } catch {
+                // swallow — emailedAt is informational; row+badge intact
+              }
+            }
           } catch (err: any) {
             errors++;
             details.push(`[MKT] Reminder ${t.type} for ${sub.id} failed (${err?.message})`);

@@ -4,6 +4,9 @@ import { withDbRetry } from "@/lib/db-retry";
 import { checkBanStatus } from "@/lib/check-ban";
 import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { isUserMarketplaceBanned } from "@/lib/marketplace-ban";
+// Phase 9 — notify poster + fire email when a creator submits.
+import { createNotification } from "@/lib/notifications";
+import { sendMarketplaceNewSubmission } from "@/lib/marketplace-email";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -109,10 +112,21 @@ export async function POST(req: NextRequest) {
 
   // Verify listing exists, is ACTIVE, and is not owned by the submitter.
   // Phase: also fetch dailySlotCount so we can enforce the daily cap below.
+  // Phase 9 — also fetch poster (user) email/username + clipAccount + campaign
+  // so we can notify the poster after a successful insert without a second
+  // round-trip. Cost is one extra join on a single-row lookup.
   const listing: any = await withDbRetry(
     () => db!.marketplacePosterListing.findUnique({
       where: { id: listingId },
-      select: { id: true, userId: true, status: true, dailySlotCount: true },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        dailySlotCount: true,
+        user: { select: { email: true, username: true } },
+        clipAccount: { select: { username: true } },
+        campaign: { select: { name: true } },
+      },
     }),
     "marketplace.submission.findListing",
   );
@@ -213,6 +227,53 @@ export async function POST(req: NextRequest) {
     );
   } catch {
     // swallow — counter drift is recoverable; do not fail the request
+  }
+
+  // Phase 9 — notify the poster (in-app) + fire transactional email.
+  // Independent of the parent action: in-app row first (so the bell badge
+  // updates even when email is unconfigured), email second wrapped in
+  // try/catch so a Resend outage never breaks submission creation.
+  // Privacy: only public handles flow into payload (no creator.email).
+  try {
+    const creator: any = await withDbRetry(
+      () => db!.user.findUnique({
+        where: { id: session.user.id },
+        select: { username: true },
+      }),
+      "marketplace.submission.findCreatorForNotify",
+    );
+    const posterId = listing.userId as string;
+    const accountUsername = listing.clipAccount?.username ?? "";
+    const campaignName = listing.campaign?.name ?? "";
+    const creatorUsername = creator?.username ?? "creator";
+    const posterUsername = listing.user?.username ?? "poster";
+    await createNotification(
+      posterId,
+      "MKT_NEW_SUBMISSION",
+      `New submission on @${accountUsername}`,
+      `@${creatorUsername} just submitted a clip to your listing for ${campaignName}.`,
+      {
+        submissionId: submission.id,
+        listingId,
+        accountUsername,
+        creatorUsername,
+      },
+    );
+    if (listing.user?.email) {
+      try {
+        await sendMarketplaceNewSubmission({
+          to: listing.user.email,
+          posterUsername,
+          creatorUsername,
+          accountUsername,
+          campaignName,
+        });
+      } catch {
+        // swallow — email failure must never break the submission flow
+      }
+    }
+  } catch {
+    // swallow — notification side effects must never break parent action
   }
 
   return NextResponse.json({ submission }, { status: 201 });

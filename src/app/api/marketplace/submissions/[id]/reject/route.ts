@@ -5,6 +5,9 @@ import { checkBanStatus } from "@/lib/check-ban";
 import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { isUserMarketplaceBanned } from "@/lib/marketplace-ban";
+// Phase 9 — notify creator + fire email when a submission is rejected.
+import { createNotification } from "@/lib/notifications";
+import { sendMarketplaceSubmissionRejected } from "@/lib/marketplace-email";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +81,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
 
+  // Phase 9 — fetch creator + listing display fields so we can notify after
+  // the update without a second round-trip.
   const submission: any = await withDbRetry(
     () => db!.marketplaceSubmission.findUnique({
       where: { id },
@@ -86,8 +91,17 @@ export async function POST(req: NextRequest, { params }: Params) {
         status: true,
         expiresAt: true,
         listingId: true,
+        creatorId: true,
         videoHash: true,
-        listing: { select: { id: true, userId: true } },
+        creator: { select: { email: true, username: true } },
+        listing: {
+          select: {
+            id: true,
+            userId: true,
+            clipAccount: { select: { username: true } },
+            campaign: { select: { name: true } },
+          },
+        },
       },
     }),
     "marketplace.submission.findForReject",
@@ -159,6 +173,49 @@ export async function POST(req: NextRequest, { params }: Params) {
         typeof improvementNote === "string" && improvementNote.trim().length > 0,
     },
   });
+
+  // Phase 9 — notify creator (in-app) + email. Body truncates the reason at
+  // 200 chars for the bell preview; full reason ships in the email body.
+  // Both side effects wrapped so a failure never breaks the rejection.
+  try {
+    const accountUsername = submission.listing?.clipAccount?.username ?? "";
+    const campaignName = submission.listing?.campaign?.name ?? "";
+    const creatorUsername = submission.creator?.username ?? "creator";
+    const trimmedReason = reason.trim();
+    const trimmedNote =
+      typeof improvementNote === "string" && improvementNote.trim().length > 0
+        ? improvementNote.trim()
+        : null;
+    const reasonShort = trimmedReason.length > 200 ? trimmedReason.slice(0, 197) + "…" : trimmedReason;
+    await createNotification(
+      submission.creatorId,
+      "MKT_SUBMISSION_REJECTED",
+      "Your submission was not approved",
+      `Your clip for ${campaignName} on @${accountUsername} was rejected. Reason: ${reasonShort}`,
+      {
+        submissionId: id,
+        reason: trimmedReason,
+        improvementNote: trimmedNote,
+        accountUsername,
+      },
+    );
+    if (submission.creator?.email) {
+      try {
+        await sendMarketplaceSubmissionRejected({
+          to: submission.creator.email,
+          creatorUsername,
+          accountUsername,
+          campaignName,
+          reason: trimmedReason,
+          improvementNote: trimmedNote,
+        });
+      } catch {
+        // swallow — email failure never breaks the parent action
+      }
+    }
+  } catch {
+    // swallow — notification side effects never break parent action
+  }
 
   return NextResponse.json({ submission: updated });
 }

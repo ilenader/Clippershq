@@ -5,6 +5,9 @@ import { checkBanStatus } from "@/lib/check-ban";
 import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { isUserMarketplaceBanned } from "@/lib/marketplace-ban";
+// Phase 9 — notify creator + fire email when a submission is approved.
+import { createNotification } from "@/lib/notifications";
+import { sendMarketplaceSubmissionApproved } from "@/lib/marketplace-email";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +58,8 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   const { id } = await params;
 
+  // Phase 9 — fetch creator + listing display fields here so we can notify
+  // after the update without a second round-trip.
   const submission: any = await withDbRetry(
     () => db!.marketplaceSubmission.findUnique({
       where: { id },
@@ -63,7 +68,16 @@ export async function POST(_req: NextRequest, { params }: Params) {
         status: true,
         expiresAt: true,
         listingId: true,
-        listing: { select: { id: true, userId: true } },
+        creatorId: true,
+        creator: { select: { email: true, username: true } },
+        listing: {
+          select: {
+            id: true,
+            userId: true,
+            clipAccount: { select: { username: true } },
+            campaign: { select: { name: true } },
+          },
+        },
       },
     }),
     "marketplace.submission.findForApprove",
@@ -128,6 +142,41 @@ export async function POST(_req: NextRequest, { params }: Params) {
       postDeadline: postDeadline.toISOString(),
     },
   });
+
+  // Phase 9 — notify creator (in-app) + email. In-app first so the bell
+  // badge updates even when EMAIL_API_KEY is unset; email is fire-and-forget
+  // in its own try/catch so Resend failures never break the approval.
+  try {
+    const accountUsername = submission.listing?.clipAccount?.username ?? "";
+    const campaignName = submission.listing?.campaign?.name ?? "";
+    const creatorUsername = submission.creator?.username ?? "creator";
+    await createNotification(
+      submission.creatorId,
+      "MKT_SUBMISSION_APPROVED",
+      "Your submission was approved!",
+      `Your clip for ${campaignName} on @${accountUsername} was approved. Post within 24h.`,
+      {
+        submissionId: id,
+        postDeadline: postDeadline.toISOString(),
+        accountUsername,
+      },
+    );
+    if (submission.creator?.email) {
+      try {
+        await sendMarketplaceSubmissionApproved({
+          to: submission.creator.email,
+          creatorUsername,
+          accountUsername,
+          campaignName,
+          postDeadlineISO: postDeadline.toISOString(),
+        });
+      } catch {
+        // swallow — email failure never breaks the parent action
+      }
+    }
+  } catch {
+    // swallow — notification side effects never break parent action
+  }
 
   return NextResponse.json({ submission: updated });
 }

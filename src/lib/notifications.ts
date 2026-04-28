@@ -10,7 +10,15 @@ export type NotificationType =
   | "STREAK_WARNING" | "STREAK_MILESTONE" | "STREAK_LOST"
   | "LEVEL_UP" | "REFERRAL_SIGNUP"
   | "PAYOUT_APPROVED" | "PAYOUT_REJECTED" | "PAYOUT_PAID"
-  | "COMMUNITY_REPLY";
+  | "COMMUNITY_REPLY"
+  // Phase 9 — marketplace event types. The Notification.type column is a
+  // free-form String so adding entries here requires no migration; the union
+  // exists purely for TypeScript safety on call sites.
+  | "MKT_NEW_SUBMISSION"
+  | "MKT_SUBMISSION_APPROVED"
+  | "MKT_SUBMISSION_REJECTED"
+  | "MKT_LISTING_APPROVED"
+  | "MKT_LISTING_REJECTED";
 
 export async function createNotification(
   userId: string,

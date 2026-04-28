@@ -4,6 +4,9 @@ import { withDbRetry } from "@/lib/db-retry";
 import { checkBanStatus } from "@/lib/check-ban";
 import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+// Phase 9 — notify poster + fire email when an OWNER approves a listing.
+import { createNotification } from "@/lib/notifications";
+import { sendMarketplaceListingApproved } from "@/lib/marketplace-email";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -32,10 +35,19 @@ export async function POST(_req: NextRequest, { params }: Params) {
   if (!db) return NextResponse.json({ error: "Database unavailable." }, { status: 500 });
 
   const { id } = await params;
+  // Phase 9 — fetch poster + display fields here so we can notify after
+  // the update without a second round-trip.
   const listing: any = await withDbRetry(
     () => db!.marketplacePosterListing.findUnique({
       where: { id },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        userId: true,
+        user: { select: { email: true, username: true } },
+        clipAccount: { select: { username: true } },
+        campaign: { select: { name: true } },
+      },
     }),
     "marketplace.admin.listing.findForApprove",
   );
@@ -64,6 +76,35 @@ export async function POST(_req: NextRequest, { params }: Params) {
     targetId: id,
     details: { previousStatus: listing.status, newStatus: "ACTIVE" },
   });
+
+  // Phase 9 — notify poster (in-app) + email. Wrapped so any failure leaves
+  // the approval intact.
+  try {
+    const accountUsername = listing.clipAccount?.username ?? "";
+    const campaignName = listing.campaign?.name ?? "";
+    const posterUsername = listing.user?.username ?? "poster";
+    await createNotification(
+      listing.userId,
+      "MKT_LISTING_APPROVED",
+      "Your marketplace listing is live",
+      `Your listing for @${accountUsername} on ${campaignName} is now active.`,
+      { listingId: id, accountUsername, campaignName },
+    );
+    if (listing.user?.email) {
+      try {
+        await sendMarketplaceListingApproved({
+          to: listing.user.email,
+          posterUsername,
+          accountUsername,
+          campaignName,
+        });
+      } catch {
+        // swallow — email failure never breaks the parent action
+      }
+    }
+  } catch {
+    // swallow — notification side effects never break parent action
+  }
 
   return NextResponse.json({ listing: updated });
 }
