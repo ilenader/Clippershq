@@ -99,7 +99,7 @@ export async function submitClip(data: {
       },
     });
 
-    if (platform === "tiktok" || platform === "instagram") {
+    if (platform === "tiktok" || platform === "instagram" || platform === "youtube") {
       await tx.trackingJob.create({
         data: {
           clipId: newClip.id,

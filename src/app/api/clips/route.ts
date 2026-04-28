@@ -371,7 +371,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      if (platform === "tiktok" || platform === "instagram") {
+      if (platform === "tiktok" || platform === "instagram" || platform === "youtube") {
         const firstCheck = new Date();
         firstCheck.setMinutes(0, 0, 0);
         firstCheck.setHours(firstCheck.getHours() + 1);
