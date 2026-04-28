@@ -201,9 +201,13 @@ function BrowseListingCard({
   listing: any;
   onSubmit: () => void;
 }) {
-  // Privacy: poster object is { username } only — never render anything else
-  // (no email, no role, no id) even if a future API change leaks them.
+  // Privacy: poster object is { username } + cached rep only — never email/
+  // role/id. Phase 7a widened the user select to include the as-poster
+  // rating fields, which are public-by-design (Q6).
   const posterUsername: string = listing.user?.username ?? "(unknown)";
+  // Phase 7a — poster's as-poster rep, surfaced under "Posted by".
+  const posterAvg: number | null = listing.user?.marketplaceAvgAsPoster ?? null;
+  const posterCount: number = listing.user?.marketplaceCountAsPoster ?? 0;
   const acctUsername: string = listing.clipAccount?.username ?? "(unknown)";
   const acctPlatform: string = listing.clipAccount?.platform ?? "";
   const profileLink: string | null = listing.clipAccount?.profileLink ?? null;
@@ -219,17 +223,30 @@ function BrowseListingCard({
   const totalApproved: number = listing.totalApproved ?? 0;
   const totalPosted: number = listing.totalPosted ?? 0;
   const averageRating: number | null = listing.averageRating ?? null;
+  // Phase 7a — count paired with averageRating for "★ 4.7 (12)" display.
+  const ratingCount: number = listing.ratingCount ?? 0;
   const country: string | null = listing.country ?? null;
   const timezone: string | null = listing.timezone ?? null;
 
   return (
     <Card>
       {/* Poster row */}
-      <p className="mb-2 text-[11px] uppercase tracking-widest text-[var(--text-muted)]">
-        Posted by{" "}
-        <span className="text-[var(--text-secondary)] normal-case tracking-normal">
-          @{posterUsername}
+      <p className="mb-2 inline-flex items-center gap-2 text-[11px] uppercase tracking-widest text-[var(--text-muted)]">
+        <span>
+          Posted by{" "}
+          <span className="text-[var(--text-secondary)] normal-case tracking-normal">
+            @{posterUsername}
+          </span>
         </span>
+        {/* Phase 7a — poster rep badge. Hidden when count === 0 (Q13). */}
+        {posterCount > 0 && posterAvg !== null ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-page)] px-2 py-0.5 text-[10px] normal-case tracking-normal text-[var(--text-secondary)]">
+            <Star className="h-2.5 w-2.5 fill-current text-accent" />
+            <span>
+              {posterAvg.toFixed(1)} ({posterCount})
+            </span>
+          </span>
+        ) : null}
       </p>
 
       {/* Account header */}
@@ -244,10 +261,12 @@ function BrowseListingCard({
             </p>
           ) : null}
         </div>
-        {averageRating !== null ? (
+        {/* Phase 7a — listing-level rep badge, paired with ratingCount.
+            Hidden when count === 0 (Q13) to avoid showing avg=null. */}
+        {ratingCount > 0 && averageRating !== null ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-page)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
-            <Star className="h-3 w-3 text-accent" />
-            {averageRating.toFixed(1)}
+            <Star className="h-3 w-3 fill-current text-accent" />
+            {averageRating.toFixed(1)} ({ratingCount})
           </span>
         ) : null}
       </div>

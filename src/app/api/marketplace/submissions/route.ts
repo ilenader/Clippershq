@@ -270,7 +270,18 @@ export async function GET(req: NextRequest) {
           select: {
             id: true,
             userId: true,
-            user: { select: { username: true } },
+            // Phase 7a — also surface the listing's averageRating + count
+            // and the poster user's as-poster rep so creators can see who
+            // they submitted to.
+            averageRating: true,
+            ratingCount: true,
+            user: {
+              select: {
+                username: true,
+                marketplaceAvgAsPoster: true,
+                marketplaceCountAsPoster: true,
+              },
+            },
             clipAccount: { select: { id: true, username: true, platform: true, profileLink: true } },
             campaign: { select: { id: true, name: true } },
           },
@@ -284,6 +295,19 @@ export async function GET(req: NextRequest) {
           select: { clip: { select: { clipUrl: true } } },
           orderBy: { postedAt: "desc" },
           take: 1,
+        },
+        // Phase 7a — same as /incoming GET. Lets the my-submissions UI
+        // toggle "Rate poster" button vs "★ Rated" readout based on whether
+        // the current creator has already rated this submission.
+        ratings: {
+          select: {
+            direction: true,
+            score: true,
+            note: true,
+            posterId: true,
+            creatorId: true,
+            createdAt: true,
+          },
         },
       },
     }),

@@ -79,13 +79,24 @@ export async function GET(req: NextRequest) {
         timezone: true,
         dailySlotCount: true,
         averageRating: true,
+        // Phase 7a — paired count for "★ 4.7 (12)" display + UI gating that
+        // hides the badge when ratingCount === 0 (Q13).
+        ratingCount: true,
         totalSubmissions: true,
         totalApproved: true,
         totalPosted: true,
         status: true,
         createdAt: true,
-        // Poster: username ONLY. Do not widen this select without privacy review.
-        user: { select: { username: true } },
+        // Poster: username + cached as-poster rep. Privacy contract still
+        // forbids email/role/id beyond what's needed; the rep fields are
+        // public-by-design (Q6 — comments and aggregates are public).
+        user: {
+          select: {
+            username: true,
+            marketplaceAvgAsPoster: true,
+            marketplaceCountAsPoster: true,
+          },
+        },
         clipAccount: {
           select: {
             id: true,

@@ -72,12 +72,27 @@ export async function GET(req: NextRequest) {
         // Phase: privacy — strip creator.email. Posters only need username
         // (display) and id (action callbacks). Email exposure across users
         // is a leak even within the OWNER-gated hidden phase.
-        creator: { select: { id: true, username: true } },
+        // Phase 7a — also surface creator's as-creator rep so posters can
+        // judge before approving ("@joe · ★ 4.7 (12)").
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            marketplaceAvgAsCreator: true,
+            marketplaceCountAsCreator: true,
+          },
+        },
         listing: {
           select: {
             id: true,
             userId: true,
             dailySlotCount: true,
+            // Phase 7a — listing-level rep (poster's listing reputation as
+            // judged by past creators). Posters viewing their own listings
+            // could care about this; the incoming page is poster-side so we
+            // include it for completeness without leaking anything cross-user.
+            averageRating: true,
+            ratingCount: true,
             clipAccount: { select: { id: true, username: true, platform: true, profileLink: true } },
             campaign: { select: { id: true, name: true } },
           },
@@ -90,6 +105,21 @@ export async function GET(req: NextRequest) {
           select: { clip: { select: { clipUrl: true } } },
           orderBy: { postedAt: "desc" },
           take: 1,
+        },
+        // Phase 7a — surface existing ratings so the UI can swap the
+        // "Rate creator" button for a "★ Rated 5/5" readout when the
+        // current user has already rated. Privacy: scores and notes from
+        // both directions are visible to both parties (public-comment
+        // policy from D6/Q6).
+        ratings: {
+          select: {
+            direction: true,
+            score: true,
+            note: true,
+            posterId: true,
+            creatorId: true,
+            createdAt: true,
+          },
         },
       },
     }),

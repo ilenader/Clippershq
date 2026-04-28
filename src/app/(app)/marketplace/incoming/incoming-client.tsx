@@ -6,7 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Inbox, ExternalLink, Check, X as XIcon, Filter } from "lucide-react";
+import { StarRating } from "@/components/ui/star-rating";
+import { Inbox, ExternalLink, Check, X as XIcon, Filter, Star } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative } from "@/lib/utils";
 // Phase: re-use the existing Mark-as-posted modal from the creator-side
@@ -15,6 +16,8 @@ import { formatRelative } from "@/lib/utils";
 // /api/marketplace/submissions/[id]/post, same listingDisplay shape.
 import { PostClipModal } from "../my-submissions/post-clip-modal";
 import { RejectSubmissionModal } from "./reject-modal";
+// Phase 7a — bidirectional rating modal, shared with /my-submissions.
+import { RateUserModal } from "../_shared/rate-user-modal";
 
 interface PostingTarget {
   submissionId: string;
@@ -31,6 +34,18 @@ interface RejectingTarget {
   submissionId: string;
   submissionDisplay: {
     creatorUsername: string;
+    accountUsername: string;
+    accountPlatform: string;
+    campaignName: string;
+  };
+}
+
+// Phase 7a — payload for the rate modal opened from a POSTED card.
+interface RatingTarget {
+  submissionId: string;
+  ratedDisplay: {
+    username: string;
+    role: "creator";
     accountUsername: string;
     accountPlatform: string;
     campaignName: string;
@@ -83,6 +98,9 @@ export function IncomingSubmissionsClient() {
 
   const [postingTarget, setPostingTarget] = useState<PostingTarget | null>(null);
   const [rejectingTarget, setRejectingTarget] = useState<RejectingTarget | null>(null);
+  // Phase 7a — open-state for the rate modal. Rating direction on this page
+  // is always POSTER_RATES_CREATOR (the page is OWNER/poster-side).
+  const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
 
   // Out-of-order fetch protection — same pattern used in browse-client.
   const fetchSeqRef = useRef(0);
@@ -201,6 +219,20 @@ export function IncomingSubmissionsClient() {
     });
   }
 
+  // Phase 7a — open the rate modal for a POSTED submission.
+  function openRate(submission: any) {
+    setRatingTarget({
+      submissionId: submission.id,
+      ratedDisplay: {
+        username: submission.creator?.username ?? "(unknown)",
+        role: "creator",
+        accountUsername: submission.listing?.clipAccount?.username ?? "(unknown)",
+        accountPlatform: submission.listing?.clipAccount?.platform ?? "",
+        campaignName: submission.listing?.campaign?.name ?? "(unknown campaign)",
+      },
+    });
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
@@ -285,6 +317,7 @@ export function IncomingSubmissionsClient() {
               onApprove={() => handleApprove(s.id)}
               onReject={() => openReject(s)}
               onMarkAsPosted={() => openMarkAsPosted(s)}
+              onRate={() => openRate(s)}
             />
           ))}
         </div>
@@ -320,6 +353,18 @@ export function IncomingSubmissionsClient() {
         submissionId={rejectingTarget?.submissionId ?? ""}
         submissionDisplay={rejectingTarget?.submissionDisplay ?? null}
       />
+      {/* Phase 7a — rate modal mounted at parent so opening for a different
+          card doesn't unmount/remount its state. */}
+      <RateUserModal
+        open={ratingTarget !== null}
+        onClose={() => setRatingTarget(null)}
+        onSuccess={() => {
+          setRatingTarget(null);
+          load();
+        }}
+        submissionId={ratingTarget?.submissionId ?? ""}
+        ratedDisplay={ratingTarget?.ratedDisplay ?? null}
+      />
     </div>
   );
 }
@@ -343,12 +388,14 @@ function IncomingSubmissionCard({
   onApprove,
   onReject,
   onMarkAsPosted,
+  onRate,
 }: {
   submission: any;
   actioning: boolean;
   onApprove: () => void;
   onReject: () => void;
   onMarkAsPosted: () => void;
+  onRate: () => void;
 }) {
   const status: string = submission.status;
   const badge =
@@ -357,6 +404,10 @@ function IncomingSubmissionCard({
   // Privacy contract: surface creator username only — incoming endpoint
   // already strips email per the Phase 7 audit.
   const creatorUsername: string = submission.creator?.username ?? "(unknown)";
+  // Phase 7a — creator's as-creator rep, shown next to their username so the
+  // poster can judge whether to approve. Hidden when count === 0 (Q13).
+  const creatorAvg: number | null = submission.creator?.marketplaceAvgAsCreator ?? null;
+  const creatorCount: number = submission.creator?.marketplaceCountAsCreator ?? 0;
   const acctUsername: string = submission.listing?.clipAccount?.username ?? "(unknown)";
   const acctPlatform: string = submission.listing?.clipAccount?.platform ?? "";
   const profileLink: string | null = submission.listing?.clipAccount?.profileLink ?? null;
@@ -372,6 +423,11 @@ function IncomingSubmissionCard({
   const rejectionReason: string | null = submission.rejectionReason ?? null;
   const improvementNote: string | null = submission.improvementNote ?? null;
   const postedClipUrl: string | null = submission.posts?.[0]?.clip?.clipUrl ?? null;
+  // Phase 7a — find the poster→creator rating if it exists. The incoming
+  // page is poster-side, so any POSTER_RATES_CREATOR row means the current
+  // poster has already rated. (Composite unique guarantees at most one.)
+  const ratings: any[] = Array.isArray(submission.ratings) ? submission.ratings : [];
+  const myRating = ratings.find((r) => r.direction === "POSTER_RATES_CREATOR");
 
   const reviewHoursLeft =
     status === "PENDING" && expiresAt ? hoursLeftUntil(expiresAt) : null;
@@ -400,7 +456,18 @@ function IncomingSubmissionCard({
       <p className="mb-1 text-[11px] uppercase tracking-widest text-[var(--text-muted)]">
         Submitted by
       </p>
-      <p className="mb-3 text-sm text-[var(--text-secondary)]">@{creatorUsername}</p>
+      <p className="mb-3 inline-flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+        <span>@{creatorUsername}</span>
+        {/* Phase 7a — creator rep badge. Hidden when no ratings (Q13). */}
+        {creatorCount > 0 && creatorAvg !== null ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-page)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
+            <Star className="h-2.5 w-2.5 fill-current text-accent" />
+            <span>
+              {creatorAvg.toFixed(1)} ({creatorCount})
+            </span>
+          </span>
+        ) : null}
+      </p>
 
       {/* Campaign */}
       <p className="mb-1 text-[11px] uppercase tracking-widest text-[var(--text-muted)]">
@@ -489,6 +556,39 @@ function IncomingSubmissionCard({
         <p className="mb-3 text-xs text-[var(--text-muted)]">
           Posted {formatRelative(postedAt)}
         </p>
+      ) : null}
+
+      {/* Phase 7a — POSTED card rating affordance. Replaced by a read-only
+          stars+note readout after the poster has rated this submission. */}
+      {status === "POSTED" ? (
+        myRating ? (
+          <div className="mb-3 rounded-lg border border-accent/20 bg-accent/5 p-3">
+            <p className="mb-1 text-[11px] uppercase tracking-widest text-accent">
+              You rated this creator
+            </p>
+            <div className="flex items-center gap-2">
+              <StarRating value={myRating.score} size="md" />
+              <span className="text-sm font-semibold text-[var(--text-primary)]">
+                {myRating.score}/5
+              </span>
+            </div>
+            {myRating.note ? (
+              <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-xs text-[var(--text-secondary)]">
+                {myRating.note}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mb-3 w-full"
+            onClick={onRate}
+            icon={<Star className="h-3.5 w-3.5" />}
+          >
+            Rate creator
+          </Button>
+        )
       ) : null}
 
       {status === "REJECTED" && rejectionReason ? (

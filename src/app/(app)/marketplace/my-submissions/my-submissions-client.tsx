@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Inbox, ExternalLink } from "lucide-react";
+import { StarRating } from "@/components/ui/star-rating";
+import { Inbox, ExternalLink, Star } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative } from "@/lib/utils";
 import { PostClipModal } from "./post-clip-modal";
+// Phase 7a — bidirectional rating modal, shared with /incoming.
+import { RateUserModal } from "../_shared/rate-user-modal";
 
 // Phase 6f — payload passed from a SubmissionCard up to the parent so the
 // modal opens with the right submission + display context. Privacy contract:
@@ -20,6 +23,19 @@ interface PostingTarget {
     accountPlatform: string;
     campaignName: string;
     postDeadline: string | null;
+  };
+}
+
+// Phase 7a — rating-target payload for the creator-side rate modal.
+// Direction here is always CREATOR_RATES_POSTER.
+interface RatingTarget {
+  submissionId: string;
+  ratedDisplay: {
+    username: string;
+    role: "poster";
+    accountUsername: string;
+    accountPlatform: string;
+    campaignName: string;
   };
 }
 
@@ -65,6 +81,9 @@ export function MySubmissionsClient() {
   // specific submission. Refetching after success flips its status to POSTED
   // in the list.
   const [postingTarget, setPostingTarget] = useState<PostingTarget | null>(null);
+  // Phase 7a — open-state for the rate-poster modal. Direction on this page
+  // is always CREATOR_RATES_POSTER (page is creator-side).
+  const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
 
   function buildUrl(cursor?: string | null): string {
     const params = new URLSearchParams();
@@ -169,7 +188,12 @@ export function MySubmissionsClient() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {submissions.map((s) => (
-            <SubmissionCard key={s.id} submission={s} onMarkAsPosted={setPostingTarget} />
+            <SubmissionCard
+              key={s.id}
+              submission={s}
+              onMarkAsPosted={setPostingTarget}
+              onRate={setRatingTarget}
+            />
           ))}
         </div>
       )}
@@ -194,6 +218,17 @@ export function MySubmissionsClient() {
         submissionId={postingTarget?.submissionId ?? ""}
         listingDisplay={postingTarget?.listingDisplay ?? null}
       />
+      {/* Phase 7a — Rate-poster modal. Same parent-level mounting pattern. */}
+      <RateUserModal
+        open={ratingTarget !== null}
+        onClose={() => setRatingTarget(null)}
+        onSuccess={() => {
+          setRatingTarget(null);
+          load();
+        }}
+        submissionId={ratingTarget?.submissionId ?? ""}
+        ratedDisplay={ratingTarget?.ratedDisplay ?? null}
+      />
     </div>
   );
 }
@@ -214,9 +249,11 @@ function formatHoursLeft(hours: number): string {
 function SubmissionCard({
   submission,
   onMarkAsPosted,
+  onRate,
 }: {
   submission: any;
   onMarkAsPosted?: (target: PostingTarget) => void;
+  onRate?: (target: RatingTarget) => void;
 }) {
   const status: string = submission.status;
   const badge =
@@ -224,6 +261,10 @@ function SubmissionCard({
 
   // Privacy contract: surface poster username only — never email/role/id.
   const posterUsername: string = submission.listing?.user?.username ?? "(unknown)";
+  // Phase 7a — poster's as-poster rep, surfaced under "Posted by" so the
+  // creator sees who they submitted to. Hidden when count === 0 (Q13).
+  const posterAvg: number | null = submission.listing?.user?.marketplaceAvgAsPoster ?? null;
+  const posterCount: number = submission.listing?.user?.marketplaceCountAsPoster ?? 0;
   const acctUsername: string = submission.listing?.clipAccount?.username ?? "(unknown)";
   const acctPlatform: string = submission.listing?.clipAccount?.platform ?? "";
   const profileLink: string | null = submission.listing?.clipAccount?.profileLink ?? null;
@@ -241,6 +282,11 @@ function SubmissionCard({
   // URL via the `posts` relation (MarketplaceClipPost). At most one entry.
   const postedClipUrl: string | null =
     submission.posts?.[0]?.clip?.clipUrl ?? null;
+  // Phase 7a — find any creator→poster rating on this submission. The page
+  // is creator-side, so any CREATOR_RATES_POSTER row means the current
+  // creator has already rated. Composite unique guarantees at most one.
+  const ratings: any[] = Array.isArray(submission.ratings) ? submission.ratings : [];
+  const myRating = ratings.find((r) => r.direction === "CREATOR_RATES_POSTER");
 
   return (
     <Card>
@@ -263,7 +309,18 @@ function SubmissionCard({
       <p className="mb-1 text-[11px] uppercase tracking-widest text-[var(--text-muted)]">
         Posted by
       </p>
-      <p className="mb-3 text-sm text-[var(--text-secondary)]">@{posterUsername}</p>
+      <p className="mb-3 inline-flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+        <span>@{posterUsername}</span>
+        {/* Phase 7a — poster rep badge. Hidden when no ratings (Q13). */}
+        {posterCount > 0 && posterAvg !== null ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-page)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
+            <Star className="h-2.5 w-2.5 fill-current text-accent" />
+            <span>
+              {posterAvg.toFixed(1)} ({posterCount})
+            </span>
+          </span>
+        ) : null}
+      </p>
 
       <p className="mb-1 text-[11px] uppercase tracking-widest text-[var(--text-muted)]">
         Campaign
@@ -372,6 +429,50 @@ function SubmissionCard({
           <ExternalLink className="h-3 w-3" />
           View posted clip
         </a>
+      ) : null}
+
+      {/* Phase 7a — POSTED card rating affordance for creator-side. Replaced
+          by a read-only readout once the creator has rated. */}
+      {status === "POSTED" ? (
+        myRating ? (
+          <div className="mb-3 rounded-lg border border-accent/20 bg-accent/5 p-3">
+            <p className="mb-1 text-[11px] uppercase tracking-widest text-accent">
+              You rated this poster
+            </p>
+            <div className="flex items-center gap-2">
+              <StarRating value={myRating.score} size="md" />
+              <span className="text-sm font-semibold text-[var(--text-primary)]">
+                {myRating.score}/5
+              </span>
+            </div>
+            {myRating.note ? (
+              <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-xs text-[var(--text-secondary)]">
+                {myRating.note}
+              </p>
+            ) : null}
+          </div>
+        ) : onRate ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mb-3 w-full"
+            onClick={() =>
+              onRate({
+                submissionId: submission.id,
+                ratedDisplay: {
+                  username: posterUsername,
+                  role: "poster",
+                  accountUsername: acctUsername,
+                  accountPlatform: acctPlatform,
+                  campaignName,
+                },
+              })
+            }
+            icon={<Star className="h-3.5 w-3.5" />}
+          >
+            Rate poster
+          </Button>
+        ) : null
       ) : null}
 
       {status === "REJECTED" && rejectionReason ? (
