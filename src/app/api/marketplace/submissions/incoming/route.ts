@@ -69,14 +69,27 @@ export async function GET(req: NextRequest) {
       take: take + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
-        creator: { select: { id: true, username: true, email: true } },
+        // Phase: privacy — strip creator.email. Posters only need username
+        // (display) and id (action callbacks). Email exposure across users
+        // is a leak even within the OWNER-gated hidden phase.
+        creator: { select: { id: true, username: true } },
         listing: {
           select: {
             id: true,
             userId: true,
+            dailySlotCount: true,
             clipAccount: { select: { id: true, username: true, platform: true, profileLink: true } },
             campaign: { select: { id: true, name: true } },
           },
+        },
+        // Phase: surface posted clip URL for POSTED submissions so the
+        // poster-review page can render a "View posted clip" verification link
+        // without an extra round-trip. Mirror of the same pattern in the
+        // creator's GET /api/marketplace/submissions handler.
+        posts: {
+          select: { clip: { select: { clipUrl: true } } },
+          orderBy: { postedAt: "desc" },
+          take: 1,
         },
       },
     }),

@@ -100,6 +100,18 @@ export function MarketplaceClient({
               </Button>
             </Link>
           ) : null}
+          {/* Phase: poster-review entry point. Drives users to the new
+              /marketplace/incoming page that consumes the existing
+              /api/marketplace/submissions/incoming endpoint. Posters click
+              individual listing cards' "Submitted" stat to drill in with a
+              ?listingId= filter. */}
+          {currentUser.role === "OWNER" ? (
+            <Link href="/marketplace/incoming">
+              <Button variant="secondary" icon={<Inbox className="h-4 w-4" />}>
+                Review submissions
+              </Button>
+            </Link>
+          ) : null}
           {currentUser.role === "OWNER" ? (
             <Link href="/marketplace/admin">
               <Button variant="secondary" icon={<ShieldCheck className="h-4 w-4" />}>
@@ -151,11 +163,15 @@ function ListingCard({ listing }: { listing: any }) {
   const badge = STATUS_BADGE[status] ?? { variant: "archived" as StatusVariant, label: status };
   const muted = status === "DELETED" || status === "BANNED";
 
+  const listingId: string = listing.id;
   const username: string = listing.clipAccount?.username ?? "(unknown)";
   const platform: string = listing.clipAccount?.platform ?? "";
   const campaignName: string = listing.campaign?.name ?? "(unknown campaign)";
   const niche: string = listing.niche ?? "";
   const slotCount: number = listing.dailySlotCount ?? 0;
+  // Phase: virtual usedToday from /api/marketplace/listings GET. Replaces the
+  // previously hardcoded "/ 10" denominator with a real "today" fraction.
+  const usedToday: number = listing.usedToday ?? 0;
   const totalSubmissions: number = listing.totalSubmissions ?? 0;
   const totalApproved: number = listing.totalApproved ?? 0;
   const totalPosted: number = listing.totalPosted ?? 0;
@@ -196,15 +212,25 @@ function ListingCard({ listing }: { listing: any }) {
         </>
       ) : null}
 
-      {/* Slot count */}
+      {/* Slot count — Phase: honest "X / Y today" instead of the previous
+          "{slotCount} / 10" literal. usedToday is a 24h trailing window. */}
       <p className="mb-3 text-sm text-[var(--text-secondary)]">
-        <span className="font-bold text-accent">{slotCount}</span>
-        <span className="text-[var(--text-muted)]"> / 10 slots per day</span>
+        <span className="font-bold text-accent">{usedToday}</span>
+        <span className="text-[var(--text-muted)]"> / {slotCount} today</span>
       </p>
 
-      {/* Stats footer */}
+      {/* Stats footer — Phase: "Submitted" is now a Link to the poster-review
+          page filtered to this listing. Approved/Posted stay static (drill-in
+          to those filters via the per-listing page filter pills). */}
       <div className="mb-4 grid grid-cols-3 gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-page)] p-2 text-center">
-        <Stat label="Submitted" value={totalSubmissions} />
+        <Link
+          href={`/marketplace/incoming?listingId=${listingId}`}
+          className="cursor-pointer rounded-lg transition-colors hover:bg-[var(--bg-card-hover)]"
+          aria-label="Review submissions for this listing"
+        >
+          <p className="text-base font-bold text-accent hover:underline">{totalSubmissions}</p>
+          <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Submitted</p>
+        </Link>
         <Stat label="Approved" value={totalApproved} />
         <Stat label="Posted" value={totalPosted} />
       </div>

@@ -108,10 +108,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify listing exists, is ACTIVE, and is not owned by the submitter.
+  // Phase: also fetch dailySlotCount so we can enforce the daily cap below.
   const listing: any = await withDbRetry(
     () => db!.marketplacePosterListing.findUnique({
       where: { id: listingId },
-      select: { id: true, userId: true, status: true },
+      select: { id: true, userId: true, status: true, dailySlotCount: true },
     }),
     "marketplace.submission.findListing",
   );
@@ -142,6 +143,31 @@ export async function POST(req: NextRequest) {
   if (dup) {
     return NextResponse.json(
       { error: "You already have a pending submission with this Drive link." },
+      { status: 409 },
+    );
+  }
+
+  // Phase: enforce dailySlotCount as a real gate. Counts non-rejected,
+  // non-expired submissions to this listing in the trailing 24h window so a
+  // creator can't spam 100 clips at a 5-slot listing. Race condition between
+  // count and create is acceptable for v1 (worst case: a couple of extra
+  // submissions slip through under heavy concurrency — counter drift, not a
+  // security issue). A later hardening pass can wrap this in a serializable
+  // transaction if needed.
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const usedToday: number = await withDbRetry(
+    () => db!.marketplaceSubmission.count({
+      where: {
+        listingId,
+        status: { notIn: ["REJECTED", "EXPIRED"] },
+        createdAt: { gte: cutoff },
+      },
+    }),
+    "marketplace.submission.countDaily",
+  );
+  if (usedToday >= listing.dailySlotCount) {
+    return NextResponse.json(
+      { error: "This listing has reached its daily submission limit. Try again tomorrow." },
       { status: 409 },
     );
   }

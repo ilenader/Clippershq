@@ -263,7 +263,7 @@ export async function GET(_req: NextRequest) {
 
   if (!db) return NextResponse.json({ error: "Database unavailable." }, { status: 500 });
 
-  const listings = await withDbRetry(
+  const listings: any[] = await withDbRetry(
     () => db!.marketplacePosterListing.findMany({
       where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
@@ -276,5 +276,35 @@ export async function GET(_req: NextRequest) {
     "marketplace.listing.listMine",
   );
 
-  return NextResponse.json({ listings });
+  // Phase: virtual usedToday counter — derived from submissions table, not
+  // stored. Cheaper than a column with cron resets, and always honest about
+  // a 24h trailing window (vs UTC-day boundary edge cases).
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  let usedTodayMap = new Map<string, number>();
+  if (listings.length > 0) {
+    try {
+      const grouped: any[] = await (db!.marketplaceSubmission.groupBy as any)({
+        by: ["listingId"],
+        where: {
+          listingId: { in: listings.map((l: any) => l.id) },
+          status: { notIn: ["REJECTED", "EXPIRED"] },
+          createdAt: { gte: cutoff },
+        },
+        _count: { _all: true },
+      });
+      usedTodayMap = new Map(
+        grouped.map((g: any) => [g.listingId as string, (g._count?._all ?? 0) as number]),
+      );
+    } catch {
+      // Aggregation failure is non-fatal — listings response must not break
+      // because a derived counter couldn't be computed. Fallback: usedToday=0.
+      usedTodayMap = new Map();
+    }
+  }
+  const enriched = listings.map((l: any) => ({
+    ...l,
+    usedToday: usedTodayMap.get(l.id) ?? 0,
+  }));
+
+  return NextResponse.json({ listings: enriched });
 }

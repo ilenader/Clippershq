@@ -109,5 +109,35 @@ export async function GET(req: NextRequest) {
     nextCursor = listings[listings.length - 1]?.id ?? null;
   }
 
-  return NextResponse.json({ listings, nextCursor });
+  // Phase: virtual usedToday counter — derived from submissions table, not
+  // stored. Cheaper than a column with cron resets. Surfaces scarcity to
+  // creators ("4 / 5 today" reads more urgently than a fixed slot number).
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  let usedTodayMap = new Map<string, number>();
+  if (listings.length > 0) {
+    try {
+      const grouped: any[] = await (db!.marketplaceSubmission.groupBy as any)({
+        by: ["listingId"],
+        where: {
+          listingId: { in: listings.map((l: any) => l.id) },
+          status: { notIn: ["REJECTED", "EXPIRED"] },
+          createdAt: { gte: cutoff },
+        },
+        _count: { _all: true },
+      });
+      usedTodayMap = new Map(
+        grouped.map((g: any) => [g.listingId as string, (g._count?._all ?? 0) as number]),
+      );
+    } catch {
+      // Aggregation failure is non-fatal — browse response must not break
+      // because a derived counter couldn't be computed. Fallback: usedToday=0.
+      usedTodayMap = new Map();
+    }
+  }
+  const enriched = listings.map((l: any) => ({
+    ...l,
+    usedToday: usedTodayMap.get(l.id) ?? 0,
+  }));
+
+  return NextResponse.json({ listings: enriched, nextCursor });
 }

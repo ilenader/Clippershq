@@ -212,6 +212,9 @@ function BrowseListingCard({
   const niche: string = listing.niche ?? "";
   const audience: string = listing.audienceDescription ?? "";
   const slots: number = listing.dailySlotCount ?? 0;
+  // Phase: virtual usedToday from /api/marketplace/browse GET. Drives the
+  // "X / Y today" scarcity copy below.
+  const usedToday: number = listing.usedToday ?? 0;
   const totalSubmissions: number = listing.totalSubmissions ?? 0;
   const totalApproved: number = listing.totalApproved ?? 0;
   const totalPosted: number = listing.totalPosted ?? 0;
@@ -305,10 +308,11 @@ function BrowseListingCard({
         <Stat label="Posted" value={totalPosted} />
       </div>
 
-      {/* Daily slots */}
+      {/* Daily slots — Phase: "X / Y today" surfaces scarcity. When usedToday
+          equals slots, no submissions accepted today (server enforces). */}
       <p className="mb-1 text-sm text-[var(--text-secondary)]">
-        <span className="font-bold text-accent">{slots}</span>
-        <span className="text-[var(--text-muted)]"> / 10 daily slots</span>
+        <span className="font-bold text-accent">{usedToday}</span>
+        <span className="text-[var(--text-muted)]"> / {slots} today</span>
       </p>
 
       {/* Country/timezone */}
