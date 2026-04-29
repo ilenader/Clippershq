@@ -114,6 +114,29 @@ export async function POST(req: NextRequest, { params }: Params) {
   );
   if (!before) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
+  // Phase: launch-fix H3 — mirror /listings DELETE in-flight guard for force-delete via override.
+  // Other status overrides (ACTIVE, BANNED, PAUSED, etc.) skip this check.
+  if (update.status === "DELETED") {
+    const inFlight: number = await withDbRetry(
+      () => db!.marketplaceSubmission.count({
+        where: {
+          listingId: id,
+          status: { in: ["PENDING", "APPROVED"] },
+        },
+      }),
+      "marketplace.admin.listing.overrideInFlightCount",
+    );
+    if (inFlight > 0) {
+      return NextResponse.json(
+        {
+          error: `Cannot force-delete: ${inFlight} submission${inFlight === 1 ? "" : "s"} still in flight. Use cancel-delete or wait for completion.`,
+          inFlight,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   const updated: any = await withDbRetry(
     () => db!.marketplacePosterListing.update({ where: { id }, data: update }),
     "marketplace.admin.listing.override",

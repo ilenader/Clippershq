@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { withDbRetry } from "@/lib/db-retry";
 import { checkBanStatus } from "@/lib/check-ban";
 import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+// Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate.
+import { isMarketplaceVisibleForUser } from "@/lib/marketplace-flag";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -30,8 +32,9 @@ export async function GET(req: NextRequest) {
   if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
-  if (role !== "OWNER") {
-    return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  // Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate. Flag flip in Phase 11 opens this to all users.
+  if (!isMarketplaceVisibleForUser(session.user as any)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const rl = checkRoleAwareRateLimit(`mkt-browse-listings:${session.user.id}`, 60, 60 * 60_000, role);

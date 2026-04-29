@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StarRating } from "@/components/ui/star-rating";
-import { Inbox, ExternalLink, Check, X as XIcon, Filter, Star } from "lucide-react";
+import { Inbox, ExternalLink, Check, X as XIcon, Filter, Star, AlertTriangle } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative } from "@/lib/utils";
 // Phase: re-use the existing Mark-as-posted modal from the creator-side
@@ -414,6 +414,9 @@ function IncomingSubmissionCard({
   const campaignName: string = submission.listing?.campaign?.name ?? "(unknown campaign)";
 
   const driveUrl: string = submission.driveUrl ?? "";
+  // Phase: launch-fix H4 — collusion detection placeholder until Phase 4b videoHash ships.
+  // Server-side flag set when another PENDING submission on the same listing shares this driveUrl.
+  const duplicateDriveUrl: boolean = submission.duplicateDriveUrl === true;
   const platforms: string[] = Array.isArray(submission.platforms) ? submission.platforms : [];
   const notes: string = submission.notes ?? "";
   const createdAt: string | null = submission.createdAt ?? null;
@@ -490,6 +493,15 @@ function IncomingSubmissionCard({
         <ExternalLink className="h-3 w-3" />
         Open clip
       </a>
+      {/* Phase: launch-fix H4 — duplicate driveUrl warning chip. Soft signal:
+          tells the poster another creator submitted the same Drive URL to
+          this listing. Not a block — review judgement still required. */}
+      {duplicateDriveUrl ? (
+        <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-amber-400">
+          <AlertTriangle className="h-3 w-3" />
+          Duplicate URL detected
+        </div>
+      ) : null}
 
       {/* Platforms */}
       {platforms.length > 0 ? (

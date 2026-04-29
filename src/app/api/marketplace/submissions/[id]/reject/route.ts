@@ -4,7 +4,9 @@ import { withDbRetry } from "@/lib/db-retry";
 import { checkBanStatus } from "@/lib/check-ban";
 import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
-import { isUserMarketplaceBanned } from "@/lib/marketplace-ban";
+import { assertNotMarketplaceBannedStrict } from "@/lib/marketplace-ban";
+// Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate.
+import { isMarketplaceVisibleForUser } from "@/lib/marketplace-flag";
 // Phase 9 — notify creator + fire email when a submission is rejected.
 import { createNotification } from "@/lib/notifications";
 import { sendMarketplaceSubmissionRejected } from "@/lib/marketplace-email";
@@ -33,21 +35,28 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
-  if (role !== "OWNER") {
-    return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  // Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate. Flag flip in Phase 11 opens this to all users.
+  if (!isMarketplaceVisibleForUser(session.user as any)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Marketplace-specific ban check — OWNER bypasses for testing/admin.
-  // Activates for non-OWNER roles when Phase 11 widens the role gate above.
+  // Phase: launch-fix H2 — fail-closed on ban check during mutations. DB blip should never accidentally let a banned user through.
   if (role !== "OWNER") {
-    const mktBan = await isUserMarketplaceBanned(session.user.id);
-    if (mktBan.banned && mktBan.until) {
+    try {
+      const mktBan = await assertNotMarketplaceBannedStrict(session.user.id);
+      if (mktBan.banned && mktBan.until) {
+        return NextResponse.json(
+          {
+            error: `You are temporarily banned from the marketplace until ${mktBan.until.toISOString()}.`,
+            bannedUntil: mktBan.until.toISOString(),
+          },
+          { status: 403 },
+        );
+      }
+    } catch {
       return NextResponse.json(
-        {
-          error: `You are temporarily banned from the marketplace until ${mktBan.until.toISOString()}.`,
-          bannedUntil: mktBan.until.toISOString(),
-        },
-        { status: 403 },
+        { error: "Could not verify marketplace status. Please try again." },
+        { status: 503 },
       );
     }
   }

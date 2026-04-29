@@ -36,7 +36,32 @@ export async function isUserMarketplaceBanned(userId: string): Promise<{
     return { banned: true, until: new Date(strike.bannedUntil) };
   } catch {
     // Fail open: a transient DB blip should not lock everyone out.
-    // Cron will re-enforce on the next tick.
+    // Cron will re-enforce on the next tick. Used for READ-only paths
+    // (sidebar visibility, page renders, browse). Mutation paths must
+    // use the strict variant below.
     return { banned: false, until: null };
   }
+}
+
+// Phase: launch-fix H2 — fail-closed variant for mutation paths.
+// Same successful-path return shape as isUserMarketplaceBanned, but
+// throws on DB error instead of silently falling open. Mutation
+// endpoints MUST catch this and return 503; better to refuse a
+// legitimate request during a DB blip than to let a banned user
+// slip through.
+export async function assertNotMarketplaceBannedStrict(userId: string): Promise<{
+  banned: boolean;
+  until: Date | null;
+}> {
+  if (!db) throw new Error("Database unavailable for marketplace ban check");
+  const strike: any = await withDbRetry(
+    () => db!.marketplaceStrike.findFirst({
+      where: { userId, bannedUntil: { gt: new Date() } },
+      orderBy: { bannedUntil: "desc" },
+      select: { bannedUntil: true },
+    }),
+    "marketplace.ban.checkStrict",
+  );
+  if (!strike?.bannedUntil) return { banned: false, until: null };
+  return { banned: true, until: new Date(strike.bannedUntil) };
 }

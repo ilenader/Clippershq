@@ -140,22 +140,100 @@ export async function processMarketplaceTimers(deadlineMs?: number): Promise<{
         const posterId: string | undefined = sub.listing?.userId;
         if (!posterId) continue;
         try {
-          // Atomic: status flip + strike issuance must succeed together.
-          // Without this, a partial write would leave APPROVED+postExpired
-          // mismatched OR a strike with no submission state change.
-          await db!.$transaction(async (tx: any) => {
-            await tx.marketplaceSubmission.update({
-              where: { id: sub.id },
+          // Phase: launch-fix H5 — if poster already has an active ban,
+          // skip strike issuance for this submission. Still flip status to
+          // POST_EXPIRED so the creator gets the right notification and the
+          // submission doesn't sit forever as APPROVED. This prevents an
+          // existing 48h ban from snowballing to 96h+ when in-flight
+          // submissions expire during the ban window.
+          const activeBan: any = await withDbRetry(
+            () => db!.marketplaceStrike.findFirst({
+              where: { userId: posterId, bannedUntil: { gt: new Date() } },
+              select: { id: true, bannedUntil: true },
+            }),
+            "marketplace.timers.findActiveBanForStrike",
+          );
+
+          // Phase: launch-fix C2 — race guard. /post may have committed
+          // POSTED between findMany above and this TX. updateMany with
+          // status+postedAt filters returns count=0 if /post already won;
+          // we treat that as "race averted" and skip strike issuance to
+          // avoid corrupted state (no double POST_EXPIRED↔POSTED flip,
+          // no false strike on a posted submission).
+          let raceAverted = false;
+          if (activeBan) {
+            // Phase: launch-fix H5 — flip status only, no strike.
+            const flipRes: any = await db!.marketplaceSubmission.updateMany({
+              where: { id: sub.id, status: "APPROVED", postedAt: null },
               data: { status: "POST_EXPIRED" },
             });
-            await tx.marketplaceStrike.create({
-              data: {
-                userId: posterId,
-                reason: "MISSED_POST_DEADLINE",
-                submissionId: sub.id,
-              },
+            if ((flipRes?.count ?? 0) === 0) raceAverted = true;
+          } else {
+            // Atomic: status flip + strike issuance must succeed together.
+            await db!.$transaction(async (tx: any) => {
+              const flipRes: any = await tx.marketplaceSubmission.updateMany({
+                where: { id: sub.id, status: "APPROVED", postedAt: null },
+                data: { status: "POST_EXPIRED" },
+              });
+              if ((flipRes?.count ?? 0) === 0) {
+                raceAverted = true;
+                return;
+              }
+              await tx.marketplaceStrike.create({
+                data: {
+                  userId: posterId,
+                  reason: "MISSED_POST_DEADLINE",
+                  submissionId: sub.id,
+                },
+              });
             });
-          });
+          }
+          if (raceAverted) {
+            try {
+              await logAudit({
+                userId: posterId,
+                action: "MARKETPLACE_POST_EXPIRED_RACE_AVERTED",
+                targetType: "marketplace_submission",
+                targetId: sub.id,
+                details: { reason: "submission no longer APPROVED at TX time (likely posted)" },
+              });
+            } catch {
+              // best-effort
+            }
+            details.push(`[MKT] Submission ${sub.id}: race averted (already posted)`);
+            continue;
+          }
+          if (activeBan) {
+            try {
+              await logAudit({
+                userId: posterId,
+                action: "MARKETPLACE_STRIKE_SKIPPED_DURING_BAN",
+                targetType: "marketplace_submission",
+                targetId: sub.id,
+                details: {
+                  reason: "poster already banned; status flipped to POST_EXPIRED without strike",
+                  bannedUntil: activeBan.bannedUntil ? new Date(activeBan.bannedUntil).toISOString() : null,
+                },
+              });
+            } catch {
+              // best-effort
+            }
+            // Still notify the creator — their clip didn't make it.
+            try {
+              await createNotification(
+                sub.creatorId,
+                "MKT_SUBMISSION_POST_EXPIRED" as any,
+                "Clip not posted in time",
+                "Your approved marketplace clip wasn't posted before the deadline and is now expired.",
+                { submissionId: sub.id },
+              );
+            } catch {
+              // best-effort
+            }
+            details.push(`[MKT] Submission ${sub.id}: status flip only (poster ${posterId.slice(0, 8)} already banned, no new strike)`);
+            processed++;
+            continue;
+          }
           postersTouched.add(posterId);
           await logAudit({
             userId: posterId,

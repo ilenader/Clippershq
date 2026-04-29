@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { withDbRetry } from "@/lib/db-retry";
 import { checkBanStatus } from "@/lib/check-ban";
 import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+// Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate.
+import { isMarketplaceVisibleForUser } from "@/lib/marketplace-flag";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -30,8 +32,9 @@ export async function GET(req: NextRequest) {
   if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
-  if (role !== "OWNER") {
-    return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  // Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate. Per-resource scoping below (where.listing.userId === session.user.id) keeps non-poster users from seeing each other's incoming submissions. Flag flip in Phase 11 opens this to all users.
+  if (!isMarketplaceVisibleForUser(session.user as any)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const rl = checkRoleAwareRateLimit(`mkt-submission-list-incoming:${session.user.id}`, 60, 60 * 60_000, role);
@@ -131,6 +134,57 @@ export async function GET(req: NextRequest) {
   if (rows.length > take) {
     submissions = rows.slice(0, take);
     nextCursor = submissions[submissions.length - 1]?.id ?? null;
+  }
+
+  // Phase: launch-fix H4 — collusion detection placeholder until Phase 4b videoHash ships.
+  // Flag PENDING submissions whose driveUrl appears on another PENDING submission for the
+  // same listing under a different creator. UI renders a soft warning chip when set.
+  // Restricted to PENDING because that's the actionable review window — past PENDING the
+  // signal is informational only and the review action is already past.
+  try {
+    const pendingRows = submissions.filter(
+      (s: any) => s?.status === "PENDING" && typeof s?.driveUrl === "string" && s.driveUrl.length > 0,
+    );
+    if (pendingRows.length > 0) {
+      const listingIds = Array.from(new Set(pendingRows.map((s: any) => s.listingId).filter(Boolean)));
+      const driveUrls = Array.from(new Set(pendingRows.map((s: any) => s.driveUrl)));
+      const dupCandidates: any[] = await withDbRetry(
+        () => db!.marketplaceSubmission.findMany({
+          where: {
+            status: "PENDING",
+            listingId: { in: listingIds },
+            driveUrl: { in: driveUrls },
+          },
+          select: { id: true, listingId: true, driveUrl: true, creatorId: true },
+          take: 2000,
+        }),
+        "marketplace.submission.incoming.dupScan",
+      );
+      const dupKeySet = new Set<string>();
+      // Build (listingId, driveUrl) → set of creatorIds. >1 distinct creator = duplicate.
+      const groupCreators = new Map<string, Set<string>>();
+      for (const row of dupCandidates) {
+        const key = `${row.listingId}::${row.driveUrl}`;
+        let set = groupCreators.get(key);
+        if (!set) { set = new Set<string>(); groupCreators.set(key, set); }
+        set.add(row.creatorId);
+      }
+      for (const [key, creators] of groupCreators) {
+        if (creators.size > 1) dupKeySet.add(key);
+      }
+      submissions = submissions.map((s: any) => {
+        if (s?.status !== "PENDING" || !s?.driveUrl || !s?.listingId) {
+          return { ...s, duplicateDriveUrl: false };
+        }
+        const k = `${s.listingId}::${s.driveUrl}`;
+        return { ...s, duplicateDriveUrl: dupKeySet.has(k) };
+      });
+    } else {
+      submissions = submissions.map((s: any) => ({ ...s, duplicateDriveUrl: false }));
+    }
+  } catch {
+    // Soft-fail: never break the incoming response if dup detection errors out.
+    submissions = submissions.map((s: any) => ({ ...s, duplicateDriveUrl: false }));
   }
 
   return NextResponse.json({ submissions, nextCursor });

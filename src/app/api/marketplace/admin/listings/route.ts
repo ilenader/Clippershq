@@ -74,7 +74,8 @@ export async function GET(req: NextRequest) {
       take: take + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
-        user: { select: { id: true, username: true, email: true } },
+        // Phase: launch-fix H1 — privacy: don't expose poster emails to admin clients
+        user: { select: { id: true, username: true } },
         clipAccount: { select: { id: true, username: true, platform: true, profileLink: true } },
         campaign: { select: { id: true, name: true, status: true } },
         _count: { select: { submissions: true } },

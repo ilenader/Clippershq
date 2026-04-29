@@ -3,6 +3,10 @@ import { db } from "@/lib/db";
 import { withDbRetry } from "@/lib/db-retry";
 import { checkBanStatus } from "@/lib/check-ban";
 import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+// Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate.
+import { isMarketplaceVisibleForUser } from "@/lib/marketplace-flag";
+// Phase: launch-fix H7 — audit log completeness for forensics.
+import { logAudit } from "@/lib/audit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -41,8 +45,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
-  if (role !== "OWNER") {
-    return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  // Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate. Flag flip in Phase 11 opens this to all users.
+  if (!isMarketplaceVisibleForUser(session.user as any)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const rl = checkRoleAwareRateLimit(`mkt-submission-get:${session.user.id}`, 120, 60 * 60_000, role);
@@ -56,7 +61,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
     () => db!.marketplaceSubmission.findUnique({
       where: { id },
       include: {
-        creator: { select: { id: true, username: true, email: true } },
+        // Phase: launch-fix C3 — privacy: posters must not see creator emails
+        creator: { select: { id: true, username: true } },
         listing: {
           select: {
             id: true,
@@ -94,8 +100,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
-  if (role !== "OWNER") {
-    return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  // Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate. Flag flip in Phase 11 opens this to all users.
+  if (!isMarketplaceVisibleForUser(session.user as any)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const rl = checkRoleAwareRateLimit(`mkt-submission-edit:${session.user.id}`, 30, 60 * 60_000, role);
@@ -177,6 +184,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     () => db!.marketplaceSubmission.update({ where: { id }, data }),
     "marketplace.submission.update",
   );
+
+  // Phase: launch-fix H7 — audit log completeness for forensics.
+  try {
+    await logAudit({
+      userId: session.user.id,
+      action: "MARKETPLACE_SUBMISSION_EDIT",
+      targetType: "marketplace_submission",
+      targetId: id,
+      details: {
+        submissionId: id,
+        fieldsChanged: Object.keys(data),
+      },
+    });
+  } catch {
+    // swallow — audit drift is recoverable
+  }
+
   return NextResponse.json({ submission: updated });
 }
 
@@ -192,8 +216,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
-  if (role !== "OWNER") {
-    return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  // Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate. Flag flip in Phase 11 opens this to all users.
+  if (!isMarketplaceVisibleForUser(session.user as any)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const rl = checkRoleAwareRateLimit(`mkt-submission-delete:${session.user.id}`, 10, 60 * 60_000, role);
@@ -229,6 +254,23 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     () => db!.marketplaceSubmission.delete({ where: { id } }),
     "marketplace.submission.delete",
   );
+
+  // Phase: launch-fix H7 — audit log completeness for forensics.
+  try {
+    await logAudit({
+      userId: session.user.id,
+      action: "MARKETPLACE_SUBMISSION_DELETE",
+      targetType: "marketplace_submission",
+      targetId: id,
+      details: {
+        submissionId: id,
+        previousStatus: submission.status,
+        creatorId: submission.creatorId,
+      },
+    });
+  } catch {
+    // swallow — audit drift is recoverable
+  }
 
   return NextResponse.json({ ok: true });
 }

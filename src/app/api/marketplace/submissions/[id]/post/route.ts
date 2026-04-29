@@ -4,7 +4,9 @@ import { withDbRetry } from "@/lib/db-retry";
 import { checkBanStatus } from "@/lib/check-ban";
 import { checkRoleAwareRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
-import { isUserMarketplaceBanned } from "@/lib/marketplace-ban";
+import { assertNotMarketplaceBannedStrict } from "@/lib/marketplace-ban";
+// Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate.
+import { isMarketplaceVisibleForUser } from "@/lib/marketplace-flag";
 import { detectPlatform } from "@/lib/apify";
 import { createNotification } from "@/lib/notifications";
 import { NextRequest, NextResponse } from "next/server";
@@ -33,21 +35,28 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (banCheck) return banCheck;
 
   const role = (session.user as any).role;
-  if (role !== "OWNER") {
-    return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  // Phase: launch-fix C1 — feature-flag gate replaces OWNER hard-gate. Flag flip in Phase 11 opens this to all users.
+  if (!isMarketplaceVisibleForUser(session.user as any)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Marketplace-specific ban check — OWNER bypasses for testing/admin.
-  // Activates for non-OWNER roles when Phase 11 widens the role gate above.
+  // Phase: launch-fix H2 — fail-closed on ban check during mutations. DB blip should never accidentally let a banned user through.
   if (role !== "OWNER") {
-    const mktBan = await isUserMarketplaceBanned(session.user.id);
-    if (mktBan.banned && mktBan.until) {
+    try {
+      const mktBan = await assertNotMarketplaceBannedStrict(session.user.id);
+      if (mktBan.banned && mktBan.until) {
+        return NextResponse.json(
+          {
+            error: `You are temporarily banned from the marketplace until ${mktBan.until.toISOString()}.`,
+            bannedUntil: mktBan.until.toISOString(),
+          },
+          { status: 403 },
+        );
+      }
+    } catch {
       return NextResponse.json(
-        {
-          error: `You are temporarily banned from the marketplace until ${mktBan.until.toISOString()}.`,
-          bannedUntil: mktBan.until.toISOString(),
-        },
-        { status: 403 },
+        { error: "Could not verify marketplace status. Please try again." },
+        { status: 503 },
       );
     }
   }
@@ -178,6 +187,19 @@ export async function POST(req: NextRequest, { params }: Params) {
   let newClipId: string;
   try {
     const result: any = await db!.$transaction(async (tx: any) => {
+      // Phase: launch-fix H6 — clipAccount status can change between listing
+      // creation and post. Recheck inside TX so a revoked or user-deleted
+      // social account at /post time blocks the clip from going live.
+      const freshAccount: any = await tx.clipAccount.findUnique({
+        where: { id: submission.listing.clipAccountId },
+        select: { id: true, status: true, deletedByUser: true },
+      });
+      if (!freshAccount || freshAccount.status !== "APPROVED" || freshAccount.deletedByUser === true) {
+        const err: any = new Error("CLIP_ACCOUNT_REVOKED");
+        err.code = "CLIP_ACCOUNT_REVOKED";
+        throw err;
+      }
+
       const newClip = await tx.clip.create({
         data: {
           userId: submission.listing.userId,
@@ -245,6 +267,14 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (err?.code === "P2002") {
       return NextResponse.json(
         { error: "This clip URL has already been submitted to this campaign." },
+        { status: 409 },
+      );
+    }
+    // Phase: launch-fix H6 — surface the in-TX clipAccount recheck failure
+    // as a friendly 409 instead of a generic 500.
+    if (err?.code === "CLIP_ACCOUNT_REVOKED" || err?.message === "CLIP_ACCOUNT_REVOKED") {
+      return NextResponse.json(
+        { error: "The social account on this listing is no longer eligible. Contact the poster." },
         { status: 409 },
       );
     }
