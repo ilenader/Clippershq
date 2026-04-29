@@ -19,6 +19,50 @@ function formatNotifTime(dateStr: string): string {
   } catch { return ""; }
 }
 
+// Phase 10 — type → marketplace deep-link map for bell dropdown rows. Returns
+// null for non-marketplace types so legacy notifications stay non-clickable.
+function notifHref(notif: any): string | null {
+  const type: string = notif?.type ?? "";
+  let metadata: any = null;
+  try {
+    metadata = typeof notif?.metadata === "string" ? JSON.parse(notif.metadata) : notif?.metadata;
+  } catch {
+    metadata = null;
+  }
+  switch (type) {
+    case "MKT_NEW_SUBMISSION": {
+      const listingId = metadata?.listingId;
+      return listingId
+        ? `/marketplace/incoming?listingId=${encodeURIComponent(String(listingId))}`
+        : "/marketplace/incoming";
+    }
+    case "MKT_SUBMISSION_APPROVED":
+    case "MKT_SUBMISSION_REJECTED":
+    case "MKT_SUBMISSION_POSTED":
+    case "MKT_SUBMISSION_REVIEW_EXPIRED":
+    case "MKT_SUBMISSION_POST_EXPIRED":
+    case "MKT_POST_DEADLINE_12H":
+    case "MKT_POST_DEADLINE_6H":
+    case "MKT_POST_DEADLINE_1H":
+      return "/marketplace/my-submissions";
+    case "MKT_LISTING_APPROVED":
+    case "MKT_LISTING_REJECTED":
+    case "MKT_POSTER_BANNED":
+    case "MKT_POSTER_UNBANNED":
+    case "MKT_POST_DEADLINE_MISSED":
+      return "/marketplace";
+    case "MKT_RATING_CREATED": {
+      // Direction unknown without DB lookup — fall back to /marketplace.
+      const dir = metadata?.direction;
+      if (dir === "POSTER_RATES_CREATOR") return "/marketplace/my-submissions";
+      if (dir === "CREATOR_RATES_POSTER") return "/marketplace/incoming";
+      return "/marketplace";
+    }
+    default:
+      return null;
+  }
+}
+
 export function Navbar() {
   const { data: session } = useSession();
   const { isDevMode, devSession, devRole, setDevRole, clearDevAuth } = useDevAuth();
@@ -118,6 +162,20 @@ export function Navbar() {
     } catch {}
   };
 
+  // Phase 10 — mark a single notification as read (best-effort, used when
+  // user clicks a row to deep-link into a marketplace page).
+  const markOneRead = useCallback(async (id: string) => {
+    try {
+      await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "markRead", id }),
+      });
+    } catch {}
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+    setNotifCount((c) => Math.max(0, c - 1));
+  }, []);
+
   // Compute dropdown position when opening
   useEffect(() => {
     if (notifOpen && bellBtnRef.current) {
@@ -216,17 +274,45 @@ export function Navbar() {
                 {notifications.length === 0 ? (
                   <p className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">No notifications yet</p>
                 ) : (
-                  notifications.map((n: any) => (
-                    <div key={n.id} className={`px-4 py-2.5 border-b border-[var(--border-subtle)] last:border-b-0 ${!n.isRead ? "bg-accent/5" : ""}`}>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-[var(--text-primary)] truncate min-w-0">{n.title}</p>
-                        {n.createdAt && (
-                          <span className="text-[11px] text-[var(--text-muted)] tabular-nums flex-shrink-0">{formatNotifTime(n.createdAt)}</span>
-                        )}
+                  notifications.map((n: any) => {
+                    // Phase 10 — type+metadata → deep-link target. Marketplace
+                    // notifications become clickable; legacy types stay <div>.
+                    const href = notifHref(n);
+                    const rowClass = `px-4 py-2.5 border-b border-[var(--border-subtle)] last:border-b-0 ${!n.isRead ? "bg-accent/5" : ""} ${href ? "cursor-pointer hover:bg-[var(--bg-card-hover)]" : ""}`;
+                    const inner = (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-[var(--text-primary)] truncate min-w-0">{n.title}</p>
+                          {n.createdAt && (
+                            <span className="text-[11px] text-[var(--text-muted)] tabular-nums flex-shrink-0">{formatNotifTime(n.createdAt)}</span>
+                          )}
+                        </div>
+                        {n.body && <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">{n.body}</p>}
+                      </>
+                    );
+                    if (href) {
+                      return (
+                        <a
+                          key={n.id}
+                          href={href}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (!n.isRead) markOneRead(n.id);
+                            setNotifOpen(false);
+                            router.push(href);
+                          }}
+                          className={`block ${rowClass}`}
+                        >
+                          {inner}
+                        </a>
+                      );
+                    }
+                    return (
+                      <div key={n.id} className={rowClass}>
+                        {inner}
                       </div>
-                      {n.body && <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">{n.body}</p>}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>,

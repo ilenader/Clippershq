@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StarRating } from "@/components/ui/star-rating";
-import { Inbox, ExternalLink, Star } from "lucide-react";
+import { Inbox, ExternalLink, Star, Ban } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative } from "@/lib/utils";
 import { PostClipModal } from "./post-clip-modal";
 // Phase 7a — bidirectional rating modal, shared with /incoming.
 import { RateUserModal } from "../_shared/rate-user-modal";
+// Phase 10 — skeleton card grid replaces plain "Loading..." text.
+import { SkeletonCardGrid } from "@/components/ui/skeleton-card";
 
 // Phase 6f — payload passed from a SubmissionCard up to the parent so the
 // modal opens with the right submission + display context. Privacy contract:
@@ -84,6 +87,12 @@ export function MySubmissionsClient() {
   // Phase 7a — open-state for the rate-poster modal. Direction on this page
   // is always CREATOR_RATES_POSTER (page is creator-side).
   const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
+  // Phase 10 — track whether the user has EVER seen any submissions in this
+  // session, so the empty-state copy can differentiate "never submitted" from
+  // "this filter has zero hits."
+  const [seenAnyEver, setSeenAnyEver] = useState(false);
+  // Phase 10 cleanup — banned banner mirrors browse-client for UX consistency.
+  const [bannedUntil, setBannedUntil] = useState<string | null>(null);
 
   function buildUrl(cursor?: string | null): string {
     const params = new URLSearchParams();
@@ -99,14 +108,33 @@ export function MySubmissionsClient() {
     try {
       const res = await fetch(buildUrl(), { cache: "no-store" });
       if (!res.ok) {
+        // Phase 10 cleanup — surface 403+bannedUntil as inline banner instead
+        // of a fire-and-forget toast. Mirrors browse-client banned banner.
+        if (res.status === 403) {
+          try {
+            const data = await res.json();
+            if (data?.bannedUntil && typeof data.bannedUntil === "string") {
+              setBannedUntil(data.bannedUntil);
+              setSubmissions([]);
+              setNextCursor(null);
+              return;
+            }
+          } catch {
+            // fall through to generic error
+          }
+        }
         toast.error("Could not load submissions.");
         setSubmissions([]);
         setNextCursor(null);
         return;
       }
       const data = await res.json();
-      setSubmissions(Array.isArray(data?.submissions) ? data.submissions : []);
+      const fetched = Array.isArray(data?.submissions) ? data.submissions : [];
+      setSubmissions(fetched);
       setNextCursor(data?.nextCursor ?? null);
+      setBannedUntil(null);
+      // Phase 10 — flip seenAnyEver once any fetch returns at least one row.
+      if (fetched.length > 0 && !seenAnyEver) setSeenAnyEver(true);
     } catch {
       toast.error("Network error loading submissions.");
     } finally {
@@ -156,6 +184,28 @@ export function MySubmissionsClient() {
         </div>
       </div>
 
+      {/* Phase 10 cleanup — banned banner. Same pattern as browse-client.
+          Existing POSTED submissions remain visible below (read-only via
+          server-side rules), so the banner sits ABOVE the filter pills
+          rather than replacing the list. */}
+      {bannedUntil ? (
+        <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/5 p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-red-500/15">
+              <Ban className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                You&apos;re banned from the marketplace until {formatRelative(bannedUntil)}
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                You can submit clips again on {new Date(bannedUntil).toLocaleString()}. Until then your existing submissions are read-only.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* Filter pills */}
       <div className="mb-6 flex flex-wrap gap-2">
         {FILTERS.map((f) => {
@@ -179,11 +229,39 @@ export function MySubmissionsClient() {
 
       {/* Body */}
       {loading ? (
-        <p className="py-12 text-center text-sm text-[var(--text-muted)]">Loading submissions...</p>
+        // Phase 10 — skeleton grid replaces plain "Loading..." text.
+        <SkeletonCardGrid count={6} />
       ) : submissions.length === 0 ? (
+        // Phase 10 — filter-aware empty state. seenAnyEver differentiates
+        // "you've never submitted" from "this filter has zero hits."
         <div className="flex flex-col items-center gap-2 py-12 text-center">
           <Inbox className="h-8 w-8 text-[var(--text-muted)]" />
-          <p className="text-sm text-[var(--text-muted)]">No submissions in this filter.</p>
+          {seenAnyEver || activeFilter !== "PENDING" ? (
+            <>
+              <p className="text-sm text-[var(--text-muted)]">
+                Nothing in {FILTERS.find((f) => f.value === activeFilter)?.label.toLowerCase() ?? activeFilter}.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveFilter("ALL")}
+                className="mt-2 text-xs font-semibold uppercase tracking-widest text-accent hover:underline"
+              >
+                Show all
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-[var(--text-muted)]">
+                You haven&apos;t submitted any clips yet.
+              </p>
+              <Link
+                href="/marketplace/browse"
+                className="mt-2 text-xs font-semibold uppercase tracking-widest text-accent hover:underline"
+              >
+                Browse listings →
+              </Link>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

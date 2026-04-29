@@ -12,8 +12,10 @@ export default async function MyMarketplaceSubmissionsPage() {
   const session = await getSession();
   const user = session?.user as { id?: string; role?: string | null } | undefined;
 
-  if (!isMarketplaceVisibleForUser(user)) notFound();
-  if (user?.role !== "OWNER") notFound();
+  // Phase 10 — feature flag replaces OWNER hard-gate, mirrors API fix C1.
+  // The API endpoint scopes all rows by creatorId === session.user.id, so
+  // gate the page on the feature flag only.
+  if (!isMarketplaceVisibleForUser(user as any)) notFound();
 
   return <MySubmissionsClient />;
 }

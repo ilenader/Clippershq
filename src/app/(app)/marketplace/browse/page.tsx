@@ -15,8 +15,10 @@ export default async function MarketplaceBrowsePage() {
   const session = await getSession();
   const user = session?.user as { id?: string; role?: string | null } | undefined;
 
-  if (!isMarketplaceVisibleForUser(user)) notFound();
-  if (user?.role !== "OWNER") notFound();
+  // Phase 10 — feature flag replaces OWNER hard-gate, mirrors API fix C1.
+  // Per-resource scoping (browse already excludes own listings) is enforced
+  // in the API. The page itself just gates on the feature flag.
+  if (!isMarketplaceVisibleForUser(user as any)) notFound();
 
   // Active campaigns for the filter dropdown. Listings are NOT prefetched
   // server-side — the client owns filter state and refetches on change.

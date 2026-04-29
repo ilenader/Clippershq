@@ -17,8 +17,10 @@ export default async function IncomingSubmissionsPage() {
   const session = await getSession();
   const user = session?.user as { id?: string; role?: string | null } | undefined;
 
-  if (!isMarketplaceVisibleForUser(user)) notFound();
-  if (user?.role !== "OWNER") notFound();
+  // Phase 10 — feature flag replaces OWNER hard-gate, mirrors API fix C1.
+  // Per-resource scoping (where.listing.userId === session.user.id) stays
+  // enforced server-side in /api/marketplace/submissions/incoming.
+  if (!isMarketplaceVisibleForUser(user as any)) notFound();
 
   return <IncomingSubmissionsClient />;
 }

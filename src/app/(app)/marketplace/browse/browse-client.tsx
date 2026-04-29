@@ -5,9 +5,12 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { Compass, Star, X } from "lucide-react";
+import { Compass, Star, X, Ban } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { SubmitClipModal } from "./submit-clip-modal";
+// Phase 10 — skeleton card grid replaces plain "Loading..." text.
+import { SkeletonCardGrid } from "@/components/ui/skeleton-card";
+import { formatRelative } from "@/lib/utils";
 
 interface SubmitTarget {
   id: string;
@@ -30,6 +33,8 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [submitTarget, setSubmitTarget] = useState<SubmitTarget | null>(null);
+  // Phase 10 — surface marketplace-ban state inline (banner) instead of toast.
+  const [bannedUntil, setBannedUntil] = useState<string | null>(null);
 
   // Track the latest fetch so out-of-order responses don't clobber state.
   const fetchSeqRef = useRef(0);
@@ -50,6 +55,21 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
       const res = await fetch(buildUrl(), { cache: "no-store" });
       if (seq !== fetchSeqRef.current) return; // stale response
       if (!res.ok) {
+        // Phase 10 — surface 403 + bannedUntil as an inline banner instead
+        // of a fire-and-forget toast. Other errors keep the toast pattern.
+        if (res.status === 403) {
+          try {
+            const data = await res.json();
+            if (data?.bannedUntil && typeof data.bannedUntil === "string") {
+              setBannedUntil(data.bannedUntil);
+              setListings([]);
+              setNextCursor(null);
+              return;
+            }
+          } catch {
+            // fall through to generic error
+          }
+        }
         toast.error("Could not load listings.");
         setListings([]);
         setNextCursor(null);
@@ -57,8 +77,10 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
       }
       const data = await res.json();
       if (seq !== fetchSeqRef.current) return;
-      setListings(Array.isArray(data?.listings) ? data.listings : []);
+      const fetched = Array.isArray(data?.listings) ? data.listings : [];
+      setListings(fetched);
       setNextCursor(data?.nextCursor ?? null);
+      setBannedUntil(null);
     } catch {
       if (seq !== fetchSeqRef.current) return;
       toast.error("Network error loading listings.");
@@ -123,6 +145,26 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
         </div>
       </div>
 
+      {/* Phase 10 — banned banner. Replaces the fire-and-forget toast so
+          the user sees the actual ban-until date inline. */}
+      {bannedUntil ? (
+        <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/5 p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-red-500/15">
+              <Ban className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                You&apos;re banned from the marketplace
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                Ban lifts {formatRelative(bannedUntil)} ({new Date(bannedUntil).toLocaleString()}). Until then, you can&apos;t browse or submit clips.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* Filter bar */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="sm:flex-1">
@@ -146,17 +188,25 @@ export function BrowseClient({ campaigns, currentUserId: _currentUserId }: Brows
       </div>
 
       {/* Body */}
-      {loading ? (
-        <p className="py-12 text-center text-sm text-[var(--text-muted)]">Loading listings...</p>
+      {bannedUntil ? null : loading ? (
+        // Phase 10 — skeleton grid replaces plain "Loading..." text.
+        <SkeletonCardGrid count={6} />
       ) : listings.length === 0 ? (
+        // Phase 10 — filter-aware empty state.
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <Compass className="h-10 w-10 text-[var(--text-muted)]" />
-          <p className="text-sm text-[var(--text-muted)]">No active listings match your filters.</p>
           {filtersActive ? (
-            <Button variant="secondary" onClick={clearFilters}>
-              Reset filters
-            </Button>
-          ) : null}
+            <>
+              <p className="text-sm text-[var(--text-muted)]">Nothing matches your filters.</p>
+              <Button variant="secondary" onClick={clearFilters}>
+                Reset filters
+              </Button>
+            </>
+          ) : (
+            <p className="text-sm text-[var(--text-muted)]">
+              No active listings available right now. Check back later as posters add more.
+            </p>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -329,7 +379,11 @@ function BrowseListingCard({
 
       {/* Daily slots — Phase: "X / Y today" surfaces scarcity. When usedToday
           equals slots, no submissions accepted today (server enforces). */}
-      <p className="mb-1 text-sm text-[var(--text-secondary)]">
+      {/* Phase 10 — title attribute tooltip clarifies the X/Y semantics. */}
+      <p
+        className="mb-1 text-sm text-[var(--text-secondary)]"
+        title="Submissions accepted today out of the poster's daily slot limit."
+      >
         <span className="font-bold text-accent">{usedToday}</span>
         <span className="text-[var(--text-muted)]"> / {slots} today</span>
       </p>

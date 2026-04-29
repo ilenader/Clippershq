@@ -9,6 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { ShieldCheck, Check, X, Inbox, Trash2, RotateCcw } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative } from "@/lib/utils";
+// Phase 10 — skeleton loading + in-app confirm modal (replaces window.confirm).
+import { SkeletonCardGrid } from "@/components/ui/skeleton-card";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 
 const MAX_REASON = 1000;
 
@@ -54,6 +57,13 @@ export function MarketplaceAdminClient() {
   const [rejectListing, setRejectListing] = useState<any | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
+
+  // Phase 10 — fade-out before refetch so cards don't pop out abruptly.
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  // Phase 10 — confirm modal targets (replaces window.confirm).
+  const [approveDeletionId, setApproveDeletionId] = useState<string | null>(null);
+  const [cancelDeletionId, setCancelDeletionId] = useState<string | null>(null);
 
   // Build the GET URL with filter, limit, optional cursor, and cache-bust.
   function buildUrl(cursor?: string | null): string {
@@ -118,6 +128,10 @@ export function MarketplaceAdminClient() {
       });
       if (res.ok) {
         toast.success("Listing approved.");
+        // Phase 10 — fade card out before refetch.
+        setRemovingId(id);
+        await new Promise((r) => setTimeout(r, 200));
+        setRemovingId(null);
         await load();
         return;
       }
@@ -140,13 +154,8 @@ export function MarketplaceAdminClient() {
   // override endpoint with status: DELETED rather than introducing a
   // dedicated finalize-delete route. Audit-logged as
   // MARKETPLACE_LISTING_OVERRIDE by the override route already.
+  // Phase 10 — confirmation handled via ConfirmModal (no more window.confirm).
   async function handleApproveDeletion(id: string) {
-    if (typeof window !== "undefined") {
-      const ok = window.confirm(
-        "Permanently delete this listing? In-flight submissions will be left as-is — they're already past the in-flight guard.",
-      );
-      if (!ok) return;
-    }
     setActioning(id);
     try {
       const res = await fetch(`/api/marketplace/admin/listings/${id}/override`, {
@@ -176,11 +185,8 @@ export function MarketplaceAdminClient() {
 
   // Phase 3b-3 — OWNER-side cancel of a pending deletion (mirrors the
   // poster-side flow). Same /cancel-delete endpoint accepts OWNER role.
+  // Phase 10 — confirmation handled via ConfirmModal (no more window.confirm).
   async function handleAdminCancelDeletion(id: string) {
-    if (typeof window !== "undefined") {
-      const ok = window.confirm("Cancel this deletion request and reactivate the listing?");
-      if (!ok) return;
-    }
     setActioning(id);
     try {
       const res = await fetch(`/api/marketplace/listings/${id}/cancel-delete`, {
@@ -235,7 +241,14 @@ export function MarketplaceAdminClient() {
       );
       if (res.ok) {
         toast.success("Listing rejected.");
+        // Phase 10 — fade card out before refetch.
+        const id = rejectListing?.id ?? null;
         closeReject();
+        if (id) {
+          setRemovingId(id);
+          await new Promise((r) => setTimeout(r, 200));
+          setRemovingId(null);
+        }
         await load();
         return;
       }
@@ -294,7 +307,8 @@ export function MarketplaceAdminClient() {
 
       {/* Body */}
       {loading ? (
-        <p className="py-12 text-center text-sm text-[var(--text-muted)]">Loading listings...</p>
+        // Phase 10 — skeleton grid replaces plain "Loading..." text.
+        <SkeletonCardGrid count={6} />
       ) : listings.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-12 text-center">
           <Inbox className="h-8 w-8 text-[var(--text-muted)]" />
@@ -307,10 +321,11 @@ export function MarketplaceAdminClient() {
               key={l.id}
               listing={l}
               actioning={actioning === l.id}
+              fadingOut={removingId === l.id}
               onApprove={() => handleApprove(l.id)}
               onReject={() => openReject(l)}
-              onApproveDeletion={() => handleApproveDeletion(l.id)}
-              onCancelDeletion={() => handleAdminCancelDeletion(l.id)}
+              onApproveDeletion={() => setApproveDeletionId(l.id)}
+              onCancelDeletion={() => setCancelDeletionId(l.id)}
             />
           ))}
         </div>
@@ -323,6 +338,35 @@ export function MarketplaceAdminClient() {
           </Button>
         </div>
       ) : null}
+
+      {/* Phase 10 — Confirm modals replace window.confirm for deletion flows. */}
+      <ConfirmModal
+        open={approveDeletionId !== null}
+        onClose={() => setApproveDeletionId(null)}
+        onConfirm={async () => {
+          const id = approveDeletionId;
+          setApproveDeletionId(null);
+          if (id) await handleApproveDeletion(id);
+        }}
+        title="Approve listing deletion"
+        body="Permanently delete this listing? In-flight submissions are already past the in-flight guard."
+        confirmLabel="Delete listing"
+        confirmVariant="danger"
+        loading={actioning === approveDeletionId}
+      />
+      <ConfirmModal
+        open={cancelDeletionId !== null}
+        onClose={() => setCancelDeletionId(null)}
+        onConfirm={async () => {
+          const id = cancelDeletionId;
+          setCancelDeletionId(null);
+          if (id) await handleAdminCancelDeletion(id);
+        }}
+        title="Cancel deletion request"
+        body="Cancel this deletion request and reactivate the listing?"
+        confirmLabel="Cancel deletion"
+        loading={actioning === cancelDeletionId}
+      />
 
       {/* Reject modal */}
       <Modal
@@ -392,6 +436,7 @@ function AdminListingCard({
   onReject,
   onApproveDeletion,
   onCancelDeletion,
+  fadingOut,
 }: {
   listing: any;
   actioning: boolean;
@@ -399,7 +444,11 @@ function AdminListingCard({
   onReject: () => void;
   onApproveDeletion: () => void;
   onCancelDeletion: () => void;
+  fadingOut: boolean;
 }) {
+  // Phase 10 — Show-more toggle for long audience descriptions. Clamps to 3
+  // lines by default so a long blob doesn't blow up the admin card height.
+  const [audienceExpanded, setAudienceExpanded] = useState(false);
   const status: string = listing.status;
   const badge =
     STATUS_BADGE[status] ?? { variant: "archived" as StatusVariant, label: status };
@@ -408,7 +457,7 @@ function AdminListingCard({
   const isDeletionRequested = status === "DELETION_REQUESTED";
 
   const posterUsername: string = listing.user?.username ?? "(unknown user)";
-  const posterEmail: string = listing.user?.email ?? "";
+  // Phase 10 — email stripped post-Fix-H1 launch-fix (API no longer returns it).
 
   const acctUsername: string = listing.clipAccount?.username ?? "(unknown)";
   const acctPlatform: string = listing.clipAccount?.platform ?? "";
@@ -425,7 +474,11 @@ function AdminListingCard({
   const rejectionReason: string | null = listing.rejectionReason ?? null;
   const createdAt: string | null = listing.createdAt ?? null;
 
+  // Phase 10 — fade-out before refetch on approve/reject.
   return (
+    <div
+      className={`transition-opacity duration-200 ${fadingOut ? "opacity-0" : "opacity-100"}`}
+    >
     <Card>
       {/* Top row: account + status */}
       <div className="mb-3 flex items-start justify-between gap-2">
@@ -446,14 +499,9 @@ function AdminListingCard({
       <p className="mb-1 text-[11px] uppercase tracking-widest text-[var(--text-muted)]">
         Posted by
       </p>
-      <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+      <p className="mb-3 truncate text-sm font-medium text-[var(--text-primary)]">
         {posterUsername}
       </p>
-      {posterEmail ? (
-        <p className="mb-3 truncate text-xs text-[var(--text-muted)]">{posterEmail}</p>
-      ) : (
-        <div className="mb-3" />
-      )}
 
       {/* Campaign */}
       <p className="mb-1 text-[11px] uppercase tracking-widest text-[var(--text-muted)]">
@@ -473,15 +521,28 @@ function AdminListingCard({
         </>
       ) : null}
 
-      {/* Audience */}
+      {/* Audience — Phase 10 line-clamp + Show more toggle */}
       {audience ? (
         <>
           <p className="mb-1 text-[11px] uppercase tracking-widest text-[var(--text-muted)]">
             Audience
           </p>
-          <p className="mb-3 whitespace-pre-wrap text-sm text-[var(--text-secondary)]">
+          <p
+            className={`whitespace-pre-wrap text-sm text-[var(--text-secondary)] ${audienceExpanded ? "" : "line-clamp-3"}`}
+          >
             {audience}
           </p>
+          {audience.length > 180 ? (
+            <button
+              type="button"
+              onClick={() => setAudienceExpanded((v) => !v)}
+              className="mt-1 mb-3 text-[11px] uppercase tracking-widest text-accent hover:underline"
+            >
+              {audienceExpanded ? "Show less" : "Show more"}
+            </button>
+          ) : (
+            <div className="mb-3" />
+          )}
         </>
       ) : null}
 
@@ -496,12 +557,11 @@ function AdminListingCard({
           </p>
         </div>
         <div>
-          <p className="text-base font-bold text-accent">
-            {slots}
-            <span className="text-xs text-[var(--text-muted)]"> / 10</span>
-          </p>
+          {/* Phase 10 — drop hardcoded "/ 10" denominator. dailySlotCount IS
+              the listing's max, not a usage ratio. */}
+          <p className="text-base font-bold text-accent">{slots}</p>
           <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
-            Daily slots
+            Slots/day
           </p>
         </div>
       </div>
@@ -594,5 +654,6 @@ function AdminListingCard({
         <p className="text-xs italic text-[var(--text-muted)]">Read-only.</p>
       )}
     </Card>
+    </div>
   );
 }

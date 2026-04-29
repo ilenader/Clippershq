@@ -10,6 +10,8 @@ import { StarRating } from "@/components/ui/star-rating";
 import { Inbox, ExternalLink, Check, X as XIcon, Filter, Star, AlertTriangle } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatRelative } from "@/lib/utils";
+// Phase 10 — skeleton card grid replaces plain "Loading..." text.
+import { SkeletonCardGrid } from "@/components/ui/skeleton-card";
 // Phase: re-use the existing Mark-as-posted modal from the creator-side
 // my-submissions page rather than duplicating it. The modal is identical
 // from the poster's POV: same submissionId-keyed POST to
@@ -101,6 +103,12 @@ export function IncomingSubmissionsClient() {
   // Phase 7a — open-state for the rate modal. Rating direction on this page
   // is always POSTER_RATES_CREATOR (the page is OWNER/poster-side).
   const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
+  // Phase 10 — fade-out before refetch on approve/reject so cards don't pop.
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  // Phase 10 — track whether the user has EVER seen any incoming submissions
+  // in this session, so the empty-state copy can differentiate "nobody has
+  // submitted to your listings yet" from "this filter has zero hits."
+  const [seenAnyEver, setSeenAnyEver] = useState(false);
 
   // Out-of-order fetch protection — same pattern used in browse-client.
   const fetchSeqRef = useRef(0);
@@ -129,8 +137,11 @@ export function IncomingSubmissionsClient() {
       }
       const data = await res.json();
       if (seq !== fetchSeqRef.current) return;
-      setSubmissions(Array.isArray(data?.submissions) ? data.submissions : []);
+      const fetched = Array.isArray(data?.submissions) ? data.submissions : [];
+      setSubmissions(fetched);
       setNextCursor(data?.nextCursor ?? null);
+      // Phase 10 — once we've seen any rows in any fetch, flip seenAnyEver.
+      if (fetched.length > 0 && !seenAnyEver) setSeenAnyEver(true);
     } catch {
       if (seq !== fetchSeqRef.current) return;
       toast.error("Network error loading submissions.");
@@ -173,7 +184,12 @@ export function IncomingSubmissionsClient() {
         method: "POST",
       });
       if (res.ok) {
-        toast.success("Submission approved. Creator can now post within 24h.");
+        // Phase 10 — trim verbose toast (bell + email already explain "post within 24h").
+        toast.success("Submission approved.");
+        // Phase 10 — fade card out before refetch.
+        setRemovingId(submissionId);
+        await new Promise((r) => setTimeout(r, 200));
+        setRemovingId(null);
         await load();
         return;
       }
@@ -291,21 +307,39 @@ export function IncomingSubmissionsClient() {
 
       {/* Body */}
       {loading ? (
-        <p className="py-12 text-center text-sm text-[var(--text-muted)]">
-          Loading submissions...
-        </p>
+        // Phase 10 — skeleton grid replaces plain "Loading..." text.
+        <SkeletonCardGrid count={6} />
       ) : submissions.length === 0 ? (
+        // Phase 10 — filter-aware empty state. seenAnyEver differentiates
+        // "you've never had a submission" from "this filter has zero hits."
         <div className="flex flex-col items-center gap-2 py-12 text-center">
           <Inbox className="h-8 w-8 text-[var(--text-muted)]" />
-          <p className="text-sm text-[var(--text-muted)]">
-            No submissions yet. They&apos;ll appear here when creators submit clips to your active listings.
-          </p>
-          <Link
-            href="/marketplace"
-            className="mt-2 text-xs font-semibold uppercase tracking-widest text-accent hover:underline"
-          >
-            Back to my listings
-          </Link>
+          {seenAnyEver || activeFilter !== "PENDING" ? (
+            <>
+              <p className="text-sm text-[var(--text-muted)]">
+                Nothing in {FILTERS.find((f) => f.value === activeFilter)?.label.toLowerCase() ?? activeFilter}.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveFilter("ALL")}
+                className="mt-2 text-xs font-semibold uppercase tracking-widest text-accent hover:underline"
+              >
+                Show all
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-[var(--text-muted)]">
+                No submissions yet. They&apos;ll appear here when creators submit clips to your active listings.
+              </p>
+              <Link
+                href="/marketplace"
+                className="mt-2 text-xs font-semibold uppercase tracking-widest text-accent hover:underline"
+              >
+                View my listings
+              </Link>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -314,6 +348,7 @@ export function IncomingSubmissionsClient() {
               key={s.id}
               submission={s}
               actioning={actioning === s.id}
+              fadingOut={removingId === s.id}
               onApprove={() => handleApprove(s.id)}
               onReject={() => openReject(s)}
               onMarkAsPosted={() => openMarkAsPosted(s)}
@@ -385,6 +420,7 @@ function formatHoursLeft(hours: number): string {
 function IncomingSubmissionCard({
   submission,
   actioning,
+  fadingOut,
   onApprove,
   onReject,
   onMarkAsPosted,
@@ -392,6 +428,7 @@ function IncomingSubmissionCard({
 }: {
   submission: any;
   actioning: boolean;
+  fadingOut: boolean;
   onApprove: () => void;
   onReject: () => void;
   onMarkAsPosted: () => void;
@@ -438,7 +475,11 @@ function IncomingSubmissionCard({
     status === "APPROVED" && postDeadline ? hoursLeftUntil(postDeadline) : null;
   const postDeadlinePassed = postHoursLeft !== null && postHoursLeft <= 0;
 
+  // Phase 10 — fade-out before refetch on approve/reject.
   return (
+    <div
+      className={`transition-opacity duration-200 ${fadingOut ? "opacity-0" : "opacity-100"}`}
+    >
     <Card>
       {/* Header: target account + status */}
       <div className="mb-3 flex items-start justify-between gap-2">
@@ -673,5 +714,6 @@ function IncomingSubmissionCard({
         </Button>
       ) : null}
     </Card>
+    </div>
   );
 }

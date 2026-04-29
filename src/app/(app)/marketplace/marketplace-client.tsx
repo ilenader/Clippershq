@@ -7,12 +7,14 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ShoppingBag, Plus, Pause, Play, Pencil, Trash2, ShieldCheck, Compass, Inbox } from "lucide-react";
+import { ShoppingBag, Plus, Pause, Play, Pencil, Trash2, ShieldCheck, Compass, Inbox, Sparkles } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { CreateListingModal } from "./create-listing-modal";
 // Phase 3b-3 — wire pause/edit/request-delete buttons.
 import { EditListingModal } from "./edit-listing-modal";
 import { RequestDeleteModal } from "./request-delete-modal";
+// Phase 10 — in-app confirm modal replaces window.confirm.
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 
 interface MarketplaceClientProps {
   listings: any[];
@@ -82,6 +84,8 @@ export function MarketplaceClient({
   // while a fetch is mid-flight to prevent double-clicks against the same
   // listing.
   const [actioningId, setActioningId] = useState<string | null>(null);
+  // Phase 10 — confirm-modal target id (replaces window.confirm).
+  const [cancelDeletionId, setCancelDeletionId] = useState<string | null>(null);
 
   function openCreate() {
     setCreateOpen(true);
@@ -145,16 +149,10 @@ export function MarketplaceClient({
     });
   }
 
-  // Phase 3b-3 — cancel a pending deletion. Lightweight confirmation via
-  // window.confirm (modal would be overkill — single endpoint, no extra
-  // input, fully reversible).
-  async function handleCancelDelete(listing: any) {
+  // Phase 3b-3 — cancel a pending deletion.
+  // Phase 10 — confirmation handled via ConfirmModal (replaces window.confirm).
+  async function performCancelDelete(id: string) {
     if (actioningId) return;
-    const id: string = listing.id;
-    if (typeof window !== "undefined") {
-      const ok = window.confirm("Cancel deletion request and reactivate this listing?");
-      if (!ok) return;
-    }
     setActioningId(id);
     try {
       const res = await fetch(`/api/marketplace/listings/${id}/cancel-delete`, {
@@ -212,37 +210,34 @@ export function MarketplaceClient({
             </p>
           </div>
         </div>
+        {/* Phase 10 — compact OWNER button row. Browse/My submissions/Review
+            stay full buttons. Admin queue collapses to icon-only on mobile,
+            full label on sm+. Create stays as the primary rightmost CTA. */}
         <div className="flex flex-wrap gap-2">
+          <Link href="/marketplace/browse">
+            <Button variant="secondary" icon={<Compass className="h-4 w-4" />}>
+              Browse
+            </Button>
+          </Link>
+          <Link href="/marketplace/my-submissions">
+            <Button variant="secondary" icon={<Inbox className="h-4 w-4" />}>
+              My submissions
+            </Button>
+          </Link>
+          <Link href="/marketplace/incoming">
+            <Button variant="secondary" icon={<Inbox className="h-4 w-4" />}>
+              Review submissions
+            </Button>
+          </Link>
           {currentUser.role === "OWNER" ? (
-            <Link href="/marketplace/browse">
-              <Button variant="secondary" icon={<Compass className="h-4 w-4" />}>
-                Browse marketplace
-              </Button>
-            </Link>
-          ) : null}
-          {currentUser.role === "OWNER" ? (
-            <Link href="/marketplace/my-submissions">
-              <Button variant="secondary" icon={<Inbox className="h-4 w-4" />}>
-                My submissions
-              </Button>
-            </Link>
-          ) : null}
-          {/* Phase: poster-review entry point. Drives users to the new
-              /marketplace/incoming page that consumes the existing
-              /api/marketplace/submissions/incoming endpoint. Posters click
-              individual listing cards' "Submitted" stat to drill in with a
-              ?listingId= filter. */}
-          {currentUser.role === "OWNER" ? (
-            <Link href="/marketplace/incoming">
-              <Button variant="secondary" icon={<Inbox className="h-4 w-4" />}>
-                Review submissions
-              </Button>
-            </Link>
-          ) : null}
-          {currentUser.role === "OWNER" ? (
-            <Link href="/marketplace/admin">
+            <Link
+              href="/marketplace/admin"
+              aria-label="Admin queue"
+              title="Admin queue"
+              className="inline-flex"
+            >
               <Button variant="secondary" icon={<ShieldCheck className="h-4 w-4" />}>
-                Admin queue
+                <span className="hidden sm:inline">Admin queue</span>
               </Button>
             </Link>
           ) : null}
@@ -254,16 +249,36 @@ export function MarketplaceClient({
 
       {/* Listings */}
       {listings.length === 0 ? (
-        <EmptyState
-          icon={<ShoppingBag className="h-10 w-10" />}
-          title="You haven't listed any accounts yet"
-          description="Create your first listing to get started."
-          action={
-            <Button onClick={openCreate} icon={<Plus className="h-4 w-4" />}>
-              Create new listing
-            </Button>
-          }
-        />
+        <>
+          {/* Phase 10 — first-time explainer card above the EmptyState. Only
+              renders when the poster has zero listings; once they create one
+              the loop is self-explanatory and the hero would just take space. */}
+          <div className="mb-4 rounded-2xl border border-accent/20 bg-accent/5 p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-accent/15">
+                <Sparkles className="h-5 w-5 text-accent" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  Welcome to the marketplace
+                </p>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  Posters list verified social accounts here. Creators submit clips to your listings. When you post their clips, you earn 30% and they earn 60% of campaign revenue. Get started by listing your first account below.
+                </p>
+              </div>
+            </div>
+          </div>
+          <EmptyState
+            icon={<ShoppingBag className="h-10 w-10" />}
+            title="You haven't listed any accounts yet"
+            description="Create your first listing to get started."
+            action={
+              <Button onClick={openCreate} icon={<Plus className="h-4 w-4" />}>
+                Create new listing
+              </Button>
+            }
+          />
+        </>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {listings.map((l) => (
@@ -274,7 +289,7 @@ export function MarketplaceClient({
               onPauseToggle={() => handlePauseToggle(l)}
               onEdit={() => handleEdit(l)}
               onRequestDelete={() => handleRequestDelete(l)}
-              onCancelDelete={() => handleCancelDelete(l)}
+              onCancelDelete={() => setCancelDeletionId(l.id)}
             />
           ))}
         </div>
@@ -312,6 +327,21 @@ export function MarketplaceClient({
               }
             : null
         }
+      />
+
+      {/* Phase 10 — ConfirmModal replaces window.confirm for cancel-deletion. */}
+      <ConfirmModal
+        open={cancelDeletionId !== null}
+        onClose={() => setCancelDeletionId(null)}
+        onConfirm={async () => {
+          const id = cancelDeletionId;
+          setCancelDeletionId(null);
+          if (id) await performCancelDelete(id);
+        }}
+        title="Cancel deletion request"
+        body="Cancel deletion request and reactivate this listing?"
+        confirmLabel="Cancel deletion"
+        loading={actioningId === cancelDeletionId}
       />
     </div>
   );
@@ -387,7 +417,11 @@ function ListingCard({
 
       {/* Slot count — Phase: honest "X / Y today" instead of the previous
           "{slotCount} / 10" literal. usedToday is a 24h trailing window. */}
-      <p className="mb-3 text-sm text-[var(--text-secondary)]">
+      {/* Phase 10 — title attribute tooltip clarifies the X/Y semantics. */}
+      <p
+        className="mb-3 text-sm text-[var(--text-secondary)]"
+        title="Submissions accepted today out of the listing's daily slot limit."
+      >
         <span className="font-bold text-accent">{usedToday}</span>
         <span className="text-[var(--text-muted)]"> / {slotCount} today</span>
       </p>
